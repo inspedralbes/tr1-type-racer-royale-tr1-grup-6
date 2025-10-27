@@ -1,33 +1,41 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
+// servidor.js
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "*", // Permet connexions des de qualsevol origen (per a desenvolupament)
   },
 });
 
-const PORT = process.env.PORT || 3000;
+const jugadors = {};
+console.log("Servidor Socket.IO escoltant al port 29845");
 
-app.get("/", (req, res) => {
-  res.send("TypeRacbackend is naadaing");
-});
+// Funció per enviar la llista de jugadors actualitzada a TOTHOM
+function broadcastPlayerList() {
+  io.emit("updatePlayerList", Object.values(jugadors));
+}
 
+// Lògica de connexió de Socket.IO
 io.on("connection", (socket) => {
-  console.log("a user connected:", socket.id);
+  console.log(`Un usuari s'ha connectat: ${socket.id}`);
 
-  socket.on("typing", (data) => {
-    socket.broadcast.emit("typing", data);
-  });
-
+  // Quan un usuari es desconnecta
   socket.on("disconnect", () => {
-    console.log("user disconnected:", socket.id);
+    console.log(`L'usuari ${socket.id} s'ha desconnectat`);
+    delete jugadors[socket.id];
+    broadcastPlayerList(); // Informem a la resta que algú ha marxat
+  });
+
+  // Quan un usuari ens envia el seu nom
+  socket.on("setPlayerName", (name) => {
+    jugadors[socket.id] = { id: socket.id, name: name };
+    console.log(`L'usuari ${socket.id} ara es diu: ${name}`);
+    broadcastPlayerList(); // Enviem la llista actualitzada a tothom
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Serv listening on port ${PORT}`);
-});
+server.listen(29845);
