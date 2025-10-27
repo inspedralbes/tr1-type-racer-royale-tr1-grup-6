@@ -1,5 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+const props = defineProps({
+  initialWords: { type: Array, default: () => [] },
+});
 const filesDelTeclat = ref([
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
@@ -30,6 +33,17 @@ function handleKeyDown(event) {
 }
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+  // Si el servidor ha passat paraules inicials, les usem
+  if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
+    estatDelJoc.value.paraules = props.initialWords.map((w, i) => ({
+      id: i + 1,
+      text: w,
+      estat: "pendent",
+      errors: 0,
+    }));
+    estatDelJoc.value.indexParaulaActiva = 0;
+  }
+
   estatDelJoc.value.paraules.forEach((p) => {
     if (
       !Array.isArray(p.letterErrors) ||
@@ -73,11 +87,13 @@ function validarProgres() {
   if (typed === target) {
     const tempsTrigat = Date.now() - tempsIniciParaula;
 
-    estatDelJoc.value.estadistiques.push({
-      paraula: paraulaActiva.value.text,
-      temps: tempsTrigat,
-      errors: paraulaActiva.value.errors,
-    });
+    // Registrado de estadísticas deshabilitado por petición del equipo
+    // Descomentar si se desea registrar datos de cada palabra
+    // estatDelJoc.value.estadistiques.push({
+    //   paraula: paraulaActiva.value.text,
+    //   temps: tempsTrigat,
+    //   errors: paraulaActiva.value.errors,
+    // });
 
     paraulaActiva.value.estat = "completada";
 
@@ -102,9 +118,10 @@ function validarProgres() {
         next.errors = 0;
       }
     } else {
-      // Joc acabat!
-      JuegoTerminado.value = true;
-      console.log("Joc acabat!", estatDelJoc.value.estadistiques);
+      // Fin del juego: mostrar estadísticas deshabilitado
+      // Si se desea volver a activar, descomentar las siguientes líneas
+      // JuegoTerminado.value = true;
+      // console.log("Joc acabat!", estatDelJoc.value.estadistiques);
     }
   }
 }
@@ -185,6 +202,7 @@ const paraulaActiva = computed(() => {
           {{ lletra }}
         </div>
       </div>
+      <!-- Estadísticas al final del juego: comentadas por petición del equipo
       <div v-if="JuegoTerminado" class="estadisticas">
         <h2>¡Juego terminado! Estadísticas:</h2>
         <div
@@ -200,6 +218,7 @@ const paraulaActiva = computed(() => {
           </p>
         </div>
       </div>
+      -->
     </div>
   </div>
 </template>

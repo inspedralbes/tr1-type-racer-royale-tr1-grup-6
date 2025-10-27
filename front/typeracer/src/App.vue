@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import GameEngine from "./components/GameEngine.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
@@ -8,7 +8,20 @@ const vistaActual = ref("salaEspera"); // 'salaEspera', 'lobby', 'joc'
 
 // Estado de conexión
 const nomJugador = ref("");
-const jugadors = ref([]);
+const playersPayload = ref({ players: [], hostId: null });
+const socketId = ref(null);
+const isReady = ref(false);
+const playerWords = ref([]);
+
+const jugadors = computed(() => playersPayload.value.players || []);
+const hostId = computed(() => playersPayload.value.hostId || null);
+const isHost = computed(
+  () => socketId.value && hostId.value === socketId.value
+);
+const allReady = computed(() => {
+  const p = playersPayload.value.players || [];
+  return p.length > 0 && p.every((x) => x.ready === true);
+});
 
 function connectarAlServidor() {
   if (nomJugador.value.trim() === "") {
@@ -16,16 +29,43 @@ function connectarAlServidor() {
     return;
   }
 
+  // Registrar callbacks
+  communicationManager.onConnect((id) => {
+    socketId.value = id;
+  });
+
+  communicationManager.onUpdatePlayerList((payload) => {
+    // payload: { players: [...], hostId }
+    playersPayload.value = payload;
+  });
+
+  communicationManager.onGameStart((payload) => {
+    // payload: { wordsByPlayer: { [id]: [...] }, maxStack, startAt }
+    const ownId = socketId.value;
+    if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
+      playerWords.value = payload.wordsByPlayer[ownId];
+    } else {
+      playerWords.value = [];
+    }
+    // Cambiar a vista de juego
+    vistaActual.value = "joc";
+  });
+
   // Connecta i envia el nom
   communicationManager.connect(nomJugador.value);
 
-  // Escolta la llista de jugadors
-  communicationManager.onUpdatePlayerList((llistaDeJugadors) => {
-    jugadors.value = llistaDeJugadors;
-  });
-
   // Canvia la vista al lobby
   vistaActual.value = "lobby";
+}
+
+function toggleReady() {
+  isReady.value = !isReady.value;
+  communicationManager.setReady(isReady.value);
+}
+
+function startGameByHost() {
+  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
+  communicationManager.requestStart();
 }
 </script>
 
@@ -47,10 +87,26 @@ function connectarAlServidor() {
       <h2>Jugadors Connectats</h2>
       <ul>
         <li v-for="jugador in jugadors" :key="jugador.id">
-          {{ jugador.name }}
+          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
+          <span v-if="jugador.id === hostId"> — host</span>
         </li>
       </ul>
-      <button @click="vistaActual = 'joc'">Comença a Jugar!</button>
+
+      <div style="margin-top: 10px">
+        <button @click="toggleReady">
+          {{ isReady ? "Unready" : "Ready" }}
+        </button>
+
+        <!-- Start visible only to host; server will check que todos estén ready -->
+        <button
+          v-if="isHost"
+          @click="startGameByHost"
+          :disabled="!allReady"
+          style="margin-left: 8px"
+        >
+          Start (host)
+        </button>
+      </div>
     </div>
 
     <!-- VISTA 3: JOC -->

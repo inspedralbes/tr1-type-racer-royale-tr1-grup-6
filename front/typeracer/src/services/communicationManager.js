@@ -6,6 +6,13 @@ const socket = io("http://localhost:3000", {
   autoConnect: false,
 });
 
+let onConnectCb = null;
+
+socket.on("connect", () => {
+  console.log("Socket connected, id=", socket.id);
+  if (typeof onConnectCb === "function") onConnectCb(socket.id);
+});
+
 const communicationManager = {
   // Funció per connectar-se i enviar el nom del jugador
   connect(playerName) {
@@ -18,9 +25,28 @@ const communicationManager = {
     });
   },
 
+  // Registrar callback per quan s'estableix la connexió i tenim socket.id
+  onConnect(callback) {
+    onConnectCb = callback;
+  },
+
   // Funcions per ESCOLTAR esdeveniments del servidor
   onUpdatePlayerList(callback) {
     socket.on("updatePlayerList", callback);
+  },
+
+  onGameStart(callback) {
+    socket.on("gameStart", callback);
+  },
+
+  // Envia que l'usuari està ready / no-ready
+  setReady(ready) {
+    socket.emit("clientReady", { ready });
+  },
+
+  // Sol·licitud explícita del host per iniciar la partida
+  requestStart() {
+    socket.emit("startGame");
   },
 
   // Exemple de funció per enviar un missatge (es podrà ampliar)
