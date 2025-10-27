@@ -12,7 +12,7 @@ const io = new Server(server, {
 });
 
 const jugadors = {};
-console.log("Servidor Socket.IO escoltant al port 29845");
+console.log("Servidor Socket.IO escoltant al port 3000");
 
 // Funció per enviar la llista de jugadors actualitzada a TOTHOM
 function broadcastPlayerList() {
@@ -38,4 +38,4 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(29845);
+server.listen(3000);

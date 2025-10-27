@@ -2,7 +2,7 @@
 import { io } from "socket.io-client";
 
 // Creem una única instància del socket per a tota l'aplicació
-const socket = io("", {
+const socket = io("http://localhost:3000", {
   autoConnect: false,
 });
 
