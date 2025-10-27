@@ -1,16 +1,40 @@
-# transversals
-Esquema mínim de carpetes pels projectes transversals
+# Transversals
 
-És obligatori seguir aquesta estructura tot i que la podeu ampliar.
+Esquema mínim de carpetes per als projectes transversals.
+
+És obligatori seguir aquesta estructura, tot i que la podeu ampliar.
+
+---
 
 ## Atenció
-Un cop comenceu heu de canviar aquesta explicació amb la corresponent al vostre projecte (utilitzant markdown)
 
-# Aquest fitxer ha de contenir com a mínim:
- * Nom dels integrants
- * Nom del projecte
- * Petita descripció
- * Adreça del gestor de tasques (taiga, jira, trello...)
- * Adreça del prototip gràfic del projecte (Penpot, figma, moqups...)
- * URL de producció (quan la tingueu)
- * Estat: (explicació d'en quin punt està)
+Un cop comenceu, heu de canviar aquesta explicació amb la corresponent al vostre projecte (utilitzant markdown).
+
+---
+
+# Informació del projecte
+
+## Integrants
+- Brian Briones
+- Amin Oulad
+- Iker Delgado
+- David Quispe
+- Adrian Maciel
+
+## Nom del projecte
+**Type Racer Royale**
+
+## Descripció
+Joc de mecanografia multijugador.
+
+## Gestor de tasques
+[Taiga](https://taiga.io)  
+
+## Prototip gràfic
+[Penpot](https://penpot.app)  
+
+## URL de producció
+*(A omplir quan estigui disponible)*
+
+## Estat
+Estat inicial: planejament de les funcions del projecte.
