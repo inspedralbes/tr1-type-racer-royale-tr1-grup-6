@@ -8,19 +8,19 @@ Un cop comenceu heu de canviar aquesta explicació amb la corresponent al vostre
 
 # Aquest fitxer ha de contenir com a mínim:
  * Nom dels integrants:
-     -Brian Briones
-     -Amin Oulad
-     -Iker Delgado
-     -David Quispe
-     -Adrian Maciel
+     *Brian Briones
+     *Amin Oulad
+     *Iker Delgado
+     *David Quispe
+     *Adrian Maciel
  * Nom del projecte
-     Type Racer Royale
+     *Type Racer Royale
  * Petita descripció
-      Joc de mecanografia multijugador
+      *Joc de mecanografia multijugador
  * Adreça del gestor de tasques (taiga, jira, trello...)
-    Taiga
+    *Taiga
  * Adreça del prototip gràfic del projecte (Penpot, figma, moqups...)
-     Penpot
+     *Penpot
  * URL de producció (quan la tingueu)
  * Estat: (explicació d'en quin punt està)
-     Estat inicial: planejament de les funcions del projecte
+     *Estat inicial: planejament de les funcions del projecte
