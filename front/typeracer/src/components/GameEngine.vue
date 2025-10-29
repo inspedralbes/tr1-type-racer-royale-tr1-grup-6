@@ -4,6 +4,7 @@ import communicationManager from "../services/communicationManager.js";
 
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
+  players: { type: Array, default: () => [] },
 });
 const filesDelTeclat = ref([
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -26,7 +27,6 @@ const estatDelJoc = ref({
 });
 
 const progresJuagdor = ref(0);
-const jugadors = ref([]);
 
 let tempsIniciParaula = 0;
 
@@ -39,9 +39,9 @@ function handleKeyDown(event) {
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
 
-  communicationManager.onPlayerProgressUpdate((updatedPlayers) => {
-    jugadors.value = updatedPlayers;
-  });
+  // actualizaciones de progreso pueden venir por socket; si queremos usarlas
+  // podemos escucharlas aquí, pero por ahora preferimos recibir `players`
+  // desde el padre (App.vue) y usar `props.players` para mostrar nombres.
 
   // Si el servidor ha passat paraules inicials, les usem
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
@@ -105,13 +105,9 @@ function validarProgres() {
     //   errors: paraulaActiva.value.errors,
     // });
 
-    // Actualitzar el progrés del jugador
-    progresJuagdor.value =
-      ((estatDelJoc.value.indexParaulaActiva + 1) /
-        estatDelJoc.value.paraules.length) *
-      100;
-
-    communicationManager.updatePlayerProgress(progresJuagdor.value);
+    // número de palabras completadas (antes de incrementar index)
+    const completedCount = estatDelJoc.value.indexParaulaActiva + 1;
+    communicationManager.updatePlayerProgress(completedCount);
 
     paraulaActiva.value.estat = "completada";
 
@@ -182,49 +178,57 @@ function calculateProgress(completedWords) {
 </script>
 <template>
   <div class="game-engine">
-    <div class="paraules-container">
-      <!-- Iterem sobre la llista de paraules -->
-      <div
-        v-for="(paraula, index) in estatDelJoc.paraules"
-        :key="paraula.id"
-        class="paraula"
-        :class="{ 'paraula-activa': index === estatDelJoc.indexParaulaActiva }"
-      >
-        <!-- Més endavant mostrarem les lletres aquí -->
-        <template v-if="index === estatDelJoc.indexParaulaActiva">
-          <span
-            v-for="(lletra, i) in paraula.text.split('')"
-            :key="i"
-            class="lletra"
-            :class="getClasseLletra(i)"
+    <div class="game-layout">
+      <div class="game-main">
+        <div class="paraules-container">
+          <!-- Iterem sobre la llista de paraules -->
+          <div
+            v-for="(paraula, index) in estatDelJoc.paraules"
+            :key="paraula.id"
+            class="paraula"
+            :class="{
+              'paraula-activa': index === estatDelJoc.indexParaulaActiva,
+            }"
           >
-            {{ lletra }}
-          </span>
-        </template>
-        <template v-else>
-          {{ paraula.text }}
-        </template>
-      </div>
-    </div>
-    <input
-      type="text"
-      class="text-input"
-      v-model="estatDelJoc.textEntrat"
-      @input="validarProgres"
-      placeholder="Comença a escriure..."
-    />
-    <div class="teclat">
-      <div v-for="(fila, fIndex) in filesDelTeclat" :key="fIndex" class="fila">
-        <div
-          v-for="lletra in fila"
-          :key="lletra"
-          class="tecla"
-          :class="{ 'tecla-premuda': teclaPremuda === lletra }"
-        >
-          {{ lletra }}
+            <!-- Més endavant mostrarem les lletres aquí -->
+            <template v-if="index === estatDelJoc.indexParaulaActiva">
+              <span
+                v-for="(lletra, i) in paraula.text.split('')"
+                :key="i"
+                class="lletra"
+                :class="getClasseLletra(i)"
+              >
+                {{ lletra }}
+              </span>
+            </template>
+            <template v-else>
+              {{ paraula.text }}
+            </template>
+          </div>
         </div>
-      </div>
-      <!-- Estadísticas al final del juego: comentadas por petición del equipo
+        <input
+          type="text"
+          class="text-input"
+          v-model="estatDelJoc.textEntrat"
+          @input="validarProgres"
+          placeholder="Comença a escriure..."
+        />
+        <div class="teclat">
+          <div
+            v-for="(fila, fIndex) in filesDelTeclat"
+            :key="fIndex"
+            class="fila"
+          >
+            <div
+              v-for="lletra in fila"
+              :key="lletra"
+              class="tecla"
+              :class="{ 'tecla-premuda': teclaPremuda === lletra }"
+            >
+              {{ lletra }}
+            </div>
+          </div>
+          <!-- Estadísticas al final del juego: comentadas por petición del equipo
       <div v-if="JuegoTerminado" class="estadisticas">
         <h2>¡Juego terminado! Estadísticas:</h2>
         <div
@@ -241,29 +245,21 @@ function calculateProgress(completedWords) {
         </div>
       </div>
       -->
-      <div class="sidebar">
+        </div>
+      </div>
+
+      <!-- Lateral: lista compacta de jugadores -->
+      <aside class="players-sidebar">
         <h3>Jugadors</h3>
         <ul>
-          <li
-            v-for="(jugador, index) in jugadors"
-            :key="jugador.id"
-            class="player"
-          >
-            <div class="player-name">{{ jugador.name }}</div>
-            <div class="player-progress">
-              <div
-                class="progress-bar"
-                :style="{
-                  width: calculateProgress(jugador.completedWords) + '%',
-                }"
-              ></div>
-            </div>
-            <div class="words-completed">
-              {{ jugador.completedWords }} paraules
-            </div>
+          <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+            <span class="player-name-text">{{ p.name }}</span>
+            <span class="completed-count"
+              >Paraules fetes: {{ p.completedWords || 0 }}</span
+            >
           </li>
         </ul>
-      </div>
+      </aside>
     </div>
   </div>
 </template>
@@ -328,6 +324,74 @@ function calculateProgress(completedWords) {
 .words-completed {
   font-size: 12px;
   color: #555;
+}
+
+/* Inline players list inside the GameEngine (simple) */
+.players-inline {
+  margin-top: 12px;
+  padding: 4px;
+}
+.players-inline h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  text-align: left;
+  color: #ddd;
+}
+.players-inline ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.player-name-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: transparent;
+  border-radius: 4px;
+  box-shadow: none;
+  border: none;
+  color: #eee;
+  font-weight: 600;
+}
+.player-name-text {
+  font-weight: 600;
+}
+.completed-count {
+  font-size: 12px;
+  color: #bbb;
+}
+
+/* Layout: game main + sidebar */
+.game-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: nowrap; /* evitar que la sidebar baje debajo del contenido */
+  justify-content: center; /* centrar conjunto en pantallas grandes */
+}
+.game-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 720px; /* limitar ancho del área principal para dejar sitio a la sidebar */
+}
+.players-sidebar {
+  flex: 0 0 220px; /* ancho fijo, no se encoge */
+  background: transparent;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: none;
+  align-self: flex-start;
+  position: sticky;
+  top: 20px; /* la hace visible al hacer scroll */
+}
+.players-sidebar h3 {
+  margin: 0 0 8px 0;
+  text-align: left;
+  color: #ddd;
+  font-weight: 700;
 }
 
 .sidebar {

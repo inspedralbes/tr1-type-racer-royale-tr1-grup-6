@@ -50,12 +50,17 @@ const communicationManager = {
   },
 
   // Enviar que l'usuari ha completat una paraula
-  updatePlayerProgress(progress){
-    socket.emit("updatePlayerProgress", progress);
+  updatePlayerProgress(progress) {
+    // progress puede ser un número (completedWords) o un objeto
+    if (typeof progress === "number") {
+      socket.emit("updatePlayerProgress", { completedWords: progress });
+    } else {
+      socket.emit("updatePlayerProgress", progress);
+    }
   },
 
   // Escoltar actualitzacions del progrés dels jugadors
-  onPlayerProgressUpdate(callback){
+  onPlayerProgressUpdate(callback) {
     socket.on("playerProgressUpdate", callback);
   },
 

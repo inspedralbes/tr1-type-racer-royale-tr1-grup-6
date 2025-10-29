@@ -65,6 +65,7 @@ io.on("connection", (socket) => {
     name: `Jugador-${socket.id.slice(0, 4)}`,
     ready: false,
     eliminated: false,
+    completedWords: 0,
   };
 
   // Si no hay host, este será el host (primer usuario)
@@ -102,6 +103,20 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Actualizaciones de progreso desde clientes: { completedWords } o número
+  socket.on("updatePlayerProgress", (payload) => {
+    let completed = 0;
+    if (typeof payload === "number") completed = payload;
+    else if (payload && typeof payload.completedWords === "number")
+      completed = payload.completedWords;
+
+    if (jugadors[socket.id]) {
+      jugadors[socket.id].completedWords = completed;
+      // Emitimos la lista actualizada para que todos vean los nuevos contadores
+      broadcastPlayerList();
+    }
+  });
+
   // Handler por si el host pulsa un botón para iniciar la partida
   socket.on("startGame", () => {
     if (socket.id !== hostId) {
@@ -123,7 +138,7 @@ io.on("connection", (socket) => {
     console.log("gameStart emitido por el host");
   });
 
-  socket.on ("completeWord", (word) => {
+  socket.on("completeWord", (word) => {
     if (jugadors[socket.id]) {
       jugadors[socket.id].completedWords += 1;
       console.log(`Jugador ${socket.id} completó la palabra: ${word}`);

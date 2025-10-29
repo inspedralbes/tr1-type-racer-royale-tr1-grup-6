@@ -111,7 +111,7 @@ function startGameByHost() {
 
     <!-- VISTA 3: JOC -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container">
-      <GameEngine />
+      <GameEngine :initialWords="playerWords" :players="jugadors" />
     </div>
   </main>
 </template>
