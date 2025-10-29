@@ -1,4 +1,3 @@
-// servidor.js
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -6,17 +5,18 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
-// Estado de jugadores: { [socketId]: { id, name, ready, eliminated } }
 const jugadors = {};
 let hostId = null;
+const MAX_STACK = 5;
+const MAX_PLAYERS = 20;
+const MIN_PLAYERS = 2;
 
 console.log("Servidor Socket.IO listo en el puerto 3000");
-// Función para emitir la lista actualizada de jugadores a todos
+
+// ---- Funciones auxiliares ----
 function broadcastPlayerList() {
   const players = Object.values(jugadors);
   io.emit("updatePlayerList", { players, hostId });
@@ -27,101 +27,134 @@ function assignNewHost() {
   hostId = ids.length > 0 ? ids[0] : null;
 }
 
-// Devuelve true si todos los jugadores (no eliminados) están ready
 function allPlayersReady() {
-  const players = Object.values(jugadors);
-  if (players.length === 0) return false;
+  const players = Object.values(jugadors).filter(p => !p.eliminated);
+  if (players.length < MIN_PLAYERS) return false;
   return players.every((p) => p.ready === true);
 }
 
-// Crea un payload simple de palabras para cada jugador (mismo set para todos por ahora)
 function createGamePayload() {
-  const sampleWords = [
-    "component",
-    "reactivitat",
-    "javascript",
-    "framework",
-    "template",
-  ];
+  const sampleWords = ["component", "reactivitat", "javascript", "framework", "template"];
 
   const wordsByPlayer = {};
   for (const id of Object.keys(jugadors)) {
     wordsByPlayer[id] = [...sampleWords];
+    jugadors[id].score = 0;
+    jugadors[id].stack = 0;
+    jugadors[id].eliminated = false;
+    jugadors[id].finished = false;
+    jugadors[id].wordsRemaining = sampleWords.length;
   }
 
   return {
     wordsByPlayer,
-    maxStack: 5,
+    maxStack: MAX_STACK,
     startAt: Date.now(),
   };
 }
 
+// ---- Eliminación y fin de partida ----
+function checkElimination(playerId) {
+  const player = jugadors[playerId];
+  if (!player || player.eliminated) return;
+
+  if (player.stack >= MAX_STACK) {
+    player.eliminated = true;
+    io.emit("playerEliminated", { playerId, name: player.name });
+    checkGameEnd();
+  }
+}
+
+function checkGameEnd() {
+  const activePlayers = Object.values(jugadors).filter(p => !p.eliminated);
+  const unfinishedPlayers = Object.values(jugadors).filter(p => !p.finished && !p.eliminated);
+
+  if (activePlayers.length <= 1 || unfinishedPlayers.length === 0) {
+    const ranking = Object.values(jugadors)
+      .sort((a, b) => b.score - a.score)
+      .map(p => ({ id: p.id, name: p.name, score: p.score }));
+    io.emit("gameEnd", { ranking });
+  }
+}
+
+// ---- Socket.io ----
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
 
-  // Inicializamos el jugador con valores por defecto
+  if (Object.keys(jugadors).length >= MAX_PLAYERS) {
+    socket.emit("serverFull");
+    socket.disconnect();
+    return;
+  }
+
   jugadors[socket.id] = {
     id: socket.id,
     name: `Jugador-${socket.id.slice(0, 4)}`,
     ready: false,
     eliminated: false,
+    finished: false,
+    score: 0,
+    stack: 0,
+    wordsRemaining: 0,
   };
 
-  // Si no hay host, este será el host (primer usuario)
-  if (!hostId) {
-    hostId = socket.id;
-  }
-
-  // Enviar la lista actualizada
+  if (!hostId) hostId = socket.id;
   broadcastPlayerList();
 
+  // ---- Eventos existentes ----
   socket.on("disconnect", () => {
     console.log(`Usuario desconectado: ${socket.id}`);
     delete jugadors[socket.id];
-    // Si el host se desconecta, reasignar
-    if (hostId === socket.id) {
-      assignNewHost();
-    }
+    if (hostId === socket.id) assignNewHost();
     broadcastPlayerList();
   });
 
   socket.on("setPlayerName", (name) => {
     if (jugadors[socket.id]) {
       jugadors[socket.id].name = name;
-      console.log(`Jugador ${socket.id} se llama: ${name}`);
       broadcastPlayerList();
     }
   });
 
   socket.on("clientReady", (payload) => {
-    const ready = !!payload?.ready;
     if (jugadors[socket.id]) {
-      jugadors[socket.id].ready = ready;
-      console.log(`Jugador ${socket.id} ready=${ready}`);
+      jugadors[socket.id].ready = !!payload?.ready;
       broadcastPlayerList();
     }
   });
 
-  // Handler por si el host pulsa un botón para iniciar la partida
   socket.on("startGame", () => {
-    if (socket.id !== hostId) {
-      console.log(
-        `Usuario ${socket.id} intentó iniciar la partida pero no es host`
-      );
-      return;
-    }
-
-    if (!allPlayersReady()) {
-      console.log(
-        "El host intentó iniciar la partida pero no todos están listos"
-      );
-      return;
-    }
+    if (socket.id !== hostId) return;
+    if (!allPlayersReady()) return;
 
     const gamePayload = createGamePayload();
     io.emit("gameStart", gamePayload);
-    console.log("gameStart emitido por el host");
+  });
+
+  // ---- Eventos nuevos ----
+  socket.on("wordCompleted", () => {
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated || player.finished) return;
+
+    player.score += 1;
+    player.wordsRemaining -= 1;
+
+    if (player.wordsRemaining <= 0) {
+      player.finished = true;
+    }
+
+    broadcastPlayerList();
+    checkGameEnd();
+  });
+
+  socket.on("addPenalty", (amount = 1) => {
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated) return;
+
+    player.stack += amount;
+    checkElimination(socket.id);
+    broadcastPlayerList();
   });
 });
 
-server.listen(3000);
+server.listen(3000, () => console.log("Servidor escuchando en puerto 3000"));

@@ -1,117 +1,124 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, onMounted, reactive } from "vue";
+import comms from "./services/communicationManager.js";
 import GameEngine from "./components/GameEngine.vue";
-import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
-// Control de vista
-const vistaActual = ref("salaEspera"); // 'salaEspera', 'lobby', 'joc'
-
-// Estado de conexión
-const nomJugador = ref("");
-const playersPayload = ref({ players: [], hostId: null });
-const socketId = ref(null);
+const playerName = ref("");
 const isReady = ref(false);
-const playerWords = ref([]);
+const isHost = ref(false);
+const inGame = ref(false);
+const initialWords = ref([]);
 
-const jugadors = computed(() => playersPayload.value.players || []);
-const hostId = computed(() => playersPayload.value.hostId || null);
-const isHost = computed(
-  () => socketId.value && hostId.value === socketId.value
-);
-const allReady = computed(() => {
-  const p = playersPayload.value.players || [];
-  return p.length > 0 && p.every((x) => x.ready === true);
-});
+const players = reactive([]);
 
-function connectarAlServidor() {
-  if (nomJugador.value.trim() === "") {
-    alert("Si us plau, introdueix un nom vàlid.");
-    return;
-  }
+const ranking = ref([]);
+const gameEnded = ref(false);
 
-  // Registrar callbacks
-  communicationManager.onConnect((id) => {
-    socketId.value = id;
-  });
-
-  communicationManager.onUpdatePlayerList((payload) => {
-    // payload: { players: [...], hostId }
-    playersPayload.value = payload;
-  });
-
-  communicationManager.onGameStart((payload) => {
-    // payload: { wordsByPlayer: { [id]: [...] }, maxStack, startAt }
-    const ownId = socketId.value;
-    if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
-      playerWords.value = payload.wordsByPlayer[ownId];
-    } else {
-      playerWords.value = [];
-    }
-    // Cambiar a vista de juego
-    vistaActual.value = "joc";
-  });
-
-  // Connecta i envia el nom
-  communicationManager.connect(nomJugador.value);
-
-  // Canvia la vista al lobby
-  vistaActual.value = "lobby";
+// ---- Funciones ----
+function setName() {
+  if (!playerName.value) return;
+  comms.emit("setPlayerName", playerName.value);
 }
 
 function toggleReady() {
   isReady.value = !isReady.value;
-  communicationManager.setReady(isReady.value);
+  comms.emit("clientReady", { ready: isReady.value });
 }
 
-function startGameByHost() {
-  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
-  communicationManager.requestStart();
+function startGame() {
+  comms.emit("startGame");
 }
+
+// Volver al lobby
+function backToLobby() {
+  inGame.value = false;
+  gameEnded.value = false;
+  initialWords.value = [];
+  players.splice(0, players.length);
+}
+
+// ---- Comunicación con backend ----
+onMounted(() => {
+  comms.on("updatePlayerList", ({ players: serverPlayers, hostId }) => {
+    players.splice(0, players.length, ...serverPlayers);
+    isHost.value = comms.socket.id === hostId;
+  });
+
+  comms.on("gameStart", (gamePayload) => {
+    const myWords = gamePayload.wordsByPlayer[comms.socket.id] || [];
+    initialWords.value = myWords;
+    inGame.value = true;
+  });
+
+  comms.on("gameEnd", ({ ranking: finalRanking }) => {
+    ranking.value = finalRanking;
+    gameEnded.value = true;
+  });
+
+  comms.on("serverFull", () => {
+    alert("El servidor está lleno. No puedes entrar.");
+  });
+});
 </script>
-
+vmdn
 <template>
-  <main>
-    <!-- VISTA 1: SALA D'ESPERA -->
-    <div v-if="vistaActual === 'salaEspera'" class="vista-container">
-      <h1>Type Racer Royale</h1>
-      <input
-        type="text"
-        v-model="nomJugador"
-        placeholder="Introdueix el teu nom"
-      />
-      <button @click="connectarAlServidor">Entra al Lobby</button>
-    </div>
+  <div id="app">
+    <h1>Type Racer Royale</h1>
 
-    <!-- VISTA 2: LOBBY -->
-    <div v-else-if="vistaActual === 'lobby'" class="vista-container">
-      <h2>Jugadors Connectats</h2>
+    <!-- Lobby -->
+    <div v-if="!inGame && !gameEnded">
+      <h2>Jugadores</h2>
       <ul>
-        <li v-for="jugador in jugadors" :key="jugador.id">
-          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
-          <span v-if="jugador.id === hostId"> — host</span>
+        <li v-for="p in players" :key="p.id">
+          {{ p.name }} - Score: {{ p.score }} - Palabras: {{ p.wordsRemaining }} - 
+          {{ p.ready ? "Ready" : "Not ready" }} 
+          <span v-if="p.eliminated">- Eliminado</span>
         </li>
       </ul>
 
-      <div style="margin-top: 10px">
-        <button @click="toggleReady">
-          {{ isReady ? "Unready" : "Ready" }}
-        </button>
+      <div>
+        <input v-model="playerName" placeholder="Tu nombre" />
+        <button @click="setName">Cambiar nombre</button>
+      </div>
 
-        <!-- Start visible only to host; server will check que todos estén ready -->
-        <button
-          v-if="isHost"
-          @click="startGameByHost"
-          :disabled="!allReady"
-          style="margin-left: 8px"
-        >
-          Start (host)
-        </button>
+      <div>
+        <button @click="toggleReady">{{ isReady ? "Cancelar Ready" : "Ready" }}</button>
+        <button v-if="isHost" @click="startGame">Iniciar partida</button>
       </div>
     </div>
 
-    <!-- VISTA 3: JOC -->
-    <div v-else-if="vistaActual === 'joc'" class="vista-container">
-      <GameEngine />
+    <!-- Juego -->
+    <div v-if="inGame && !gameEnded">
+      <GameEngine :initialWords="initialWords" />
     </div>
-  </main>
+
+    <!-- Fin de juego / ranking -->
+    <div v-if="gameEnded">
+      <h2>Juego terminado!</h2>
+      <ol>
+        <li v-for="p in ranking" :key="p.id">
+          {{ p.name }} - Score: {{ p.score }}
+        </li>
+      </ol>
+      <button @click="backToLobby">Volver al lobby</button>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+#app {
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+input {
+  padding: 5px;
+  margin: 5px;
+}
+button {
+  margin: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+</style>
