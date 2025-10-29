@@ -2,6 +2,12 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -36,23 +42,56 @@ function allPlayersReady() {
 
 // Crea un payload simple de palabras para cada jugador (mismo set para todos por ahora)
 function createGamePayload() {
-  const sampleWords = [
-    "component",
-    "reactivitat",
-    "javascript",
-    "framework",
-    "template",
-  ];
+  let words = [];
+  try {
+    // Ruta al archivo words.json relativa a este archivo
+    const wordsPath = path.join(__dirname, "data", "words.json");
+    console.log("Intentando leer words.json desde:", wordsPath);
+    const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, ""); // Eliminar BOM si existe
+    words = JSON.parse(raw.trim());
+    console.log(`Leídas ${words.length} palabras de words.json`);
+    if (!Array.isArray(words)) words = [];
+  } catch (err) {
+    console.error("No se pudo leer words.json:", err.message);
+    words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
+  }
+  // Mezcla (Fisher-Yates)
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Configuración del juego
+  const maxStack = 20; // cuantas palabras visibles a la vez
+  const intervalMs = 2000; // cada cuánto aparecen palabras
+  const wordsPerPlayer = Math.max(
+    20,
+    Math.floor(words.length / Math.max(1, Object.keys(jugadors).length))
+  );
 
   const wordsByPlayer = {};
+  const shuffled = shuffle(words);
   for (const id of Object.keys(jugadors)) {
-    wordsByPlayer[id] = [...sampleWords];
+    // Asignamos un bloque de palabras para cada jugador (puede repetirse si hay pocos)
+    const playerWords = [];
+    for (let i = 0; i < wordsPerPlayer; i++) {
+      playerWords.push(
+        shuffled[(i + Object.keys(jugadors).indexOf(id)) % shuffled.length]
+      );
+    }
+    wordsByPlayer[id] = playerWords;
   }
 
   return {
     wordsByPlayer,
-    maxStack: 5,
-    startAt: Date.now(),
+    maxStack,
+    intervalMs,
+    // startAt da un pequeño margen para que clientes preparen la UI
+    startAt: Date.now() + 1500,
   };
 }
 

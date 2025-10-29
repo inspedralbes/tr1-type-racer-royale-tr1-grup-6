@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
+  intervalMs: { type: Number, default: 2000 },
+  maxStack: { type: Number, default: 20 },
 });
 const filesDelTeclat = ref([
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -11,17 +13,15 @@ const filesDelTeclat = ref([
 const teclaPremuda = ref("");
 const JuegoTerminado = ref(false);
 const estatDelJoc = ref({
-  paraules: [
-    { id: 1, text: "component", estat: "pendent", errors: 0 },
-    { id: 2, text: "reactivitat", estat: "pendent", errors: 0 },
-    { id: 3, text: "javascript", estat: "pendent", errors: 0 },
-    { id: 4, text: "framework", estat: "pendent", errors: 0 },
-    { id: 5, text: "template", estat: "pendent", errors: 0 },
-  ],
+  paraules: [],
   indexParaulaActiva: 0,
   textEntrat: "",
   estadistiques: [],
 });
+
+// Cola de palabras pendientes por revelar (tomadas de props.initialWords)
+const remainingWords = ref([]);
+let revealTimer = null;
 
 let tempsIniciParaula = 0;
 
@@ -35,14 +35,32 @@ onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
   // Si el servidor ha passat paraules inicials, les usem
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
-    estatDelJoc.value.paraules = props.initialWords.map((w, i) => ({
-      id: i + 1,
-      text: w,
-      estat: "pendent",
-      errors: 0,
-    }));
-    estatDelJoc.value.indexParaulaActiva = 0;
+    remainingWords.value = props.initialWords.slice();
   }
+
+  // Revelar palabras cada intervalMs hasta maxStack (una palabra por tick)
+  revealTimer = setInterval(() => {
+    try {
+      if (
+        remainingWords.value.length > 0 &&
+        estatDelJoc.value.paraules.length -
+          estatDelJoc.value.indexParaulaActiva <
+          props.maxStack
+      ) {
+        const nextText = remainingWords.value.shift();
+        const newParaula = {
+          id: Date.now() + Math.random(),
+          text: nextText,
+          estat: "pendent",
+          errors: 0,
+          letterErrors: Array.from({ length: nextText.length }, () => false),
+        };
+        estatDelJoc.value.paraules.push(newParaula);
+      }
+    } catch (e) {
+      console.error("Error en revealTimer:", e);
+    }
+  }, props.intervalMs || 3000);
 
   estatDelJoc.value.paraules.forEach((p) => {
     if (
@@ -56,6 +74,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
+  if (revealTimer) clearInterval(revealTimer);
 });
 function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
@@ -87,26 +106,20 @@ function validarProgres() {
   if (typed === target) {
     const tempsTrigat = Date.now() - tempsIniciParaula;
 
-    // Registrado de estadísticas deshabilitado por petición del equipo
-    // Descomentar si se desea registrar datos de cada palabra
-    // estatDelJoc.value.estadistiques.push({
-    //   paraula: paraulaActiva.value.text,
-    //   temps: tempsTrigat,
-    //   errors: paraulaActiva.value.errors,
-    // });
+    // Estadísticas deshabilitadas por petición del equipo
+    // estatDelJoc.value.estadistiques.push({ paraula: paraulaActiva.value.text, temps: tempsTrigat, errors: paraulaActiva.value.errors });
 
-    paraulaActiva.value.estat = "completada";
+    // Marcamos completada y la removemos de la cola visible para dejar sitio a nuevas palabras
+    // (mantenemos index a 0 porque siempre consumimos la primera)
+    estatDelJoc.value.paraules.shift();
 
-    estatDelJoc.value.indexParaulaActiva++;
-
+    // reset del input y temporizador
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
 
-    if (
-      estatDelJoc.value.indexParaulaActiva < estatDelJoc.value.paraules.length
-    ) {
-      const next =
-        estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
+    // Si quedan palabras visibles, aseguramos que la nueva paraula activa tiene letterErrors inicializado
+    if (estatDelJoc.value.paraules.length > 0) {
+      const next = estatDelJoc.value.paraules[0];
       if (
         !Array.isArray(next.letterErrors) ||
         next.letterErrors.length !== next.text.length
@@ -118,10 +131,11 @@ function validarProgres() {
         next.errors = 0;
       }
     } else {
-      // Fin del juego: mostrar estadísticas deshabilitado
-      // Si se desea volver a activar, descomentar las siguientes líneas
-      // JuegoTerminado.value = true;
-      // console.log("Joc acabat!", estatDelJoc.value.estadistiques);
+      // Si no quedan palabras visibles y tampoco quedan pendientes, podríamos terminar el juego
+      if (remainingWords.value.length === 0) {
+        // JuegoTerminado.value = true; // opcional
+        // console.log("Joc acabat!", estatDelJoc.value.estadistiques);
+      }
     }
   }
 }
