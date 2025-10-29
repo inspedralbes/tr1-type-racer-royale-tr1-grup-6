@@ -122,6 +122,14 @@ io.on("connection", (socket) => {
     io.emit("gameStart", gamePayload);
     console.log("gameStart emitido por el host");
   });
+
+  socket.on ("completeWord", (word) => {
+    if (jugadors[socket.id]) {
+      jugadors[socket.id].completedWords += 1;
+      console.log(`Jugador ${socket.id} completó la palabra: ${word}`);
+      broadcastPlayerList();
+    }
+  });
 });
 
 server.listen(3000);

@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import communicationManager from "../services/communicationManager.js";
+
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
 });
@@ -23,6 +25,9 @@ const estatDelJoc = ref({
   estadistiques: [],
 });
 
+const progresJuagdor = ref(0);
+const jugadors = ref([]);
+
 let tempsIniciParaula = 0;
 
 function handleKeyDown(event) {
@@ -33,6 +38,11 @@ function handleKeyDown(event) {
 }
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+
+  communicationManager.onPlayerProgressUpdate((updatedPlayers) => {
+    jugadors.value = updatedPlayers;
+  });
+
   // Si el servidor ha passat paraules inicials, les usem
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     estatDelJoc.value.paraules = props.initialWords.map((w, i) => ({
@@ -94,6 +104,14 @@ function validarProgres() {
     //   temps: tempsTrigat,
     //   errors: paraulaActiva.value.errors,
     // });
+
+    // Actualitzar el progrés del jugador
+    progresJuagdor.value =
+      ((estatDelJoc.value.indexParaulaActiva + 1) /
+        estatDelJoc.value.paraules.length) *
+      100;
+
+    communicationManager.updatePlayerProgress(progresJuagdor.value);
 
     paraulaActiva.value.estat = "completada";
 
@@ -157,6 +175,10 @@ function getClasseLletra(indexLletra) {
 const paraulaActiva = computed(() => {
   return estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
 });
+
+function calculateProgress(completedWords) {
+  return (completedWords / estatDelJoc.value.paraules.length) * 100;
+}
 </script>
 <template>
   <div class="game-engine">
@@ -219,6 +241,29 @@ const paraulaActiva = computed(() => {
         </div>
       </div>
       -->
+      <div class="sidebar">
+        <h3>Jugadors</h3>
+        <ul>
+          <li
+            v-for="(jugador, index) in jugadors"
+            :key="jugador.id"
+            class="player"
+          >
+            <div class="player-name">{{ jugador.name }}</div>
+            <div class="player-progress">
+              <div
+                class="progress-bar"
+                :style="{
+                  width: calculateProgress(jugador.completedWords) + '%',
+                }"
+              ></div>
+            </div>
+            <div class="words-completed">
+              {{ jugador.completedWords }} paraules
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
@@ -266,5 +311,78 @@ const paraulaActiva = computed(() => {
 .tecla-premuda {
   background-color: lightblue;
   border-color: #007bff;
+}
+
+.player-progress {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #76c7c0;
+}
+.words-completed {
+  font-size: 12px;
+  color: #555;
+}
+
+.sidebar {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  width: 250px;
+  background-color: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.player {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.player-name {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.player-progress {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 10px;
+  margin-bottom: 5px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #76c7c0;
+  transition: width 0.3s ease;
+}
+
+.words-completed {
+  font-size: 12px;
+  color: #555;
 }
 </style>

@@ -49,6 +49,16 @@ const communicationManager = {
     socket.emit("startGame");
   },
 
+  // Enviar que l'usuari ha completat una paraula
+  updatePlayerProgress(progress){
+    socket.emit("updatePlayerProgress", progress);
+  },
+
+  // Escoltar actualitzacions del progrés dels jugadors
+  onPlayerProgressUpdate(callback){
+    socket.on("playerProgressUpdate", callback);
+  },
+
   // Exemple de funció per enviar un missatge (es podrà ampliar)
   sendEvent(eventName, data) {
     socket.emit(eventName, data);
