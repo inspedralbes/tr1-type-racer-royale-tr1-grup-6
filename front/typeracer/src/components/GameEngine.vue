@@ -378,37 +378,23 @@ function calculateProgress(completedWords) {
   max-width: 720px; /* limitar ancho del área principal para dejar sitio a la sidebar */
 }
 .players-sidebar {
-  flex: 0 0 220px; /* ancho fijo, no se encoge */
-  background: transparent;
-  border-radius: 6px;
-  padding: 8px;
-  box-shadow: none;
-  align-self: flex-start;
-  position: sticky;
-  top: 20px; /* la hace visible al hacer scroll */
-}
-.players-sidebar h3 {
-  margin: 0 0 8px 0;
-  text-align: left;
-  color: #ddd;
-  font-weight: 700;
-}
-
-.sidebar {
   position: fixed;
   right: 20px;
-  top: 20px;
-  width: 250px;
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 350px;
+  background: transparent;
+  border-radius: 6px;
+  padding: 15px;
+  box-shadow: none;
+  align-self: flex-start;
+  top: 20px; /* la hace visible al hacer scroll */
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 1);
 }
 
-.sidebar h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: #333;
+.players-sidebar h3 {
+  margin: 0 0 15px 0;
+  text-align: center;
+  color: #ddd;
+  font-weight: 750;
 }
 
 .sidebar ul {
