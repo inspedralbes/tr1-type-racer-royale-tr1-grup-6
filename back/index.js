@@ -112,6 +112,7 @@ io.on("connection", (socket) => {
   socket.on("setPlayerName", (name) => {
     if (jugadors[socket.id]) {
       jugadors[socket.id].name = name;
+      console.log(`jugador ${socket.id} se llama: ${name}`); 
       broadcastPlayerList();
     }
   });

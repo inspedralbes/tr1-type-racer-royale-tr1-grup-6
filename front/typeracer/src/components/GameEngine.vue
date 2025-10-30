@@ -137,11 +137,8 @@ onMounted(() => {
   // Fin de juego
   comms.on("gameEnd", ({ ranking }) => {
     JuegoTerminado.value = true;
-    alert(
-      "Juego terminado! Ranking:\n" +
-        ranking.map((p, i) => `${i + 1}. ${p.name} - ${p.score}`).join("\n")
-    );
   });
+
 });
 
 onUnmounted(() => {
