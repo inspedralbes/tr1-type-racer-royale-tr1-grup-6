@@ -2,6 +2,7 @@
   "name": "tr1-backend",
   "version": "0.1.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon --watch . --legacy-watch index.js"

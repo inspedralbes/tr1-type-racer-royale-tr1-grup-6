@@ -12,6 +12,8 @@ const playersPayload = ref({ players: [], hostId: null });
 const socketId = ref(null);
 const isReady = ref(false);
 const playerWords = ref([]);
+const gameIntervalMs = ref(3000);
+const gameMaxStack = ref(5);
 
 const jugadors = computed(() => playersPayload.value.players || []);
 const hostId = computed(() => playersPayload.value.hostId || null);
@@ -44,6 +46,8 @@ function connectarAlServidor() {
     const ownId = socketId.value;
     if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
       playerWords.value = payload.wordsByPlayer[ownId];
+      gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
+      gameMaxStack.value = payload.maxStack || 5;
     } else {
       playerWords.value = [];
     }
@@ -111,7 +115,12 @@ function startGameByHost() {
 
     <!-- VISTA 3: JOC -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container">
-      <GameEngine :initialWords="playerWords" :players="jugadors" />
+      <GameEngine
+        :initialWords="playerWords"
+        :intervalMs="gameIntervalMs"
+        :maxStack="gameMaxStack"
+        :players="jugadors"
+      />
     </div>
   </main>
 </template>
