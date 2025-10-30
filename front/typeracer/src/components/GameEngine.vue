@@ -333,4 +333,12 @@ function calculateProgress(completedWords) {
   color: var(--color-text);
   opacity: 0.9;
 }
+.paraules-container {
+  min-height: 300px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  display: flex;
+  flex-direction: column-reverse; /* clave para invertir dirección */
+  justify-content: flex-start;
+}
 </style>
