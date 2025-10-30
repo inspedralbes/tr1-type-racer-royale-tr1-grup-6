@@ -48,6 +48,9 @@ const communicationManager = {
   requestStart() {
     socket.emit("startGame");
   },
+  reportPlayerLost() {
+    socket.emit("playerLost");
+  },
 
   // Enviar que l'usuari ha completat una paraula
   updatePlayerProgress(progress) {
@@ -79,6 +82,18 @@ const communicationManager = {
     if (socket.connected) {
       socket.disconnect();
     }
+  },
+
+  onPlayerEliminated(callback) {
+    socket.on("playerEliminated", callback);
+  },
+
+  onPlayerWon(callback) {
+    socket.on("playerWon", callback);
+  },
+
+  onGameOver(callback) {
+    socket.on("gameOver", callback);
   },
 };
 

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import communicationManager from "../services/communicationManager.js";
+import GameResult from "@/components/GameResult.vue";
 
 // Props
 const props = defineProps({
@@ -9,6 +10,11 @@ const props = defineProps({
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
 });
+
+//variables per guanyador y perdedor
+const perdedor = ref(false);
+const ganador = ref(false);
+const perdidoMensaje = ref("");
 
 // Estado del teclado
 const filesDelTeclat = ref([
@@ -136,6 +142,44 @@ function getClasseLletra(indexLletra) {
 // Ciclo de vida
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+  //perdedor y ganador
+  communicationManager.onPlayerEliminated((data) => {
+    if (JuegoTerminado.value) return;
+    perdedor.value = true;
+    ganador.value = false;
+    JuegoTerminado.value = true;
+    perdidoMensaje.value =
+      data?.message || "Has perdido: demasiadas palabras acumuladas.";
+  });
+
+  //  Cuando este jugador gana
+  communicationManager.onPlayerWon((data) => {
+    if (JuegoTerminado.value) return;
+    ganador.value = true;
+    perdedor.value = false;
+    JuegoTerminado.value = true;
+    perdidoMensaje.value =
+      data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
+  });
+
+  //  Cuando la partida termina para todos (por ejemplo, último jugador en pie)
+  communicationManager.onGameOver((data) => {
+    if (JuegoTerminado.value) return;
+
+    if (data.winnerId === communicationManager.id) {
+      ganador.value = true;
+      perdedor.value = false;
+      perdidoMensaje.value =
+        data.message || "¡Has ganado! Todos los demás fueron eliminados.";
+    } else {
+      ganador.value = false;
+      perdedor.value = true;
+      perdidoMensaje.value =
+        data.message || `Has perdido. ${data.winnerName} ha ganado.`;
+    }
+
+    JuegoTerminado.value = true;
+  });
 
   // Si hay palabras iniciales de props, se cargan en remainingWords
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
@@ -159,6 +203,15 @@ onMounted(() => {
         };
         // Añadimos palabra al final
         estatDelJoc.value.paraules.push(newParaula);
+      }
+      if (
+        estatDelJoc.value.paraules.length >= props.maxStack &&
+        !perdedor.value
+      ) {
+        perdedor.value = true;
+        JuegoTerminado.value = true;
+        perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
+        communicationManager.reportPlayerLost();
       }
     } catch (e) {
       console.error("Error en revealTimer:", e);
@@ -242,6 +295,12 @@ function calculateProgress(completedWords) {
         </li>
       </ul>
     </aside>
+    <GameResult
+      v-if="JuegoTerminado"
+      :winner="ganador"
+      :loser="perdedor"
+      :message="perdidoMensaje"
+    />
   </div>
 </template>
 
