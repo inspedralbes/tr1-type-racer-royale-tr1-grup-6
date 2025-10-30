@@ -264,30 +264,14 @@ function calculateProgress(completedWords) {
   </div>
 </template>
 <style scoped>
-.estadisticas {
-  margin-top: 20px;
-  padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-}
-
-.stat-item {
-  margin: 10px 0;
-  padding: 10px;
-  background-color: #000000;
-  border-radius: 4px;
-}
-
-.stat-item p {
-  margin: 0;
-  line-height: 1.5;
-}
+/* Kept styles used by this component's template */
 .correcte {
   color: green;
 }
 .incorrecte {
   color: red;
 }
+
 .teclat {
   margin-top: 20px;
   text-align: center;
@@ -309,130 +293,60 @@ function calculateProgress(completedWords) {
   border-color: #007bff;
 }
 
-.player-progress {
-  width: 100%;
-  background-color: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-  height: 10px;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: #76c7c0;
-}
-.words-completed {
-  font-size: 12px;
-  color: #555;
-}
-
-/* Inline players list inside the GameEngine (simple) */
-.players-inline {
-  margin-top: 12px;
-  padding: 4px;
-}
-.players-inline h3 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  text-align: left;
-  color: #ddd;
-}
-.players-inline ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.player-name-inline {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin-bottom: 6px;
-  background: transparent;
-  border-radius: 4px;
-  box-shadow: none;
-  border: none;
-  color: #eee;
-  font-weight: 600;
-}
-.player-name-text {
-  font-weight: 600;
-}
-.completed-count {
-  font-size: 12px;
-  color: #bbb;
-}
-
 /* Layout: game main + sidebar */
 .game-layout {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  flex-wrap: nowrap; /* evitar que la sidebar baje debajo del contenido */
-  justify-content: center; /* centrar conjunto en pantallas grandes */
+  flex-wrap: nowrap;
+  justify-content: center;
 }
 .game-main {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 720px; /* limitar ancho del área principal para dejar sitio a la sidebar */
+  max-width: 720px;
 }
+
+/* Players sidebar (compact list) */
 .players-sidebar {
   position: fixed;
-  right: 20px;
+  right: 100px;
   width: 350px;
+  background: var(--color-background-soft);
+  border-radius: 8px;
+  padding: 12px 16px;
+  align-self: flex-start;
+  top: 20px;
+  box-shadow: 0 6px 18px var(--shadow-color);
+  border: 1px solid var(--color-border);
+}
+.players-sidebar h3 {
+  margin: 0 0 12px 0;
+  text-align: center;
+  color: var(--color-heading);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.player-name-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
   background: transparent;
   border-radius: 6px;
-  padding: 15px;
-  box-shadow: none;
-  align-self: flex-start;
-  top: 20px; /* la hace visible al hacer scroll */
-  box-shadow: 0 2px 4px rgba(255, 255, 255, 1);
+  color: var(--color-text);
+  font-weight: 600;
 }
-
-.players-sidebar h3 {
-  margin: 0 0 15px 0;
-  text-align: center;
-  color: #ddd;
-  font-weight: 750;
+.player-name-text {
+  font-weight: 700;
+  color: var(--color-heading);
 }
-
-.sidebar ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.player {
-  margin-bottom: 15px;
-  padding: 10px;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.player-name {
-  font-weight: bold;
-  margin-bottom: 8px;
-}
-
-.player-progress {
-  width: 100%;
-  background-color: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-  height: 10px;
-  margin-bottom: 5px;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: #76c7c0;
-  transition: width 0.3s ease;
-}
-
-.words-completed {
+.completed-count {
   font-size: 12px;
-  color: #555;
+  color: var(--color-text);
+  opacity: 0.9;
 }
 </style>
