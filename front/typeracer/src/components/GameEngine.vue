@@ -1,6 +1,7 @@
 <script setup>
 import communicationManager from "@/services/communicationManager";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import GameResult from "./GameResult.vue"; 
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
 });
@@ -13,6 +14,7 @@ const teclaPremuda = ref("");
 const JuegoTerminado = ref(false);
 const perdedor = ref(false);
 const ganador = ref(false);
+const perdidoMensaje = ref("");
 const estatDelJoc = ref({
   paraules: [
     { id: 1, text: "component", estat: "pendent", errors: 0 },
@@ -38,6 +40,7 @@ onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
   communicationManager.onEvent("playerEliminated", (data) => {
     perdedor.value = true;
+    perdidoMensaje.value = data?.message || "Muchos errores, has sido eliminado.";
     JuegoTerminado.value = true;
     console.log(data.message); // Opcional: para debug
   });
@@ -101,6 +104,7 @@ function validarProgres() {
 
   //mas de 5 errores no avanza
   if (estatDelJoc.value.totalErrors >= 5 && !perdedor.value) {
+  perdidoMensaje.value = "Has cometido demasiados errores.";
   perdedor.value = true;
   JuegoTerminado.value = true;
   console.log("Has perdido la partida");
@@ -173,47 +177,48 @@ const paraulaActiva = computed(() => {
 <template>
   <div class="game-engine">
     <div class="paraules-container">
-
-      <div v-if="perdedor" class="overlay lose">
-      <h2> Has perdido</h2>
-      <p>Cometiste demasiados errores.</p>
-    </div>
-
-    <div v-if="ganador" class="overlay win">
-      <h2>¡Has ganado!</h2>
-      <p>Completaste todas las palabras.</p>
-    </div>
-      <!-- Iterem sobre la llista de paraules -->
-      <div
-        v-for="(paraula, index) in estatDelJoc.paraules"
-        :key="paraula.id"
-        class="paraula"
-        :class="{ 'paraula-activa': index === estatDelJoc.indexParaulaActiva }"
-      >
-        <!-- Més endavant mostrarem les lletres aquí -->
-        <template v-if="index === estatDelJoc.indexParaulaActiva">
-          <span
-            v-for="(lletra, i) in paraula.text.split('')"
-            :key="i"
-            class="lletra"
-            :class="getClasseLletra(i)"
-          >
-            {{ lletra }}
-          </span>
-        </template>
-        <template v-else>
-          {{ paraula.text }}
-        </template>
+    <!-- Muestra el componente de resultado cuando el juego ha terminado -->
+    <GameResult :winner="ganador" :loser="perdedor" v-if="JuegoTerminado" />
+    <GameResult
+      v-if="JuegoTerminado"
+      :winner="ganador"
+      :loser="perdedor"
+      :message="perdidoMensaje"
+    />
+      <div v-else class="paraules-container">
+    
+        <!-- Iterem sobre la llista de paraules -->
+        <div
+          v-for="(paraula, index) in estatDelJoc.paraules"
+          :key="paraula.id"
+          class="paraula"
+          :class="{ 'paraula-activa': index === estatDelJoc.indexParaulaActiva }"
+        >
+          <template v-if="index === estatDelJoc.indexParaulaActiva">
+            <span
+              v-for="(lletra, i) in paraula.text.split('')"
+              :key="i"
+              class="lletra"
+              :class="getClasseLletra(i)"
+            >
+              {{ lletra }}
+            </span>
+          </template>
+          <template v-else>
+            {{ paraula.text }}
+          </template>
+        </div>
       </div>
     </div>
     <input
+      v-if="!JuegoTerminado"
       type="text"
       class="text-input"
       v-model="estatDelJoc.textEntrat"
       @input="validarProgres"
       placeholder="Comença a escriure..."
     />
-    <div class="teclat">
+    <div v-if="!JuegoTerminado"  class="teclat">
       <div v-for="(fila, fIndex) in filesDelTeclat" :key="fIndex" class="fila">
         <div
           v-for="lletra in fila"
