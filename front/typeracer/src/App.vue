@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import GameEngine from "./components/GameEngine.vue";
+import DarkModeToggle from "./components/DarkModeToggle.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
 // Control de vista
@@ -75,6 +76,7 @@ function startGameByHost() {
 
 <template>
   <main>
+    <DarkModeToggle />
     <!-- VISTA 1: SALA D'ESPERA -->
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Type Racer Royale</h1>
