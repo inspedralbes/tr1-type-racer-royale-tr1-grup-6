@@ -1,51 +1,64 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+
+// --- PROPS ---
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
   intervalMs: { type: Number, default: 2000 },
   maxStack: { type: Number, default: 20 },
 });
+
+// --- ESTADO DEL TECLADO ---
 const filesDelTeclat = ref([
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
   ["Z", "X", "C", "V", "B", "N", "M"],
 ]);
 const teclaPremuda = ref("");
+
+// --- ESTADO DEL JUEGO ---
 const JuegoTerminado = ref(false);
 const estatDelJoc = ref({
-  paraules: [],
-  indexParaulaActiva: 0,
-  textEntrat: "",
+  paraules: [], // La pila de palabras visibles
+  textEntrat: "", // Lo que el usuario está tecleando
   estadistiques: [],
 });
 
-// Cola de palabras pendientes por revelar (tomadas de props.initialWords)
-const remainingWords = ref([]);
+const remainingWords = ref([]); // Palabras pendientes del servidor
 let revealTimer = null;
-
 let tempsIniciParaula = 0;
 
+// --- COMPUTED: PALABRA ACTIVA ---
+// Correcto: La palabra activa es la ÚLTIMA del array (la de más abajo)
+const paraulaActiva = computed(() => {
+  if (estatDelJoc.value.paraules.length === 0) {
+    return null; // No hay palabras activas
+  }
+  return estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+});
+
+// --- MANEJO DEL TECLADO ---
 function handleKeyDown(event) {
+  if (event.key.length > 1 && event.key !== "Backspace") return;
   teclaPremuda.value = event.key.toUpperCase();
   setTimeout(() => {
     teclaPremuda.value = "";
   }, 100);
 }
+
+// --- CICLO DE VIDA ---
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
-  // Si el servidor ha passat paraules inicials, les usem
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Revelar palabras cada intervalMs hasta maxStack (una palabra por tick)
+  // Timer para revelar palabras
   revealTimer = setInterval(() => {
     try {
       if (
         remainingWords.value.length > 0 &&
-        estatDelJoc.value.paraules.length -
-          estatDelJoc.value.indexParaulaActiva <
-          props.maxStack
+        estatDelJoc.value.paraules.length < props.maxStack
       ) {
         const nextText = remainingWords.value.shift();
         const newParaula = {
@@ -55,27 +68,21 @@ onMounted(() => {
           errors: 0,
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
-        estatDelJoc.value.paraules.push(newParaula);
+        // LÓGICA DE CAÍDA: .unshift() añade la palabra nueva ARRIBA (índice 0)
+        estatDelJoc.value.paraules.unshift(newParaula);
       }
     } catch (e) {
       console.error("Error en revealTimer:", e);
     }
   }, props.intervalMs || 3000);
-
-  estatDelJoc.value.paraules.forEach((p) => {
-    if (
-      !Array.isArray(p.letterErrors) ||
-      p.letterErrors.length !== p.text.length
-    ) {
-      p.letterErrors = Array.from({ length: p.text.length }, () => false);
-      p.errors = p.errors || 0;
-    }
-  });
 });
+
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
   if (revealTimer) clearInterval(revealTimer);
 });
+
+// --- LÓGICA DEL JUEGO ---
 function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
@@ -86,40 +93,45 @@ function validarProgres() {
   }
 
   const typed = estatDelJoc.value.textEntrat;
-  const target = paraulaActiva.value.text;
 
-  for (let i = 0; i < typed.length && i < target.length; i++) {
-    if (typed[i] !== target[i]) {
-      paraulaActiva.value.letterErrors[i] = true;
-    }
+  if (!paraulaActiva.value) {
+    estatDelJoc.value.textEntrat = "";
+    return;
   }
 
-  const totalErrors = (paraulaActiva.value.letterErrors || []).reduce(
-    (acc, cur) => acc + (cur ? 1 : 0),
-    0
-  );
-  paraulaActiva.value.errors = totalErrors;
-  console.log(
-    `Errors en la paraula "${paraulaActiva.value.text}": ${totalErrors}`
-  );
-
+  const target = paraulaActiva.value.text;
+  
+  // CORREGIDO: Lógica de errores DIRECTA
+  paraulaActiva.value.letterErrors.fill(false);
+  let errorCount = 0;
+  for (let i = 0; i < typed.length; i++) {
+    if (i >= target.length) break; // Se pasó de largo
+    
+    // Compara la letra tecleada (ej. typed[0] = 'v')
+    // con la letra mostrada (ej. target[0] = 'v')
+    if (typed[i] !== target[i]) {
+      paraulaActiva.value.letterErrors[i] = true;
+      errorCount++;
+    }
+  }
+  paraulaActiva.value.errors = errorCount;
+  
+  // --- Comprobación de Victoria ---
+  // CORREGIDO: Compara lo tecleado con el objetivo DIRECTO
   if (typed === target) {
     const tempsTrigat = Date.now() - tempsIniciParaula;
+    // ... (estadísticas) ...
 
-    // Estadísticas deshabilitadas por petición del equipo
-    // estatDelJoc.value.estadistiques.push({ paraula: paraulaActiva.value.text, temps: tempsTrigat, errors: paraulaActiva.value.errors });
+    // LÓGICA DE PILA: .pop() elimina la palabra de ABAJO (la activa)
+    estatDelJoc.value.paraules.pop();
 
-    // Marcamos completada y la removemos de la cola visible para dejar sitio a nuevas palabras
-    // (mantenemos index a 0 porque siempre consumimos la primera)
-    estatDelJoc.value.paraules.shift();
-
-    // reset del input y temporizador
+    // Resetea para la siguiente palabra
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
 
-    // Si quedan palabras visibles, aseguramos que la nueva paraula activa tiene letterErrors inicializado
-    if (estatDelJoc.value.paraules.length > 0) {
-      const next = estatDelJoc.value.paraules[0];
+    // Prepara la NUEVA palabra activa (si queda alguna)
+    if (paraulaActiva.value) { // 'paraulaActiva' computed ya apunta a la nueva
+      const next = paraulaActiva.value;
       if (
         !Array.isArray(next.letterErrors) ||
         next.letterErrors.length !== next.text.length
@@ -130,60 +142,51 @@ function validarProgres() {
         );
         next.errors = 0;
       }
-    } else {
-      // Si no quedan palabras visibles y tampoco quedan pendientes, podríamos terminar el juego
-      if (remainingWords.value.length === 0) {
-        // JuegoTerminado.value = true; // opcional
-        // console.log("Joc acabat!", estatDelJoc.value.estadistiques);
-      }
     }
   }
 }
 
+// --- LÓGICA VISUAL (PINTAR LETRAS) ---
 function getClasseLletra(indexLletra) {
-  if (
-    indexLletra < estatDelJoc.value.textEntrat.length &&
-    estatDelJoc.value.textEntrat[indexLletra] ===
-      paraulaActiva.value.text[indexLletra]
-  ) {
-    return "correcte";
+  // 'indexLletra' es el índice de la palabra MOSTRADA (ej. 0 para 'v' en "votar")
+  const typed = estatDelJoc.value.textEntrat;
+  
+  if (!paraulaActiva.value) return "";
+  
+  const target = paraulaActiva.value.text;
+
+  // CORREGIDO: Lógica de pintado DIRECTA
+
+  // Si el usuario aún no ha tecleado esa letra
+  if (indexLletra >= typed.length) {
+    // Pintar si ya tuvo un error aquí (al borrar)
+    if (paraulaActiva.value.letterErrors[indexLletra]) {
+      return "incorrecte";
+    }
+    return ""; // Pendiente
   }
 
-  const hadError =
-    paraulaActiva.value.letterErrors &&
-    paraulaActiva.value.letterErrors[indexLletra];
-  if (hadError) {
-    return "incorrecte";
-  }
-
-  if (indexLletra >= estatDelJoc.value.textEntrat.length) {
-    return "";
-  } else if (
-    estatDelJoc.value.textEntrat[indexLletra] ===
-    paraulaActiva.value.text[indexLletra]
-  ) {
+  // Compara la letra tecleada (directa) con la mostrada (directa)
+  if (typed[indexLletra] === target[indexLletra]) {
     return "correcte";
   } else {
     return "incorrecte";
   }
 }
-
-const paraulaActiva = computed(() => {
-  return estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
-});
 </script>
+
 <template>
   <div class="game-engine">
     <div class="paraules-container">
-      <!-- Iterem sobre la llista de paraules -->
       <div
         v-for="(paraula, index) in estatDelJoc.paraules"
         :key="paraula.id"
         class="paraula"
-        :class="{ 'paraula-activa': index === estatDelJoc.indexParaulaActiva }"
+        
+        :class="{ 'paraula-activa': index === estatDelJoc.paraules.length - 1 }"
       >
-        <!-- Més endavant mostrarem les lletres aquí -->
-        <template v-if="index === estatDelJoc.indexParaulaActiva">
+        
+        <template v-if="index === estatDelJoc.paraules.length - 1">
           <span
             v-for="(lletra, i) in paraula.text.split('')"
             :key="i"
@@ -198,13 +201,18 @@ const paraulaActiva = computed(() => {
         </template>
       </div>
     </div>
+    
     <input
       type="text"
       class="text-input"
       v-model="estatDelJoc.textEntrat"
       @input="validarProgres"
+      :disabled="!paraulaActiva"
       placeholder="Comença a escriure..."
+      autocomplete="off"
+      autofocus
     />
+    
     <div class="teclat">
       <div v-for="(fila, fIndex) in filesDelTeclat" :key="fIndex" class="fila">
         <div
@@ -216,27 +224,12 @@ const paraulaActiva = computed(() => {
           {{ lletra }}
         </div>
       </div>
-      <!-- Estadísticas al final del juego: comentadas por petición del equipo
-      <div v-if="JuegoTerminado" class="estadisticas">
-        <h2>¡Juego terminado! Estadísticas:</h2>
-        <div
-          v-for="(stat, index) in estatDelJoc.estadistiques"
-          :key="index"
-          class="stat-item"
-        >
-          <p>
-            Palabra: <strong>{{ stat.paraula }}</strong
-            ><br />
-            Tiempo: <strong>{{ (stat.temps / 1000).toFixed(2) }}s</strong><br />
-            Errores: <strong>{{ stat.errors }}</strong>
-          </p>
-        </div>
       </div>
-      -->
-    </div>
   </div>
 </template>
+
 <style scoped>
+/* Tus estilos originales */
 .estadisticas {
   margin-top: 20px;
   padding: 20px;
@@ -257,9 +250,11 @@ const paraulaActiva = computed(() => {
 }
 .correcte {
   color: green;
+  font-weight: bold;
 }
 .incorrecte {
   color: red;
+  text-decoration: underline;
 }
 .teclat {
   margin-top: 20px;
@@ -280,5 +275,35 @@ const paraulaActiva = computed(() => {
 .tecla-premuda {
   background-color: lightblue;
   border-color: #007bff;
+}
+
+/* Estilos para que la pila funcione de arriba a abajo */
+.paraules-container {
+  min-height: 300px; 
+  border: 1px solid #ccc;
+  padding: 10px;
+  display: flex;
+  flex-direction: column; /* Dirección normal (arriba a abajo) */
+  justify-content: flex-start; /* Palabras alineadas arriba */
+}
+.paraula {
+  font-size: 1.5em;
+  padding: 5px;
+  text-align: center;
+  border: 1px solid transparent;
+  margin-bottom: 4px; /* Espacio entre palabras */
+}
+/* La palabra de abajo (la activa) se resalta */
+.paraula-activa {
+  font-weight: bold;
+  border-color: blue;
+  background-color: #f0f8ff;
+}
+.text-input {
+  width: 100%;
+  padding: 10px;
+  font-size: 1.2em;
+  margin-top: 10px;
+  box-sizing: border-box; 
 }
 </style>
