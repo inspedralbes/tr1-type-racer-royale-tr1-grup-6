@@ -59,6 +59,15 @@ const communicationManager = {
     socket.on(eventName, callback);
   },
 
+  // Nous esdeveniments: eliminació i victòria
+  onPlayerEliminated(callback) {
+    socket.on("playerEliminated", callback);
+  },
+
+  onPlayerWon(callback) {
+    socket.on("playerWon", callback);
+  },
+
   // Funció per desconnectar-se del servidor
   disconnect() {
     if (socket.connected) {

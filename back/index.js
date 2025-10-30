@@ -29,9 +29,23 @@ function assignNewHost() {
 
 // Devuelve true si todos los jugadores (no eliminados) están ready
 function allPlayersReady() {
-  const players = Object.values(jugadors);
+  const players = Object.values(jugadors).filter(p => !p.eliminated);
   if (players.length === 0) return false;
   return players.every((p) => p.ready === true);
+}
+
+function handlePlayerErrors(count) {
+  const player = jugadors[this.id];
+  if (!player || player.eliminated) return;
+
+  if (count >= 5) {
+    player.eliminated = true;
+    console.log(`Jugador ${player.name} eliminado por errores`);
+    this.emit("playerEliminated", {
+      message: "Has sido eliminado por cometer demasiados errores."
+    });
+    broadcastPlayerList();
+  }
 }
 
 // Crea un payload simple de palabras para cada jugador (mismo set para todos por ahora)
@@ -100,6 +114,48 @@ io.on("connection", (socket) => {
       console.log(`Jugador ${socket.id} ready=${ready}`);
       broadcastPlayerList();
     }
+  });
+  // Nuevo handler para eliminar jugador por errores
+  socket.on("playerEliminated", (count) => {
+    const player = jugadors[socket.id];
+    if(player || player.eliminated) return;
+    if (count>=5){
+      player.eliminated = true;
+      console.log(`Jugador ${player.name} eliminado por errores`);
+      socket.emit("playerEliminated", {
+        message: "Has sido eliminado por cometer demasiados errores."
+      });
+      broadcastPlayerList();
+
+    }
+  });
+
+  // Aceptamos tanto "playerErrorCount" (frontend actual) como "playerEliminated"
+  socket.on("playerErrorCount", handlePlayerErrors);
+  socket.on("playerWon", () => {
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated) return;
+
+    console.log(`Jugador ${player.name} ha completado las palabras`);
+    socket.emit("playerWon", {
+      message: "Has completado las palabras."
+    });
+
+    //marcamos a los otros jugadores como eliminados y les avisamos
+    for (const id of Object.keys(jugadors)) {
+      if (id !== socket.id) {
+        jugadors[id].eliminated = true; // “perdedor”
+        io.to(id).emit("playerEliminated", {
+          message: `Has perdido porque ${player.name} completó todas las palabras.`
+        });
+      }
+    }
+
+    io.emit("gameOver", {
+      winnerId: socket.id,
+      winnerName: player.name,
+      message: `${player.name} ha completado las palabras`
+    });
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida

@@ -1,4 +1,5 @@
 <script setup>
+import communicationManager from "@/services/communicationManager";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
@@ -10,6 +11,8 @@ const filesDelTeclat = ref([
 ]);
 const teclaPremuda = ref("");
 const JuegoTerminado = ref(false);
+const perdedor = ref(false);
+const ganador = ref(false);
 const estatDelJoc = ref({
   paraules: [
     { id: 1, text: "component", estat: "pendent", errors: 0 },
@@ -33,6 +36,11 @@ function handleKeyDown(event) {
 }
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+  communicationManager.onEvent("playerEliminated", (data) => {
+    perdedor.value = true;
+    JuegoTerminado.value = true;
+    console.log(data.message); // Opcional: para debug
+  });
   // Si el servidor ha passat paraules inicials, les usem
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     estatDelJoc.value.paraules = props.initialWords.map((w, i) => ({
@@ -62,6 +70,7 @@ function iniciarCronometreParaula() {
 }
 
 function validarProgres() {
+  if (JuegoTerminado.value) return;
   if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
@@ -84,21 +93,24 @@ function validarProgres() {
     `Errors en la paraula "${paraulaActiva.value.text}": ${totalErrors}`
   );
 
+  //sumar errores totales a las estadísticas
+  estatDelJoc.value.totalErrors = estatDelJoc.value.paraules.reduce(
+    (acc, p) => acc + (p.errors || 0),
+    0
+  );
+
+  //mas de 5 errores no avanza
+  if (estatDelJoc.value.totalErrors >= 5 && !perdedor.value) {
+  perdedor.value = true;
+  JuegoTerminado.value = true;
+  console.log("Has perdido la partida");
+  communicationManager.sendEvent("playerErrorCount", estatDelJoc.value.totalErrors);
+}
+
   if (typed === target) {
     const tempsTrigat = Date.now() - tempsIniciParaula;
-
-    // Registrado de estadísticas deshabilitado por petición del equipo
-    // Descomentar si se desea registrar datos de cada palabra
-    // estatDelJoc.value.estadistiques.push({
-    //   paraula: paraulaActiva.value.text,
-    //   temps: tempsTrigat,
-    //   errors: paraulaActiva.value.errors,
-    // });
-
     paraulaActiva.value.estat = "completada";
-
     estatDelJoc.value.indexParaulaActiva++;
-
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
 
@@ -118,13 +130,12 @@ function validarProgres() {
         next.errors = 0;
       }
     } else {
-      // Fin del juego: mostrar estadísticas deshabilitado
-      // Si se desea volver a activar, descomentar las siguientes líneas
-      // JuegoTerminado.value = true;
-      // console.log("Joc acabat!", estatDelJoc.value.estadistiques);
-    }
+      communicationManager.sendEvent("playerWon");
+      ganador.value = true;
+      JuegoTerminado.value = true;
+      console.log(" Has ganado la partida");
   }
-}
+  }}
 
 function getClasseLletra(indexLletra) {
   if (
@@ -157,10 +168,21 @@ function getClasseLletra(indexLletra) {
 const paraulaActiva = computed(() => {
   return estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
 });
+
 </script>
 <template>
   <div class="game-engine">
     <div class="paraules-container">
+
+      <div v-if="perdedor" class="overlay lose">
+      <h2> Has perdido</h2>
+      <p>Cometiste demasiados errores.</p>
+    </div>
+
+    <div v-if="ganador" class="overlay win">
+      <h2>¡Has ganado!</h2>
+      <p>Completaste todas las palabras.</p>
+    </div>
       <!-- Iterem sobre la llista de paraules -->
       <div
         v-for="(paraula, index) in estatDelJoc.paraules"
