@@ -184,6 +184,48 @@ io.on("connection", (socket) => {
       broadcastPlayerList();
     }
   });
-});
+  // Cuando un jugador pierde (por acumular maxStack palabras)
+  // Cuando un jugador pierde (por acumular maxStack palabras)
+  socket.on("playerLost", () => {
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated) return;
 
+    player.eliminated = true;
+    console.log(
+      `Jugador ${player.name} ha sido eliminado por acumulación de palabras.`
+    );
+    socket.emit("playerEliminated", {
+      message: "Has perdido: demasiadas palabras acumuladas.",
+    });
+    broadcastPlayerList();
+
+    // Comprobamos si queda solo un jugador no eliminado → ese gana
+    const activos = Object.values(jugadors).filter((p) => !p.eliminated);
+
+    if (activos.length === 1) {
+      const ganador = activos[0];
+
+      // Enviamos mensaje de victoria al ganador
+      io.to(ganador.id).emit("playerWon", {
+        message: "¡Enhorabuena! Has ganado a todos los jugadores.",
+      });
+
+      // Enviamos mensaje de derrota a los demás
+      Object.values(jugadors).forEach((j) => {
+        if (j.id !== ganador.id) {
+          io.to(j.id).emit("playerEliminated", {
+            message: `Has perdido. El ganador es ${ganador.name}.`,
+          });
+        }
+      });
+
+      // Emitimos evento global de fin de partida
+      io.emit("gameOver", {
+        winnerId: ganador.id,
+        winnerName: ganador.name,
+        message: `${ganador.name} ha ganado la partida.`,
+      });
+    }
+  });
+});
 server.listen(3000);
