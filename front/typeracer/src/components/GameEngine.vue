@@ -303,7 +303,7 @@ function calculateProgress(completedWords) {
         class="text-input"
         v-model="estatDelJoc.textEntrat"
         @input="validarProgres"
-        placeholder="[translate:Comença a escriure...]"
+        placeholder="Comença a escriure..."
         :disabled="JuegoTerminado"
       />
 
@@ -326,12 +326,12 @@ function calculateProgress(completedWords) {
     </div>
 
     <aside class="players-sidebar">
-      <h3>[translate:Jugadors]</h3>
+      <h3>Jugadors</h3>
       <ul>
         <li v-for="p in props.players" :key="p.id" class="player-name-inline">
           <span class="player-name-text">{{ p.name }}</span>
           <span class="completed-count">
-            [translate:Paraules fetes:] {{ p.completedWords || 0 }}
+            Paraules fetes: {{ p.completedWords || 0 }}
           </span>
         </li>
       </ul>
@@ -515,6 +515,30 @@ function calculateProgress(completedWords) {
   margin-left: 1px;
   color: #007bff;
   font-size: 1.6rem;
+}
+.text-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 2rem;
+  padding: 16px 20px;
+  border-radius: 10px;
+  border: 2px solid #007bff;
+  margin-top: 30px;
+  background: #181a20;
+  color: white;
+  font-family: "Courier New", Courier, monospace;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 123, 255, 0.08);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.text-input:focus {
+  border-color: #28a745;
+}
+.text-input:disabled {
+  background: #444851;
+  color: #b3b3b3;
+  opacity: 0.7;
 }
 
 @keyframes blink {
