@@ -1,5 +1,6 @@
 <script setup>
 import communicationManager from "@/services/communicationManager";
+import DarkModeToggle from "./DarkModeToggle.vue";
 import { watch, computed } from "vue";
 
 const props = defineProps({
@@ -30,6 +31,7 @@ function volverLobby() {
 
 <template>
   <div class="result-screen" role="dialog" aria-live="polite">
+    <DarkModeToggle />
     <div class="result-card" :class="{ win: winner, lose: loser }">
       <h1>{{ title }}</h1>
       <p>{{ displayedMessage }}</p>
@@ -47,7 +49,7 @@ function volverLobby() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  background: var(--color-background);
   z-index: 9999;
 }
 
@@ -56,38 +58,46 @@ function volverLobby() {
   width: 90%;
   padding: 32px;
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px var(--shadow-color);
   text-align: center;
-  background: #f8fafc;
+  background: var(--color-background-soft);
 }
 
 .result-card.win {
   border: 4px solid #28a745;
+  background-color: var(--color-background-soft);
 }
 
 .result-card.lose {
   border: 4px solid #dc3545;
+  background-color: var(--color-background-soft);
 }
 
 .result-card h1 {
   margin: 0 0 12px;
   font-size: 2rem;
+  color: var(--color-heading);
 }
 
 .result-card p {
   margin: 0 0 20px;
   font-size: 1.1rem;
+  color: var(--color-text);
+  opacity: 0.9;
 }
 
 .actions button {
   padding: 10px 16px;
   border-radius: 6px;
-  border: none;
-  background: #1f6feb;
-  color: white;
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
+
 .actions button:hover {
-  opacity: 0.95;
+  background: var(--color-background-mute);
+  border-color: var(--color-border-hover);
 }
 </style>
