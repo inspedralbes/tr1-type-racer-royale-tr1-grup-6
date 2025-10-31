@@ -6,7 +6,7 @@ import GameResult from "@/components/GameResult.vue";
 // Props
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
-  intervalMs: { type: Number, default: 2000 },
+  intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
 });
@@ -30,7 +30,6 @@ const estatDelJoc = ref({
   paraules: [],
   textEntrat: "",
   estadistiques: [],
-  indexParaulaActiva: 0,
 });
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
@@ -39,13 +38,10 @@ let tempsIniciParaula = 0;
 
 // Computed: palabra activa
 const paraulaActiva = computed(() => {
-  if (
-    estatDelJoc.value.paraules.length === 0 ||
-    estatDelJoc.value.indexParaulaActiva >= estatDelJoc.value.paraules.length
-  ) {
+  if (estatDelJoc.value.paraules.length === 0) {
     return null;
   }
-  return estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
+  return estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
 });
 
 // Manejo teclado
@@ -120,8 +116,7 @@ function validarProgres() {
 
     communicationManager.updatePlayerProgress(palabrasCompletadas.value);
 
-    estatDelJoc.value.paraules.splice(estatDelJoc.value.indexParaulaActiva, 1);
-    estatDelJoc.value.indexParaulaActiva = 0;
+    estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
 
@@ -231,7 +226,7 @@ onMounted(() => {
           errors: 0,
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
-        estatDelJoc.value.paraules.push(newParaula);
+        estatDelJoc.value.paraules.unshift(newParaula);
       }
       if (
         estatDelJoc.value.paraules.length >= props.maxStack &&
@@ -269,20 +264,20 @@ function calculateProgress(completedWords) {
 <template>
   <div class="game-layout">
     <div class="game-main">
-      <div class="paraules-container">
+      <TransitionGroup name="fall" tag="div" class="paraules-container">
         <div
           v-for="(paraula, index) in estatDelJoc.paraules"
           :key="paraula.id"
           class="paraula"
           :class="{
-            'paraula-activa': index === estatDelJoc.indexParaulaActiva,
+            'paraula-activa': index === estatDelJoc.paraules.length - 1,
             'completada-correcta':
               paraula.estat === 'completada' && paraula.errors === 0,
             'completada-incorrecta':
               paraula.estat === 'completada' && paraula.errors > 0,
           }"
         >
-          <template v-if="index === estatDelJoc.indexParaulaActiva">
+          <template v-if="index === estatDelJoc.paraules.length - 1">
             <span
               v-for="(lletra, i) in paraula.text.split('')"
               :key="i"
@@ -296,7 +291,7 @@ function calculateProgress(completedWords) {
             {{ paraula.text }}
           </template>
         </div>
-      </div>
+      </TransitionGroup>
 
       <input
         type="text"
@@ -463,8 +458,8 @@ function calculateProgress(completedWords) {
   background: var(--color-background, #fff);
   padding: 16px;
   display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-start;
+  flex-direction: column;
+  justify-content: flex-end;
   border-radius: 8px;
   box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
   overflow-y: auto;
@@ -540,6 +535,35 @@ function calculateProgress(completedWords) {
   background: #444851;
   color: #b3b3b3;
   opacity: 0.7;
+}
+
+.fall-enter-active {
+  transition: all 0.5s ease-in;
+}
+.fall-enter-from {
+  opacity: 0;
+  transform: translateY(-40px);
+}
+.fall-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fall-leave-active {
+  transition: all 0.3s ease-out;
+  position: absolute;
+}
+.fall-leave-from {
+  opacity: 1;
+  transform: scale(1);
+}
+.fall-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fall-move {
+  transition: transform 0.4s ease;
 }
 
 @keyframes blink {
