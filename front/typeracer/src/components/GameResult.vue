@@ -1,12 +1,18 @@
 <script setup>
 import communicationManager from "@/services/communicationManager";
 import DarkModeToggle from "./DarkModeToggle.vue";
-import { watch, computed } from "vue";
+import { ref, computed } from "vue";
+const showRanking = ref(false);
+
+function toggleRanking() {
+  showRanking.value = !showRanking.value;
+}
 
 const props = defineProps({
   winner: { type: Boolean, default: false },
   loser: { type: Boolean, default: false },
   message: { type: String, default: "" },
+  players: { type: Array, default: () => [] },
 });
 
 // Texto calculado según props
@@ -37,12 +43,57 @@ function volverLobby() {
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="volverLobby">Volver al lobby</button>
+        <button @click="toggleRanking">
+          {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
+        </button>
+      </div>
+      <div v-if="showRanking" class="ranking-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th>Palabras completadas</th>
+              <th>Errores totales</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="player in players" :key="player.id">
+              <td>{{ player.name }}</td>
+              <td>{{ player.completedWords || 0 }}</td>
+              <td>{{ player.totalErrors || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.ranking-table {
+  margin-top: 24px;
+  text-align: left;
+}
+.ranking-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ranking-table th,
+.ranking-table td {
+  border: 1px solid var(--color-border, #ccc);
+  padding: 8px 10px;
+  text-align: center;
+}
+.ranking-table th {
+  background: var(--color-background-soft, #f4f4f4);
+  color: var(--color-heading, #333);
+  font-weight: 700;
+}
+.ranking-table td {
+  color: var(--color-text, #333);
+  font-weight: 500;
+}
+
 .result-screen {
   position: fixed;
   inset: 0;

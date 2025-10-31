@@ -342,6 +342,7 @@ function calculateProgress(completedWords) {
       :winner="ganador"
       :loser="perdedor"
       :message="perdidoMensaje"
+      :players="props.players"
     />
   </div>
 </template>
