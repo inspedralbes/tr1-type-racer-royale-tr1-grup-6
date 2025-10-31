@@ -11,12 +11,12 @@ const props = defineProps({
   players: { type: Array, default: () => [] },
 });
 
-//variables per guanyador y perdedor
+// Estado ganador y perdedor
 const perdedor = ref(false);
 const ganador = ref(false);
 const perdidoMensaje = ref("");
 
-// Estado del teclado
+// Estado teclado
 const filesDelTeclat = ref([
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
@@ -24,22 +24,20 @@ const filesDelTeclat = ref([
 ]);
 const teclaPremuda = ref("");
 
-// Estado del juego
+// Estado juego
 const JuegoTerminado = ref(false);
 const estatDelJoc = ref({
-  paraules: [], // pila de palabras visibles
-  textEntrat: "", // texto introducido por el usuario
-  estadistiques: [], // estadísticas (deshabilitadas)
-  indexParaulaActiva: 0, // índice para palabra activa (si usas)
+  paraules: [],
+  textEntrat: "",
+  estadistiques: [],
+  indexParaulaActiva: 0,
 });
 const palabrasCompletadas = ref(0);
-
-// Variables auxiliares
-const remainingWords = ref([]); // palabras pendientes por revelar
+const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 
-// Computed: palabra activa (la primera de la pila)
+// Computed: palabra activa
 const paraulaActiva = computed(() => {
   if (
     estatDelJoc.value.paraules.length === 0 ||
@@ -50,21 +48,38 @@ const paraulaActiva = computed(() => {
   return estatDelJoc.value.paraules[estatDelJoc.value.indexParaulaActiva];
 });
 
-// Manejo del teclado (para animar tecla pulsada)
+// Manejo teclado
 function handleKeyDown(event) {
-  if (event.key.length > 1 && event.key !== "Backspace") return;
-  teclaPremuda.value = event.key.toUpperCase();
-  setTimeout(() => {
-    teclaPremuda.value = "";
-  }, 100);
+  const key = event.key;
+
+  if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
+    teclaPremuda.value = key.toUpperCase();
+    setTimeout(() => {
+      teclaPremuda.value = "";
+    }, 100);
+  }
+
+  if (JuegoTerminado.value) return;
+
+  if (key === "Backspace") {
+    event.preventDefault();
+    estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
+  } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
+    event.preventDefault();
+    estatDelJoc.value.textEntrat += key;
+  } else {
+    return;
+  }
+
+  validarProgres();
 }
 
-// Inicializar timer para medir tiempo de palabra
+// Cronómetro inicio palabra
 function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
 
-// Validar progreso en la palabra actual y actualizar estado
+// Validar progreso en palabra actual
 function validarProgres() {
   if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
@@ -78,34 +93,38 @@ function validarProgres() {
     return;
   }
 
-  const target = paraula.text;
+  if (
+    !Array.isArray(paraula.letterErrors) ||
+    paraula.letterErrors.length !== paraula.text.length
+  ) {
+    paraula.letterErrors = Array.from(
+      { length: paraula.text.length },
+      () => false
+    );
+  }
+
   paraula.letterErrors.fill(false);
   let errorCount = 0;
 
   for (let i = 0; i < typed.length; i++) {
-    if (i >= target.length) break;
-    if (typed[i] !== target[i]) {
+    if (i >= paraula.text.length) break;
+    if (typed[i] !== paraula.text[i]) {
       paraula.letterErrors[i] = true;
       errorCount++;
     }
   }
   paraula.errors = errorCount;
 
-  if (typed === target) {
+  if (typed === paraula.text) {
     palabrasCompletadas.value++;
 
     communicationManager.updatePlayerProgress(palabrasCompletadas.value);
 
-    // Eliminar palabra completada del array
     estatDelJoc.value.paraules.splice(estatDelJoc.value.indexParaulaActiva, 1);
-
-    // Resetear índice a 0 para la siguiente palabra (ahora primera)
     estatDelJoc.value.indexParaulaActiva = 0;
-
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
 
-    // Preparar la siguiente palabra, si existe
     const nextParaula = paraulaActiva.value;
     if (nextParaula) {
       if (
@@ -122,7 +141,7 @@ function validarProgres() {
   }
 }
 
-// Lógica visual para pintar colores de letras
+// Lógica colores letras
 function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return "";
 
@@ -139,10 +158,11 @@ function getClasseLletra(indexLletra) {
   return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
 }
 
-// Ciclo de vida
+// Ciclo vida
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
-  //perdedor y ganador
+
+  // Eventos de ganador/perdedor
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
     perdedor.value = true;
@@ -150,9 +170,12 @@ onMounted(() => {
     JuegoTerminado.value = true;
     perdidoMensaje.value =
       data?.message || "Has perdido: demasiadas palabras acumuladas.";
+    if (revealTimer) {
+      clearInterval(revealTimer);
+      revealTimer = null;
+    }
   });
 
-  //  Cuando este jugador gana
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
@@ -160,9 +183,12 @@ onMounted(() => {
     JuegoTerminado.value = true;
     perdidoMensaje.value =
       data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
+    if (revealTimer) {
+      clearInterval(revealTimer);
+      revealTimer = null;
+    }
   });
 
-  //  Cuando la partida termina para todos (por ejemplo, último jugador en pie)
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
 
@@ -179,9 +205,12 @@ onMounted(() => {
     }
 
     JuegoTerminado.value = true;
+    if (revealTimer) {
+      clearInterval(revealTimer);
+      revealTimer = null;
+    }
   });
 
-  // Si hay palabras iniciales de props, se cargan en remainingWords
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     remainingWords.value = props.initialWords.slice();
   }
@@ -202,7 +231,6 @@ onMounted(() => {
           errors: 0,
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
-        // Añadimos palabra al final
         estatDelJoc.value.paraules.push(newParaula);
       }
       if (
@@ -213,6 +241,11 @@ onMounted(() => {
         JuegoTerminado.value = true;
         perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
         communicationManager.reportPlayerLost();
+
+        if (revealTimer) {
+          clearInterval(revealTimer);
+          revealTimer = null;
+        }
       }
     } catch (e) {
       console.error("Error en revealTimer:", e);
@@ -234,70 +267,76 @@ function calculateProgress(completedWords) {
 </script>
 
 <template>
-  <div class="game-engine">
-    <div class="paraules-container">
-      <!-- Iteramos sobre la lista de palabras -->
-      <div
-        v-for="(paraula, index) in estatDelJoc.paraules"
-        :key="paraula.id"
-        class="paraula"
-        :class="{
-          'paraula-activa': index === estatDelJoc.indexParaulaActiva,
-          'completada-correcta':
-            paraula.estat === 'completada' && paraula.errors === 0,
-          'completada-incorrecta':
-            paraula.estat === 'completada' && paraula.errors > 0,
-        }"
-      >
-        <!-- Mostrar letras solo en palabra activa -->
-        <template v-if="index === estatDelJoc.indexParaulaActiva">
-          <span
-            v-for="(lletra, i) in paraula.text.split('')"
-            :key="i"
-            class="lletra"
-            :class="getClasseLletra(i)"
+  <div class="game-layout">
+    <div class="game-main">
+      <div class="paraules-container">
+        <div
+          v-for="(paraula, index) in estatDelJoc.paraules"
+          :key="paraula.id"
+          class="paraula"
+          :class="{
+            'paraula-activa': index === estatDelJoc.indexParaulaActiva,
+            'completada-correcta':
+              paraula.estat === 'completada' && paraula.errors === 0,
+            'completada-incorrecta':
+              paraula.estat === 'completada' && paraula.errors > 0,
+          }"
+        >
+          <template v-if="index === estatDelJoc.indexParaulaActiva">
+            <span
+              v-for="(lletra, i) in paraula.text.split('')"
+              :key="i"
+              class="lletra"
+              :class="getClasseLletra(i)"
+            >
+              {{ lletra }}
+            </span>
+          </template>
+          <template v-else>
+            {{ paraula.text }}
+          </template>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        class="text-input"
+        v-model="estatDelJoc.textEntrat"
+        @input="validarProgres"
+        placeholder="[translate:Comença a escriure...]"
+        :disabled="JuegoTerminado"
+      />
+
+      <div class="teclat">
+        <div
+          v-for="(fila, fIndex) in filesDelTeclat"
+          :key="fIndex"
+          class="fila"
+        >
+          <div
+            v-for="lletra in fila"
+            :key="lletra"
+            class="tecla"
+            :class="{ 'tecla-premuda': teclaPremuda === lletra }"
           >
             {{ lletra }}
-          </span>
-        </template>
-        <template v-else>
-          {{ paraula.text }}
-        </template>
-      </div>
-    </div>
-    <input
-      type="text"
-      class="text-input"
-      v-model="estatDelJoc.textEntrat"
-      @input="validarProgres"
-      placeholder="Comença a escriure..."
-      :disabled="JuegoTerminado"
-    />
-    <div class="teclat">
-      <div v-for="(fila, fIndex) in filesDelTeclat" :key="fIndex" class="fila">
-        <div
-          v-for="lletra in fila"
-          :key="lletra"
-          class="tecla"
-          :class="{ 'tecla-premuda': teclaPremuda === lletra }"
-        >
-          {{ lletra }}
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Sidebar jugadores -->
     <aside class="players-sidebar">
-      <h3>Jugadors</h3>
+      <h3>[translate:Jugadors]</h3>
       <ul>
         <li v-for="p in props.players" :key="p.id" class="player-name-inline">
           <span class="player-name-text">{{ p.name }}</span>
-          <span class="completed-count"
-            >Paraules fetes: {{ p.completedWords || 0 }}</span
-          >
+          <span class="completed-count">
+            [translate:Paraules fetes:] {{ p.completedWords || 0 }}
+          </span>
         </li>
       </ul>
     </aside>
+
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"
@@ -308,44 +347,63 @@ function calculateProgress(completedWords) {
 </template>
 
 <style scoped>
-/* Kept styles used by this component's template */
 .correcte {
-  color: green;
+  color: #28a745;
   font-weight: bold;
 }
 .incorrecte {
-  color: red;
-  text-decoration: underline;
+  color: #dc3545;
+  background-color: #f8d7da;
+  border-radius: 3px;
 }
 
 .teclat {
   margin-top: 20px;
   text-align: center;
+  display: block;
+  max-width: 100%;
 }
 .fila {
   margin-bottom: 5px;
+  display: flex;
+  justify-content: center;
 }
 .tecla {
-  display: inline-block;
+  display: inline-flex;
   padding: 10px;
   border-radius: 4px;
-  border: 1px solid #ccc;
-  width: 30px;
-  height: 30px;
+  border: 1px solid var(--color-border, #ccc);
+  min-width: 40px;
+  height: 45px;
   margin: 2px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.1s ease-out;
+  font-weight: bold;
+  background: var(--color-background, #fff);
+  color: var(--color-text, #333);
+}
+.tecla:hover {
+  background-color: var(--color-background-soft, #f0f0f0);
 }
 .tecla-premuda {
-  background-color: lightblue;
+  background-color: #007bff;
   border-color: #007bff;
+  color: white;
+  transform: scale(0.95);
 }
 
-/* Layout: game main + sidebar */
 .game-layout {
   display: flex;
-  gap: 16px;
+  gap: 24px;
   align-items: flex-start;
   flex-wrap: nowrap;
   justify-content: center;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 .game-main {
   flex: 1 1 auto;
@@ -353,25 +411,23 @@ function calculateProgress(completedWords) {
   max-width: 720px;
 }
 
-/* Players sidebar (compact list) */
 .players-sidebar {
-  position: fixed;
-  right: 100px;
-  width: 350px;
-  background: var(--color-background-soft);
+  width: 300px;
+  background: var(--color-background-soft, #f8f8f8);
   border-radius: 8px;
   padding: 12px 16px;
   align-self: flex-start;
-  top: 20px;
-  box-shadow: 0 6px 18px var(--shadow-color);
-  border: 1px solid var(--color-border);
+  box-shadow: 0 6px 18px var(--shadow-color, rgba(0, 0, 0, 0.08));
+  border: 1px solid var(--color-border, #e0e0e0);
 }
 .players-sidebar h3 {
   margin: 0 0 12px 0;
   text-align: center;
-  color: var(--color-heading);
+  color: var(--color-heading, #333);
   font-weight: 700;
   font-size: 1.1rem;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  padding-bottom: 8px;
 }
 
 .player-name-inline {
@@ -383,24 +439,91 @@ function calculateProgress(completedWords) {
   margin-bottom: 8px;
   background: transparent;
   border-radius: 6px;
-  color: var(--color-text);
+  color: var(--color-text, #333);
   font-weight: 600;
 }
 .player-name-text {
   font-weight: 700;
-  color: var(--color-heading);
+  color: var(--color-heading, #333);
 }
 .completed-count {
   font-size: 12px;
-  color: var(--color-text);
+  color: var(--color-text, #555);
   opacity: 0.9;
+  background: var(--color-background, #fff);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
 }
+
 .paraules-container {
   min-height: 300px;
-  border: 1px solid #ccc;
-  padding: 10px;
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-background, #fff);
+  padding: 16px;
   display: flex;
-  flex-direction: column-reverse; /* clave para invertir dirección */
+  flex-direction: column-reverse;
   justify-content: flex-start;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
+  overflow-y: auto;
+}
+
+.paraula {
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: var(--color-background-soft, #f4f4f4);
+  border: 1px solid var(--color-border, #e0e0e0);
+  transition: all 0.3s ease;
+  font-size: 1.2rem;
+  color: var(--color-text-muted, #aaa);
+  opacity: 0.6;
+  text-align: center;
+  font-weight: 500;
+}
+
+.paraula-activa {
+  background: var(--color-background, #fff);
+  color: var(--color-heading, #333);
+  opacity: 1;
+  font-size: 1.6rem;
+  font-weight: bold;
+  border-color: #007bff;
+  box-shadow: 0 4px 12px var(--shadow-color, rgba(0, 123, 255, 0.15));
+  transform: scale(1.02);
+}
+
+.input-display-area {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-family: "Courier New", Courier, monospace;
+  color: var(--color-text, #333);
+  min-height: 55px;
+  background: var(--color-background, #fff);
+  text-align: left;
+  box-shadow: 0 2px 4px var(--shadow-color, rgba(0, 0, 0, 0.05));
+  word-wrap: break-word;
+}
+
+.cursor {
+  animation: blink 1s step-end infinite;
+  font-weight: bold;
+  margin-left: 1px;
+  color: #007bff;
+  font-size: 1.6rem;
+}
+
+@keyframes blink {
+  from,
+  to {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 </style>
