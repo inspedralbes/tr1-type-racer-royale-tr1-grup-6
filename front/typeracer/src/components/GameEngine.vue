@@ -188,6 +188,7 @@ onMounted(() => {
 
   // Timer para revelar palabras periódicamente
   revealTimer = setInterval(() => {
+    if (JuegoTerminado.value) return;
     try {
       if (
         remainingWords.value.length > 0 &&
@@ -221,7 +222,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
-  if (revealTimer) clearInterval(revealTimer);
+  if (revealTimer) {
+    clearInterval(revealTimer);
+    revealTimer = null;
+  }
 });
 
 function calculateProgress(completedWords) {
@@ -261,15 +265,14 @@ function calculateProgress(completedWords) {
         </template>
       </div>
     </div>
-
     <input
       type="text"
       class="text-input"
       v-model="estatDelJoc.textEntrat"
       @input="validarProgres"
       placeholder="Comença a escriure..."
+      :disabled="JuegoTerminado"
     />
-
     <div class="teclat">
       <div v-for="(fila, fIndex) in filesDelTeclat" :key="fIndex" class="fila">
         <div
