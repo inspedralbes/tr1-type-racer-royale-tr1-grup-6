@@ -105,6 +105,7 @@ io.on("connection", (socket) => {
     ready: false,
     eliminated: false,
     completedWords: 0,
+    totalErrors: 0, // contador total de errores
   };
 
   // Si no hay host, este será el host (primer usuario)
@@ -144,14 +145,15 @@ io.on("connection", (socket) => {
 
   // Actualizaciones de progreso desde clientes: { completedWords } o número
   socket.on("updatePlayerProgress", (payload) => {
-    let completed = 0;
-    if (typeof payload === "number") completed = payload;
-    else if (payload && typeof payload.completedWords === "number")
-      completed = payload.completedWords;
+    if (!payload) return;
 
     if (jugadors[socket.id]) {
-      jugadors[socket.id].completedWords = completed;
-      // Emitimos la lista actualizada para que todos vean los nuevos contadores
+      if (typeof payload.completedWords === "number") {
+        jugadors[socket.id].completedWords = payload.completedWords;
+      }
+      if (typeof payload.totalErrors === "number") {
+        jugadors[socket.id].totalErrors = payload.totalErrors;
+      } // Emitir lista actualizada para reflejar cambios
       broadcastPlayerList();
     }
   });
@@ -162,6 +164,16 @@ io.on("connection", (socket) => {
       console.log(
         `Usuario ${socket.id} intentó iniciar la partida pero no es host`
       );
+      return;
+    }
+
+    if (Object.keys(jugadors).length < 2) {
+      console.log(
+        "No hay suficientes jugadores para iniciar la partida. Mínimo 2 requeridos."
+      );
+      socket.emit("notEnoughPlayers", {
+        message: "Se requieren al menos 2 jugadores para iniciar.",
+      });
       return;
     }
 

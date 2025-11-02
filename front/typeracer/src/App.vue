@@ -37,6 +37,12 @@ function connectarAlServidor() {
     socketId.value = id;
   });
 
+  communicationManager.onEvent("notEnoughPlayers", (data) => {
+    alert(
+      data.message || "Es requereix almenys 2 jugadors per iniciar la partida."
+    );
+  });
+
   communicationManager.onUpdatePlayerList((payload) => {
     // payload: { players: [...], hostId }
     playersPayload.value = payload;
@@ -107,7 +113,7 @@ function startGameByHost() {
         <button
           v-if="isHost"
           @click="startGameByHost"
-          :disabled="!allReady"
+          :disabled="!allReady || jugadors.length < 2"
           style="margin-left: 8px"
         >
           Start (host)

@@ -44,6 +44,8 @@ const paraulaActiva = computed(() => {
   return estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
 });
 
+const totalErrors = ref(0);
+
 // Manejo teclado
 function handleKeyDown(event) {
   const key = event.key;
@@ -99,22 +101,32 @@ function validarProgres() {
     );
   }
 
-  paraula.letterErrors.fill(false);
   let errorCount = 0;
 
   for (let i = 0; i < typed.length; i++) {
     if (i >= paraula.text.length) break;
-    if (typed[i] !== paraula.text[i]) {
+    const isError = typed[i] !== paraula.text[i];
+    if (isError) {
+      // Solo incrementa errores totales si el error en esta letra no estaba marcado antes
+      if (!paraula.letterErrors[i]) {
+        totalErrors.value++;
+      }
       paraula.letterErrors[i] = true;
       errorCount++;
+    } else {
+      // Si la letra es correcta, aseguramos que no hay error ahí
+      paraula.letterErrors[i] = false;
     }
   }
-  paraula.errors = errorCount;
+  paraula.errors = errorCount; // Enviar progreso y errores acumulados al servidor
+
+  communicationManager.updatePlayerProgress({
+    completedWords: palabrasCompletadas.value,
+    totalErrors: totalErrors.value,
+  });
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-
-    communicationManager.updatePlayerProgress(palabrasCompletadas.value);
 
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
