@@ -77,46 +77,50 @@ function startGameByHost() {
 <template>
   <main>
     <DarkModeToggle />
-    <!-- VISTA 1: SALA D'ESPERA -->
-    <div v-if="vistaActual === 'salaEspera'" class="vista-container">
-      <h1>Type Racer Royale</h1>
-      <input
-        type="text"
-        v-model="nomJugador"
-        placeholder="Introdueix el teu nom"
-      />
-      <button @click="connectarAlServidor">Entra al Lobby</button>
-    </div>
 
-    <!-- VISTA 2: LOBBY -->
-    <div v-else-if="vistaActual === 'lobby'" class="vista-container">
-      <h2>Jugadors Connectats</h2>
-      <ul>
-        <li v-for="jugador in jugadors" :key="jugador.id">
-          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
-          <span v-if="jugador.id === hostId"> — host</span>
-        </li>
-      </ul>
+    <!-- Centered stage for entry screens (salaEspera and lobby) -->
+    <div v-if="vistaActual !== 'joc'" class="stage">
+      <!-- VISTA 1: SALA D'ESPERA -->
+      <div v-if="vistaActual === 'salaEspera'" class="vista-container">
+        <h1>Type Racer Royale</h1>
+        <input
+          type="text"
+          v-model="nomJugador"
+          placeholder="Introdueix el teu nom"
+        />
+        <button @click="connectarAlServidor">Entra al Lobby</button>
+      </div>
 
-      <div style="margin-top: 10px">
-        <button @click="toggleReady">
-          {{ isReady ? "Unready" : "Ready" }}
-        </button>
+      <!-- VISTA 2: LOBBY -->
+      <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
+        <h2>Jugadors Connectats</h2>
+        <ul>
+          <li v-for="jugador in jugadors" :key="jugador.id">
+            {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
+            <span v-if="jugador.id === hostId"> — host</span>
+          </li>
+        </ul>
 
-        <!-- Start visible only to host; server will check que todos estén ready -->
-        <button
-          v-if="isHost"
-          @click="startGameByHost"
-          :disabled="!allReady"
-          style="margin-left: 8px"
-        >
-          Start (host)
-        </button>
+        <div style="margin-top: 10px">
+          <button @click="toggleReady">
+            {{ isReady ? "Unready" : "Ready" }}
+          </button>
+
+          <!-- Start visible only to host; server will check que todos estén ready -->
+          <button
+            v-if="isHost"
+            @click="startGameByHost"
+            :disabled="!allReady"
+            class="btn-host"
+          >
+            Start (host)
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- VISTA 3: JOC -->
-    <div v-else-if="vistaActual === 'joc'" class="vista-container">
+    <!-- VISTA 3: JOC (no centered stage, full layout) -->
+    <div v-else class="vista-container-joc">
       <GameEngine
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
@@ -126,3 +130,67 @@ function startGameByHost() {
     </div>
   </main>
 </template>
+<style scoped>
+.vista-container {
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 20px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  text-align: center;
+  align-items: center;
+}
+.vista-container-lobby {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 20px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  text-align: center;
+}
+.vista-container-joc {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Stage wrapper centers entry views on wide screens */
+.stage {
+  width: 100%;
+  /* make the stage take the full viewport so it centers regardless of parent layout */
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* Reduce default margins inside the centered containers so they don't add extra offset */
+.vista-container,
+.vista-container-lobby,
+.vista-container-joc {
+  margin: 0 auto;
+}
+input[type="text"] {
+  width: 80%;
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
+}
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  cursor: pointer;
+}
+button.btn-host {
+  background-color: var(--color-success, #28a745);
+  margin-left: 8px;
+}
+</style>
