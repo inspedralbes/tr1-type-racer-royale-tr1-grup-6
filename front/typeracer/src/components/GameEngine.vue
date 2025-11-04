@@ -366,10 +366,20 @@ function calculateProgress(completedWords) {
 }
 
 .teclat {
-  margin-top: 20px;
+  /* sticky keyboard so it remains visible while words scroll */
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
   text-align: center;
   display: block;
   max-width: 100%;
+  padding: 10px 0 16px;
+  background: linear-gradient(
+    to top,
+    var(--color-background-soft),
+    transparent
+  );
+  z-index: 30;
 }
 .fila {
   margin-bottom: 5px;
@@ -417,6 +427,11 @@ function calculateProgress(completedWords) {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  /* keep the keyboard visible by bounding the game area height */
+  min-height: calc(60vh);
+  max-height: calc(80vh);
 }
 
 .players-sidebar {
@@ -465,16 +480,19 @@ function calculateProgress(completedWords) {
 }
 
 .paraules-container {
-  min-height: 300px;
+  /* Make the word stack scroll inside this box instead of growing the page */
   border: 1px solid var(--color-border, #ccc);
   background: var(--color-background, #fff);
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   border-radius: 8px;
   box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
   overflow-y: auto;
+  /* allow this area to grow within .game-main but not push the keyboard */
+  flex: 1 1 auto;
+  min-height: 120px;
 }
 
 .paraula {
@@ -528,12 +546,12 @@ function calculateProgress(completedWords) {
   width: 100%;
   box-sizing: border-box;
   font-size: 2rem;
-  padding: 16px 20px;
+  padding: 12px 16px;
   border-radius: 10px;
   border: 2px solid #007bff;
-  margin-top: 30px;
-  background: #181a20;
-  color: white;
+  margin: 14px 0 6px;
+  background: var(--color-background, #fff);
+  color: var(--color-text, #333);
   font-family: "Courier New", Courier, monospace;
   text-align: center;
   box-shadow: 0 2px 12px rgba(0, 123, 255, 0.08);
