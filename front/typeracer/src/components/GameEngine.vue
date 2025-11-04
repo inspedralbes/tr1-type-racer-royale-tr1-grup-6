@@ -3,6 +3,9 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import communicationManager from "../services/communicationManager.js";
 import GameResult from "@/components/GameResult.vue";
 
+const startTime = ref(null);
+const endTime = ref(null);
+
 // Props
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
@@ -82,6 +85,9 @@ function validarProgres() {
   if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
+  if (!startTime.value && estatDelJoc.value.textEntrat.length === 1) {
+    startTime.value = Date.now();
+  }
 
   const typed = estatDelJoc.value.textEntrat;
   const paraula = paraulaActiva.value;
@@ -123,6 +129,7 @@ function validarProgres() {
   communicationManager.updatePlayerProgress({
     completedWords: palabrasCompletadas.value,
     totalErrors: totalErrors.value,
+    playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
   });
 
   if (typed === paraula.text) {
@@ -152,6 +159,11 @@ function validarProgres() {
       }
     }
   }
+}
+
+function onGameEnd() {
+  endTime.value = Date.now();
+  const playTime = endTime.value - startTime.value; // Temps total jugat en ms
 }
 
 // Lógica colores letras

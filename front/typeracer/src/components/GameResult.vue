@@ -2,11 +2,32 @@
 import communicationManager from "@/services/communicationManager";
 import DarkModeToggle from "./DarkModeToggle.vue";
 import { ref, computed } from "vue";
+
+
 const showRanking = ref(false);
+const showStats = ref(false);
 
 function toggleRanking() {
   showRanking.value = !showRanking.value;
 }
+function toggleStats() {
+  showStats.value = !showStats.value;
+}
+
+function calcularWPM(player) {
+  if (!player.playTime || player.playTime === 0) return 0;
+  const minutes = player.playTime / 60000;
+  if (minutes === 0) return 0;
+  return Math.round(player.completedWords / minutes);
+}
+
+function calcularPrecision(player) {
+  const totalTyped = (player.completedWords || 0) * 5 + (player.totalErrors || 0);
+  if (!totalTyped) return 0; // Quan no ha tipejat res, mostra 0%
+  return Math.round(100 * ((player.completedWords * 5) / totalTyped));
+}
+
+
 
 const props = defineProps({
   winner: { type: Boolean, default: false },
@@ -43,9 +64,8 @@ function volverLobby() {
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="volverLobby">Volver al lobby</button>
-        <button @click="toggleRanking">
-          {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
-        </button>
+        <button @click="toggleRanking">{{ showRanking ? "Ocultar ranking" : "Ver ranking" }}</button>
+        <button @click="toggleStats">{{ showStats ? "Ocultar estadísticas" : "Estadísticas" }}</button>
       </div>
       <div v-if="showRanking" class="ranking-table">
         <table>
@@ -61,6 +81,24 @@ function volverLobby() {
               <td>{{ player.name }}</td>
               <td>{{ player.completedWords || 0 }}</td>
               <td>{{ player.totalErrors || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="showStats" style="text-align: center; margin-top: 24px;">
+        <table class="ranking-table" style="margin: 0 auto; max-width: 500px;">
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th>Velocidad (WPM)</th>
+              <th>Precisión (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="player in players" :key="player.id">
+              <td>{{ player.name }}</td>
+              <td>{{ calcularWPM(player) }}</td>
+              <td>{{ calcularPrecision(player) }}%</td>
             </tr>
           </tbody>
         </table>

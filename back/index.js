@@ -145,18 +145,22 @@ io.on("connection", (socket) => {
 
   // Actualizaciones de progreso desde clientes: { completedWords } o número
   socket.on("updatePlayerProgress", (payload) => {
-    if (!payload) return;
+  if (!payload) return;
 
-    if (jugadors[socket.id]) {
-      if (typeof payload.completedWords === "number") {
-        jugadors[socket.id].completedWords = payload.completedWords;
-      }
-      if (typeof payload.totalErrors === "number") {
-        jugadors[socket.id].totalErrors = payload.totalErrors;
-      } // Emitir lista actualizada para reflejar cambios
-      broadcastPlayerList();
+  if (jugadors[socket.id]) {
+    if (typeof payload.completedWords === "number") {
+      jugadors[socket.id].completedWords = payload.completedWords;
     }
-  });
+    if (typeof payload.totalErrors === "number") {
+      jugadors[socket.id].totalErrors = payload.totalErrors;
+    }
+    if (typeof payload.playTime === "number") {
+      jugadors[socket.id].playTime = payload.playTime;
+    }
+    broadcastPlayerList();
+  }
+});
+
 
   // Handler por si el host pulsa un botón para iniciar la partida
   socket.on("startGame", () => {
