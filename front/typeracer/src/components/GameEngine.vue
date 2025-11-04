@@ -128,6 +128,12 @@ function validarProgres() {
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
 
+    // Enviar progreso actualizado justo al completar la palabra
+    communicationManager.updatePlayerProgress({
+      completedWords: palabrasCompletadas.value,
+      totalErrors: totalErrors.value,
+    });
+
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
     tempsIniciParaula = 0;
