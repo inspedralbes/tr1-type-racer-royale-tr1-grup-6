@@ -159,7 +159,8 @@ io.on("connection", (socket) => {
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida
-  socket.on("startGame", () => {
+  let modoActual = "normal"; // modo por defecto
+  socket.on("startGame", (payload) => {
     if (socket.id !== hostId) {
       console.log(
         `Usuario ${socket.id} intentó iniciar la partida pero no es host`
@@ -183,10 +184,13 @@ io.on("connection", (socket) => {
       );
       return;
     }
+    modoActual = payload?.modo || "normal";
 
     const gamePayload = createGamePayload();
+    // Añade el modo seleccionado al payload
+    gamePayload.modo = modoActual;
     io.emit("gameStart", gamePayload);
-    console.log("gameStart emitido por el host");
+    console.log("gameStart emitido por el host con modo:", modoActual);
   });
 
   socket.on("completeWord", (word) => {
@@ -232,6 +236,37 @@ io.on("connection", (socket) => {
       });
 
       // Emitimos evento global de fin de partida
+      io.emit("gameOver", {
+        winnerId: ganador.id,
+        winnerName: ganador.name,
+        message: `${ganador.name} ha ganado la partida.`,
+      });
+    }
+  });
+  socket.on("playerEliminated", () => {
+    if (modoActual !== "muerteSubita") return;
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated) return;
+    player.eliminated = true;
+
+    socket.emit("playerEliminated", {
+      message: "Te has equivocado, ¡estás eliminado!",
+    });
+    broadcastPlayerList();
+
+    const activos = Object.values(jugadors).filter((p) => !p.eliminated);
+    if (activos.length === 1) {
+      const ganador = activos[0];
+      io.to(ganador.id).emit("playerWon", {
+        message: "¡Eres el último jugador en pie!",
+      });
+      Object.values(jugadors).forEach((j) => {
+        if (j.id !== ganador.id) {
+          io.to(j.id).emit("playerEliminated", {
+            message: `Has perdido. El ganador es ${ganador.name}.`,
+          });
+        }
+      });
       io.emit("gameOver", {
         winnerId: ganador.id,
         winnerName: ganador.name,

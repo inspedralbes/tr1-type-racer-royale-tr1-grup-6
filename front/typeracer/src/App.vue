@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import GameEngine from "./components/GameEngine.vue";
+import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
@@ -15,6 +16,7 @@ const isReady = ref(false);
 const playerWords = ref([]);
 const gameIntervalMs = ref(3000);
 const gameMaxStack = ref(5);
+const modoJuego = ref("normal"); // 'normal', 'Muerte súbita'
 
 const jugadors = computed(() => playersPayload.value.players || []);
 const hostId = computed(() => playersPayload.value.hostId || null);
@@ -55,8 +57,10 @@ function connectarAlServidor() {
       playerWords.value = payload.wordsByPlayer[ownId];
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
       gameMaxStack.value = payload.maxStack || 5;
+      modoJuego.value = payload.modo || "normal";
     } else {
       playerWords.value = [];
+      modoJuego.value = payload.modo || "normal";
     }
     // Cambiar a vista de juego
     vistaActual.value = "joc";
@@ -75,8 +79,8 @@ function toggleReady() {
 }
 
 function startGameByHost() {
-  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
-  communicationManager.requestStart();
+  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready y elegirá modo de juego
+  communicationManager.requestStart({ modo: modoJuego.value });
 }
 </script>
 
@@ -120,16 +124,28 @@ function startGameByHost() {
         >
           Start (host)
         </button>
+        <div v-if="isHost && vistaActual === 'lobby'" style="margin: 14px 0">
+          <label>
+            <input type="radio" value="normal" v-model="modoJuego" />
+            Normal
+          </label>
+          <label style="margin-left: 15px">
+            <input type="radio" value="muerteSubita" v-model="modoJuego" />
+            Muerte Súbita
+          </label>
+        </div>
       </div>
     </div>
 
     <!-- VISTA 3: JOC (no centered stage, full layout) -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
-      <GameEngine
+      <component
+        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"
         :players="jugadors"
+        :modo="modoJuego"
       />
     </div>
   </main>

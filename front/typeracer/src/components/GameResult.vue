@@ -13,6 +13,7 @@ const props = defineProps({
   loser: { type: Boolean, default: false },
   message: { type: String, default: "" },
   players: { type: Array, default: () => [] },
+  modo: { type: String, default: "normal" },
 });
 
 // Texto calculado según props
