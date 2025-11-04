@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import GameEngine from "./components/GameEngine.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
+import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
 // Control de vista
@@ -15,6 +16,7 @@ const isReady = ref(false);
 const playerWords = ref([]);
 const gameIntervalMs = ref(3000);
 const gameMaxStack = ref(5);
+const currentRoom = ref(null);
 
 const jugadors = computed(() => playersPayload.value.players || []);
 const hostId = computed(() => playersPayload.value.hostId || null);
@@ -65,7 +67,14 @@ function connectarAlServidor() {
   // Connecta i envia el nom
   communicationManager.connect(nomJugador.value);
 
-  // Canvia la vista al lobby
+  // Go to rooms selector so user can pick/create a room
+  vistaActual.value = "rooms";
+}
+
+function onRoomJoined(payload) {
+  // payload may contain roomId and roomName
+  currentRoom.value = payload?.roomId || payload?.id || null;
+  // after joining a room, navigate to lobby where player list will be shown
   vistaActual.value = "lobby";
 }
 
@@ -81,60 +90,74 @@ function startGameByHost() {
 </script>
 
 <template>
-  <main>
-    <DarkModeToggle />
+  <div class="app">
+    <main>
+      <DarkModeToggle />
 
-    <!-- Centered stage for entry screens (salaEspera and lobby) -->
-    <!-- VISTA 1: SALA D'ESPERA -->
-    <div v-if="vistaActual === 'salaEspera'" class="vista-container">
-      <h1>Type Racer Royale</h1>
-      <input
-        type="text"
-        v-model="nomJugador"
-        placeholder="Introdueix el teu nom"
-      />
-      <button @click="connectarAlServidor">Entra al Lobby</button>
-    </div>
-
-    <!-- VISTA 2: LOBBY -->
-    <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
-      <h2>Jugadors Connectats</h2>
-      <ul>
-        <li v-for="jugador in jugadors" :key="jugador.id">
-          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
-          <span v-if="jugador.id === hostId"> — host</span>
-        </li>
-      </ul>
-      <div style="margin-top: 10px">
-        <button @click="toggleReady">
-          {{ isReady ? "Unready" : "Ready" }}
-        </button>
-
-        <!-- Start visible only to host; server will check que todos estén ready -->
-        <button
-          v-if="isHost"
-          @click="startGameByHost"
-          :disabled="!allReady || jugadors.length < 2"
-          style="margin-left: 8px"
-          class="btn-host"
-        >
-          Start (host)
-        </button>
+      <!-- VISTA 1: SALA D'ESPERA -->
+      <div v-if="vistaActual === 'salaEspera'" class="vista-container">
+        <h1>Type Racer Royale</h1>
+        <input
+          type="text"
+          v-model="nomJugador"
+          placeholder="Introdueix el teu nom"
+        />
+        <button @click="connectarAlServidor">Entra al Lobby</button>
       </div>
-    </div>
 
-    <!-- VISTA 3: JOC (no centered stage, full layout) -->
-    <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
-      <GameEngine
-        :initialWords="playerWords"
-        :intervalMs="gameIntervalMs"
-        :maxStack="gameMaxStack"
-        :players="jugadors"
-      />
-    </div>
-  </main>
+      <!-- VISTA 2: ROOMS -->
+      <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
+        <RoomSelector @joined="onRoomJoined" />
+      </div>
+
+      <!-- VISTA 3: LOBBY -->
+
+      <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
+        <h2>Jugadors Connectats</h2>
+        <ul>
+          <li v-for="jugador in jugadors" :key="jugador.id">
+            {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
+            <span v-if="jugador.id === hostId"> — host</span>
+          </li>
+        </ul>
+        <div style="margin-top: 10px">
+          <button @click="toggleReady">
+            {{ isReady ? "Unready" : "Ready" }}
+          </button>
+
+          <!-- Start visible only to host; server will check que todos estén ready -->
+          <button
+            v-if="isHost"
+            @click="startGameByHost"
+            :disabled="!allReady || jugadors.length < 2"
+            style="margin-left: 8px"
+            class="btn-host"
+          >
+            Start (host)
+          </button>
+        </div>
+      </div>
+
+      <!-- VISTA 3: JOC (no centered stage, full layout) -->
+      <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
+        <GameEngine
+          :initialWords="playerWords"
+          :intervalMs="gameIntervalMs"
+          :maxStack="gameMaxStack"
+          :players="jugadors"
+        />
+      </div>
+    </main>
+  </div>
 </template>
 <style scoped>
+.app {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 18px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial;
+}
 .vista-container {
   max-width: 400px;
   margin: 40px auto;
@@ -163,17 +186,11 @@ function startGameByHost() {
 
 /* Stage wrapper centers entry views on wide screens */
 .stage {
-  width: 100%;
-  /* make the stage take the full viewport so it centers regardless of parent layout */
-  min-height: 100vh;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 20px;
 }
 
 /* Reduce default margins inside the centered containers so they don't add extra offset */
-.vista-container,
 .vista-container-lobby,
 .vista-container-joc {
   margin: 0 auto;

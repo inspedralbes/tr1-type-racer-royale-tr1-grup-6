@@ -7,6 +7,7 @@ const socket = io("http://localhost:3000", {
 });
 
 let onConnectCb = null;
+let currentRoom = null;
 
 socket.on("connect", () => {
   console.log("Socket connected, id=", socket.id);
@@ -22,7 +23,13 @@ const communicationManager = {
     // Opcional: escoltem la desconnexió
     socket.on("disconnect", () => {
       console.log("Desconnectat del servidor");
+      currentRoom = null;
     });
+  },
+
+  // Obtener la sala actual
+  getCurrentRoom() {
+    return currentRoom;
   },
 
   // Registrar callback per quan s'estableix la connexió i tenim socket.id
@@ -75,6 +82,68 @@ const communicationManager = {
   // Exemple de funció per escoltar un esdeveniment arbitrari
   onEvent(eventName, callback) {
     socket.on(eventName, callback);
+  },
+
+  // --- Rooms convenience API ---
+  // Request server to list rooms
+  listRooms() {
+    socket.emit("listRooms");
+  },
+
+  // Create a new room with a name
+  createRoom(name) {
+    socket.emit("createRoom", { name });
+  },
+
+  // Join an existing room by id
+  joinRoom(roomId) {
+    socket.emit("joinRoom", { roomId });
+    // No establecemos currentRoom aquí, esperamos la confirmación del servidor
+  },
+
+  // Leave current room
+  leaveRoom() {
+    if (currentRoom) {
+      socket.emit("leaveRoom");
+      currentRoom = null;
+    }
+  },
+
+  // Envia que l'usuari está ready en la sala actual
+  setReady(ready) {
+    if (currentRoom) {
+      socket.emit("clientReady", { ready, roomId: currentRoom });
+    }
+  },
+
+  // Sol·licitud explícita del host per iniciar la partida en la sala actual
+  requestStart() {
+    if (currentRoom) {
+      socket.emit("startGame", { roomId: currentRoom });
+    }
+  },
+
+  // Convenience listeners for rooms
+  onRoomList(callback) {
+    socket.on("roomList", callback);
+  },
+
+  onJoinedRoom(callback) {
+    socket.on("joinedRoom", (data) => {
+      if (data.success) {
+        currentRoom = data.roomId;
+      }
+      callback(data);
+    });
+  },
+
+  onLeftRoom(callback) {
+    socket.on("leftRoom", (data) => {
+      if (data.success) {
+        currentRoom = null;
+      }
+      callback(data);
+    });
   },
 
   // Funció per desconnectar-se del servidor

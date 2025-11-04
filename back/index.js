@@ -17,16 +17,26 @@ const io = new Server(server, {
   },
 });
 
-// Estado de jugadores: { [socketId]: { id, name, ready, eliminated } }
+// Estado de jugadores y rooms
 const jugadors = {};
+const rooms = new Map(); // Map to store rooms: { id, name, players: Map<socketId, playerData>, hostId }
 let hostId = null;
 
-console.log("Servidor Socket.IO listo en el puerto 3000");
-// Función para emitir la lista actualizada de jugadores a todos
-function broadcastPlayerList() {
-  const players = Object.values(jugadors);
-  io.emit("updatePlayerList", { players, hostId });
+// Genera un ID único para una room
+function generateRoomId() {
+  return Math.random().toString(36).substr(2, 9);
 }
+
+// Función para emitir la lista actualizada de jugadores de una room específica
+function broadcastRoomPlayerList(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  const players = Array.from(room.players.values());
+  io.to(roomId).emit("updatePlayerList", { players, hostId: room.hostId });
+}
+
+console.log("Servidor Socket.IO listo en el puerto 3000");
 
 function assignNewHost() {
   const ids = Object.keys(jugadors);
@@ -34,10 +44,10 @@ function assignNewHost() {
 }
 
 // Devuelve true si todos los jugadores (no eliminados) están ready
-function allPlayersReady() {
-  const players = Object.values(jugadors);
-  if (players.length === 0) return false;
-  return players.every((p) => p.ready === true);
+function allPlayersReadyInRoom(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || room.players.size === 0) return false;
+  return Array.from(room.players.values()).every((p) => p.ready === true);
 }
 
 // Crea un payload simple de palabras para cada jugador (mismo set para todos por ahora)
@@ -113,33 +123,208 @@ io.on("connection", (socket) => {
     hostId = socket.id;
   }
 
-  // Enviar la lista actualizada
-  broadcastPlayerList();
+
+  // Room management events
+  socket.on("listRooms", () => {
+    const roomsList = Array.from(rooms.values()).map((room) => ({
+      id: room.id,
+      name: room.name,
+      count: room.players.size,
+    }));
+    socket.emit("roomList", roomsList);
+  });
+
+  socket.on("createRoom", (data) => {
+    if (!data.name) return;
+    const roomId = generateRoomId();
+    const room = {
+      id: roomId,
+      name: data.name,
+      players: new Map(),
+      hostId: socket.id,
+      gameState: {
+        started: false,
+        wordsByPlayer: {},
+        maxStack: 20,
+        intervalMs: 2000,
+      },
+    };
+
+    room.players.set(socket.id, {
+      id: socket.id,
+      name: `Jugador-${socket.id.slice(0, 4)}`,
+      ready: false,
+      eliminated: false,
+      completedWords: 0,
+      totalErrors: 0, // contador total de errores
+    });
+
+    rooms.set(roomId, room);
+    console.log(`Room created: ${room.name} (${roomId})`);
+
+    socket.join(roomId);
+    socket.emit("joinedRoom", { success: true, roomId: roomId });
+
+    io.emit(
+      "roomList",
+      Array.from(rooms.values()).map((r) => ({
+        id: r.id,
+        name: r.name,
+        count: r.players.size,
+      }))
+    );
+
+    broadcastRoomPlayerList(roomId);
+  });
+
+  socket.on("joinRoom", (data) => {
+    const room = rooms.get(data.roomId);
+    if (room) {
+      // No permitir unirse si el juego ya comenzó
+      if (room.gameState.started) {
+        socket.emit("joinedRoom", {
+          success: false,
+          error: "Game already started",
+        });
+        return;
+      }
+
+      // Añadir jugador a la room
+      room.players.set(socket.id, {
+        id: socket.id,
+        name: jugadors[socket.id]?.name || `Jugador-${socket.id.slice(0, 4)}`,
+        ready: false,
+        eliminated: false,
+        completedWords: 0,
+        totalErrors: 0,
+      });
+
+      socket.join(data.roomId);
+      socket.emit("joinedRoom", { success: true, roomId: data.roomId });
+      console.log(`Player ${socket.id} joined room ${data.roomId}`);
+
+      // Update room list for all clients
+      io.emit(
+        "roomList",
+        Array.from(rooms.values()).map((r) => ({
+          id: r.id,
+          name: r.name,
+          count: r.players.size,
+        }))
+      );
+
+      // Broadcast updated player list to room
+      broadcastRoomPlayerList(data.roomId);
+    } else {
+      socket.emit("joinedRoom", { success: false, error: "Room not found" });
+    }
+  });
+
+  socket.on("leaveRoom", () => {
+    // Find and leave any room the player is in
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        room.players.delete(socket.id);
+        socket.leave(roomId);
+
+        // Si el host se va, asignar nuevo host al siguiente jugador
+        if (room.hostId === socket.id && room.players.size > 0) {
+          room.hostId = Array.from(room.players.keys())[0];
+        }
+
+        // If room is empty, remove it
+        if (room.players.size === 0) {
+          rooms.delete(roomId);
+        } else {
+          // Si la room sigue existiendo, actualizar la lista de jugadores
+          broadcastRoomPlayerList(roomId);
+        }
+
+        socket.emit("leftRoom", { success: true });
+
+        // Update room list for all clients
+        io.emit(
+          "roomList",
+          Array.from(rooms.values()).map((r) => ({
+            id: r.id,
+            name: r.name,
+            count: r.players.size,
+          }))
+        );
+        break;
+      }
+    }
+  });
 
   socket.on("disconnect", () => {
     console.log(`Usuario desconectado: ${socket.id}`);
+
+    // Clean up room membership
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        room.players.delete(socket.id);
+        if (room.players.size === 0) {
+          rooms.delete(roomId);
+        }
+      }
+    }
+
     delete jugadors[socket.id];
     // Si el host se desconecta, reasignar
     if (hostId === socket.id) {
       assignNewHost();
     }
-    broadcastPlayerList();
+
+    // Update room list for all clients
+    io.emit(
+      "roomList",
+      Array.from(rooms.values()).map((r) => ({
+        id: r.id,
+        name: r.name,
+        count: r.players.size,
+      }))
+    );
   });
 
   socket.on("setPlayerName", (name) => {
     if (jugadors[socket.id]) {
       jugadors[socket.id].name = name;
       console.log(`Jugador ${socket.id} se llama: ${name}`);
-      broadcastPlayerList();
     }
   });
 
   socket.on("clientReady", (payload) => {
     const ready = !!payload?.ready;
-    if (jugadors[socket.id]) {
-      jugadors[socket.id].ready = ready;
-      console.log(`Jugador ${socket.id} ready=${ready}`);
-      broadcastPlayerList();
+    const roomId = payload?.roomId; // Necesitamos que el cliente envíe el roomId
+
+    // Buscar la sala del jugador si no se proporcionó
+    let targetRoomId = roomId;
+    if (!targetRoomId) {
+      for (const [rid, room] of rooms.entries()) {
+        if (room.players.has(socket.id)) {
+          targetRoomId = rid;
+          break;
+        }
+      }
+    }
+
+    if (!targetRoomId) {
+      console.log(
+        `Player ${socket.id} tried to set ready but is not in any room`
+      );
+      return;
+    }
+
+    const room = rooms.get(targetRoomId);
+    if (!room) return;
+
+    const player = room.players.get(socket.id);
+    if (player) {
+      player.ready = ready;
+      console.log(
+        `Jugador ${socket.id} ready=${ready} en room ${targetRoomId}`
+      );
+      broadcastRoomPlayerList(targetRoomId);
     }
   });
 
@@ -154,22 +339,34 @@ io.on("connection", (socket) => {
       if (typeof payload.totalErrors === "number") {
         jugadors[socket.id].totalErrors = payload.totalErrors;
       } // Emitir lista actualizada para reflejar cambios
-      broadcastPlayerList();
     }
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida
-  socket.on("startGame", () => {
-    if (socket.id !== hostId) {
+  socket.on("startGame", (payload) => {
+    const roomId = payload?.roomId;
+    if (!roomId) {
+      console.log("No room ID provided for start game");
+      return;
+    }
+
+    const room = rooms.get(roomId);
+    if (!room) {
+      console.log(`Room ${roomId} not found`);
+      return;
+    }
+
+    // Verificar que es el host de la sala
+    if (socket.id !== room.hostId) {
       console.log(
-        `Usuario ${socket.id} intentó iniciar la partida pero no es host`
+        `Usuario ${socket.id} intentó iniciar la partida en room ${roomId} pero no es host`
       );
       return;
     }
 
-    if (Object.keys(jugadors).length < 2) {
+    if (room.players.size < 2) {
       console.log(
-        "No hay suficientes jugadores para iniciar la partida. Mínimo 2 requeridos."
+        `Room ${roomId}: No hay suficientes jugadores para iniciar. Mínimo 2 requeridos.`
       );
       socket.emit("notEnoughPlayers", {
         message: "Se requieren al menos 2 jugadores para iniciar.",
@@ -177,23 +374,72 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (!allPlayersReady()) {
+    if (!allPlayersReadyInRoom(roomId)) {
       console.log(
-        "El host intentó iniciar la partida pero no todos están listos"
+        `Room ${roomId}: El host intentó iniciar la partida pero no todos están listos`
       );
       return;
     }
 
-    const gamePayload = createGamePayload();
-    io.emit("gameStart", gamePayload);
-    console.log("gameStart emitido por el host");
+    // Crear payload específico para esta sala
+    let words = [];
+    try {
+      const wordsPath = path.join(__dirname, "data", "words.json");
+      const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, "");
+      words = JSON.parse(raw.trim());
+      if (!Array.isArray(words)) words = [];
+    } catch (err) {
+      console.error("No se pudo leer words.json:", err.message);
+      words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
+    }
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    const wordsPerPlayer = Math.max(
+      20,
+      Math.floor(words.length / Math.max(1, room.players.size))
+    );
+
+    const wordsByPlayer = {};
+    const shuffled = shuffle(words);
+    const players = Array.from(room.players.keys());
+
+    for (let i = 0; i < players.length; i++) {
+      const playerId = players[i];
+      const playerWords = [];
+      for (let j = 0; j < wordsPerPlayer; j++) {
+        playerWords.push(shuffled[(j + i) % shuffled.length]);
+      }
+      wordsByPlayer[playerId] = playerWords;
+    }
+
+    const gamePayload = {
+      wordsByPlayer,
+      maxStack: 20,
+      intervalMs: 2000,
+      startAt: Date.now() + 1500,
+    };
+
+    // Marcar la sala como iniciada
+    room.gameState.started = true;
+    room.gameState.wordsByPlayer = wordsByPlayer;
+
+    // Emitir solo a los jugadores de esta sala
+    io.to(roomId).emit("gameStart", gamePayload);
+    console.log(`gameStart emitido para room ${roomId}`);
   });
 
   socket.on("completeWord", (word) => {
     if (jugadors[socket.id]) {
       jugadors[socket.id].completedWords += 1;
       console.log(`Jugador ${socket.id} completó la palabra: ${word}`);
-      broadcastPlayerList();
     }
   });
   // Cuando un jugador pierde (por acumular maxStack palabras)
@@ -209,7 +455,6 @@ io.on("connection", (socket) => {
     socket.emit("playerEliminated", {
       message: "Has perdido: demasiadas palabras acumuladas.",
     });
-    broadcastPlayerList();
 
     // Comprobamos si queda solo un jugador no eliminado → ese gana
     const activos = Object.values(jugadors).filter((p) => !p.eliminated);
