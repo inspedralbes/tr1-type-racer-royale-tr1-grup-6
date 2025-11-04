@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import communicationManager from "../services/communicationManager.js";
 import GameResult from "@/components/GameResult.vue";
+import { useSounds } from '@/composables/useSounds';
 
 // Props
 const props = defineProps({
@@ -10,6 +11,12 @@ const props = defineProps({
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
 });
+
+// 2. Inicializa el gestor
+const { playSound } = useSounds();
+
+const isShaking = ref(false);
+
 
 // Estado ganador y perdedor
 const perdedor = ref(false);
@@ -62,6 +69,7 @@ function handleKeyDown(event) {
   if (key === "Backspace") {
     event.preventDefault();
     estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
+    playSound('keyBackspace'); // <-- SONIDO
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
     estatDelJoc.value.textEntrat += key;
@@ -91,6 +99,24 @@ function validarProgres() {
     return;
   }
 
+  // Lógica de sonido para tecla correcta/incorrecta
+  if (typed.length > 0) {
+    const lastCharIndex = typed.length - 1;
+    if (lastCharIndex < paraula.text.length) {
+      if (typed[lastCharIndex] !== paraula.text[lastCharIndex]) {
+        playSound('keyError'); // <-- SONIDO
+        isShaking.value = true;
+        setTimeout(() => { isShaking.value = false; }, 400);
+      } else {
+        playSound('keyPress'); // <-- SONIDO
+      }
+    } else {
+      playSound('keyError'); // <-- SONIDO
+      isShaking.value = true;
+      setTimeout(() => { isShaking.value = false; }, 400);
+    }
+  }
+
   if (
     !Array.isArray(paraula.letterErrors) ||
     paraula.letterErrors.length !== paraula.text.length
@@ -107,18 +133,16 @@ function validarProgres() {
     if (i >= paraula.text.length) break;
     const isError = typed[i] !== paraula.text[i];
     if (isError) {
-      // Solo incrementa errores totales si el error en esta letra no estaba marcado antes
       if (!paraula.letterErrors[i]) {
         totalErrors.value++;
       }
       paraula.letterErrors[i] = true;
       errorCount++;
     } else {
-      // Si la letra es correcta, aseguramos que no hay error ahí
       paraula.letterErrors[i] = false;
     }
   }
-  paraula.errors = errorCount; // Enviar progreso y errores acumulados al servidor
+  paraula.errors = errorCount;
 
   communicationManager.updatePlayerProgress({
     completedWords: palabrasCompletadas.value,
@@ -127,8 +151,8 @@ function validarProgres() {
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
+    playSound('wordComplete'); // <-- SONIDO
 
-    // Enviar progreso actualizado justo al completar la palabra
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
       totalErrors: totalErrors.value,
@@ -157,7 +181,6 @@ function validarProgres() {
 // Lógica colores letras
 function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return "";
-
   const typed = estatDelJoc.value.textEntrat;
   const target = paraulaActiva.value.text;
 
@@ -167,7 +190,6 @@ function getClasseLletra(indexLletra) {
     }
     return "";
   }
-
   return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
 }
 
@@ -181,6 +203,7 @@ onMounted(() => {
     perdedor.value = true;
     ganador.value = false;
     JuegoTerminado.value = true;
+    playSound('gameLose'); // <-- SONIDO
     perdidoMensaje.value =
       data?.message || "Has perdido: demasiadas palabras acumuladas.";
     if (revealTimer) {
@@ -194,6 +217,7 @@ onMounted(() => {
     ganador.value = true;
     perdedor.value = false;
     JuegoTerminado.value = true;
+    playSound('gameWin'); // <-- SONIDO
     perdidoMensaje.value =
       data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
     if (revealTimer) {
@@ -204,19 +228,19 @@ onMounted(() => {
 
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
-
     if (data.winnerId === communicationManager.id) {
       ganador.value = true;
       perdedor.value = false;
+      playSound('gameWin'); // <-- SONIDO
       perdidoMensaje.value =
         data.message || "¡Has ganado! Todos los demás fueron eliminados.";
     } else {
       ganador.value = false;
       perdedor.value = true;
+      playSound('gameLose'); // <-- SONIDO
       perdidoMensaje.value =
         data.message || `Has perdido. ${data.winnerName} ha ganado.`;
     }
-
     JuegoTerminado.value = true;
     if (revealTimer) {
       clearInterval(revealTimer);
@@ -245,6 +269,7 @@ onMounted(() => {
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
         estatDelJoc.value.paraules.unshift(newParaula);
+        playSound('newWord'); // <-- SONIDO
       }
       if (
         estatDelJoc.value.paraules.length >= props.maxStack &&
@@ -253,6 +278,7 @@ onMounted(() => {
         perdedor.value = true;
         JuegoTerminado.value = true;
         perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
+        playSound('gameLose'); // <-- SONIDO
         communicationManager.reportPlayerLost();
 
         if (revealTimer) {
@@ -314,6 +340,7 @@ function calculateProgress(completedWords) {
       <input
         type="text"
         class="text-input"
+        :class="{ 'shake-animation': isShaking }"
         v-model="estatDelJoc.textEntrat"
         @input="validarProgres"
         placeholder="Comença a escriure..."
@@ -342,6 +369,7 @@ function calculateProgress(completedWords) {
       <h3>Jugadors</h3>
       <ul>
         <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+          <span class="color-dot" :style="{ backgroundColor: p.color }"></span>
           <span class="player-name-text">{{ p.name }}</span>
           <span class="completed-count">
             Paraules fetes: {{ p.completedWords || 0 }}
@@ -361,6 +389,7 @@ function calculateProgress(completedWords) {
 </template>
 
 <style scoped>
+/* Tus estilos no necesitan cambios */
 .correcte {
   color: #28a745;
   font-weight: bold;
@@ -372,7 +401,6 @@ function calculateProgress(completedWords) {
 }
 
 .teclat {
-  /* sticky keyboard so it remains visible while words scroll */
   position: sticky;
   bottom: 0;
   margin-top: 12px;
@@ -435,7 +463,6 @@ function calculateProgress(completedWords) {
   max-width: 720px;
   display: flex;
   flex-direction: column;
-  /* keep the keyboard visible by bounding the game area height */
   min-height: calc(60vh);
   max-height: calc(80vh);
 }
@@ -486,7 +513,6 @@ function calculateProgress(completedWords) {
 }
 
 .paraules-container {
-  /* Make the word stack scroll inside this box instead of growing the page */
   border: 1px solid var(--color-border, #ccc);
   background: var(--color-background, #fff);
   padding: 12px;
@@ -496,7 +522,6 @@ function calculateProgress(completedWords) {
   border-radius: 8px;
   box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
   overflow-y: auto;
-  /* allow this area to grow within .game-main but not push the keyboard */
   flex: 1 1 auto;
   min-height: 120px;
 }
@@ -600,6 +625,54 @@ function calculateProgress(completedWords) {
 
 .fall-move {
   transition: transform 0.4s ease;
+}
+
+.color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+  border: 1px solid rgba(0,0,0,0.2);
+  flex-shrink: 0; /* Evita que el punt es redueixi */
+}
+
+/* Ajusta el 'li' per a una millor alineació */
+.player-name-inline {
+  display: flex;
+  align-items: center;
+  /* ... la resta dels teus estils .player-name-inline ... */
+}
+
+.player-name-text {
+  /* ... la resta dels teus estils .player-name-text ... */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1; /* Permet que el nom ocupi l'espai */
+}
+
+.shake-animation {
+  /* Aplica la animación 'shake' */
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+@keyframes shake {
+  10%, 90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%, 80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%, 50%, 70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%, 60% {
+    transform: translate3d(4px, 0, 0);
+  }
 }
 
 @keyframes blink {

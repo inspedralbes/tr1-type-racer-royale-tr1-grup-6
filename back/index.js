@@ -102,6 +102,7 @@ io.on("connection", (socket) => {
   jugadors[socket.id] = {
     id: socket.id,
     name: `Jugador-${socket.id.slice(0, 4)}`,
+    color: '#9E9E9E',
     ready: false,
     eliminated: false,
     completedWords: 0,
@@ -126,10 +127,11 @@ io.on("connection", (socket) => {
     broadcastPlayerList();
   });
 
-  socket.on("setPlayerName", (name) => {
-    if (jugadors[socket.id]) {
-      jugadors[socket.id].name = name;
-      console.log(`Jugador ${socket.id} se llama: ${name}`);
+  socket.on("join", (playerData) => {
+    if (jugadors[socket.id] && playerData) {
+      jugadors[socket.id].name = playerData.name || `Jugador-${socket.id.slice(0, 4)}`;
+      jugadors[socket.id].color = playerData.color || '#9E9E9E'; // Asigna el color
+      console.log(`Jugador ${socket.id} s'ha unit: ${jugadors[socket.id].name} (${jugadors[socket.id].color})`);
       broadcastPlayerList();
     }
   });

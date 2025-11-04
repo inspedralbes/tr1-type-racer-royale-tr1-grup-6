@@ -1,4 +1,3 @@
-// src/services/communicationManager.js
 import { io } from "socket.io-client";
 
 // Creem una única instància del socket per a tota l'aplicació
@@ -14,10 +13,12 @@ socket.on("connect", () => {
 });
 
 const communicationManager = {
-  // Funció per connectar-se i enviar el nom del jugador
-  connect(playerName) {
+  // 🎨 CAMBIO: Ara accepta 'playerData' (un objecte) i emet 'join'
+  // Funció per connectar-se i enviar les dades del jugador
+  connect(playerData) { // L'argument ara és 'playerData' (que conté { name, color })
     socket.connect();
-    socket.emit("setPlayerName", playerName);
+    // L'esdeveniment ara és 'join' i enviem l'objecte sencer
+    socket.emit("join", playerData);
 
     // Opcional: escoltem la desconnexió
     socket.on("disconnect", () => {
