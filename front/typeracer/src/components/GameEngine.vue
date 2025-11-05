@@ -82,6 +82,8 @@ function iniciarCronometreParaula() {
 
 // Validar progreso en palabra actual
 function validarProgres() {
+  if (JuegoTerminado.value) return; // Bloqueja tot si la partida ha finalitzat
+
   if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
@@ -134,6 +136,11 @@ function validarProgres() {
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
+    
+    if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
+      JuegoTerminado.value = true;
+      // Qualsevol acció extra: mostrar resultats, deshabilitar input, etc.
+    }
 
     // Enviar progreso actualizado justo al completar la palabra
     communicationManager.updatePlayerProgress({
