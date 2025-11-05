@@ -20,15 +20,23 @@ const props = defineProps({
 const title = computed(() =>
   props.winner ? "¡Has ganado!" : props.loser ? "Has perdido" : ""
 );
-const displayedMessage = computed(() =>
-  props.winner
-    ? "Completaste todas las palabras."
-    : props.message
-    ? props.message // mostrar mensaje enviado por el servidor / frontend
-    : props.loser
-    ? "Muchos errores, has perdido."
-    : ""
-);
+const displayedMessage = computed(() => {
+  if (props.message) return props.message;
+
+  if (props.winner) {
+    return props.modo === "muerteSubita"
+      ? "¡Eres el último jugador en pie!"
+      : "Completaste todas las palabras.";
+  }
+
+  if (props.loser) {
+    return props.modo === "muerteSubita"
+      ? "Fallaste una palabra. Has sido eliminado."
+      : "Demasiados errores o palabras acumuladas.";
+  }
+
+  return "";
+});
 
 // Opciones: recargar para volver a lobby / reiniciar
 function volverLobby() {
@@ -41,6 +49,7 @@ function volverLobby() {
     <DarkModeToggle />
     <div class="result-card" :class="{ win: winner, lose: loser }">
       <h1>{{ title }}</h1>
+      <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="volverLobby">Volver al lobby</button>
@@ -137,6 +146,18 @@ function volverLobby() {
   color: var(--color-text);
   opacity: 0.9;
 }
+
+.badge {
+  display: inline-block;
+  background: #dc3545;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+
 
 .actions button {
   padding: 10px 16px;

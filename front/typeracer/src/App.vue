@@ -124,15 +124,25 @@ function startGameByHost() {
         >
           Start (host)
         </button>
-        <div v-if="isHost && vistaActual === 'lobby'" style="margin: 14px 0">
-          <label>
-            <input type="radio" value="normal" v-model="modoJuego" />
-            Normal
-          </label>
-          <label style="margin-left: 15px">
-            <input type="radio" value="muerteSubita" v-model="modoJuego" />
-            Muerte Súbita
-          </label>
+        <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
+          <h3>Selecciona el modo de juego</h3>
+          <div class="modo-buttons">
+            <label
+              class="modo-btn"
+              :class="{ active: modoJuego === 'normal' }"
+            >
+              <input type="radio" value="normal" v-model="modoJuego" />
+              <span>🎯 Normal</span>
+            </label>
+
+            <label
+              class="modo-btn muerte"
+              :class="{ active: modoJuego === 'muerteSubita' }"
+            >
+              <input type="radio" value="muerteSubita" v-model="modoJuego" />
+              <span>💀 Muerte Súbita</span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -213,4 +223,82 @@ button.btn-host {
   background-color: var(--color-success, #28a745);
   margin-left: 8px;
 }
+/* Modo selector styles */
+.modo-selector {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.modo-selector h3 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  color: var(--color-heading, #333);
+}
+
+.modo-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.modo-btn {
+  position: relative;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: linear-gradient(145deg, #e3e3e3, #f9f9f9);
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.modo-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.modo-btn input {
+  display: none;
+}
+
+.modo-btn span {
+  position: relative;
+  z-index: 2;
+}
+
+.modo-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, #007bff, #00d4ff);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 12px;
+  z-index: 1;
+}
+
+.modo-btn.active::before {
+  opacity: 1;
+}
+
+.modo-btn.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Colores específicos para muerte súbita */
+.modo-btn.muerte::before {
+  background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
+}
+.modo-btn.muerte.active {
+  color: white;
+}
+
+/* Animación sutil al hacer hover */
+.modo-btn:active {
+  transform: scale(0.98);
+}
+
 </style>

@@ -274,6 +274,14 @@ function calculateProgress(completedWords) {
 </script>
 
 <template>
+  <div class="game-header">
+    <h2 class="modo-titulo">
+        Modo de juego: 
+      <span :class="['modo-text', props.modo]">
+        {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+      </span>
+    </h2>
+  </div>
   <div class="game-layout">
     <div class="game-main">
       <TransitionGroup name="fall" tag="div" class="paraules-container">
@@ -350,6 +358,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
+      :modo="props.modo" 
     />
   </div>
 </template>

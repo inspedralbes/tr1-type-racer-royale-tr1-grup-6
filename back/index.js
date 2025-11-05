@@ -94,6 +94,7 @@ function createGamePayload() {
     startAt: Date.now() + 1500,
   };
 }
+let modoActual = "normal"; // modo de juego actual
 
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
@@ -159,7 +160,7 @@ io.on("connection", (socket) => {
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida
-  let modoActual = "normal"; // modo por defecto
+
   socket.on("startGame", (payload) => {
     if (socket.id !== hostId) {
       console.log(
@@ -250,6 +251,8 @@ io.on("connection", (socket) => {
     player.eliminated = true;
 
     socket.emit("playerEliminated", {
+      playerId: player.id,
+      playerName: player.name,
       message: "Te has equivocado, ¡estás eliminado!",
     });
     broadcastPlayerList();

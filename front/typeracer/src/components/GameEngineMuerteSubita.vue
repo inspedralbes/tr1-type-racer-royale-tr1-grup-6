@@ -132,13 +132,16 @@ function validarProgres() {
       totalErrors.value++;
       if (
         props.modo === "muerteSubita" &&
-        !JuegoTerminado.value &&
-        !perdedor.value
+        !perdedor.value&&
+        !ganador.value
       ) {
         perdedor.value = true;
-        JuegoTerminado.value = true;
         perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
         communicationManager.reportPlayerEliminated();
+        // El jugador local ya no puede escribir
+        estatDelJoc.value.textEntrat = "";
+        window.removeEventListener("keydown", handleKeyDown);
+        estatDelJoc.value.textEntrat = "";
         if (revealTimer) {
           clearInterval(revealTimer);
           revealTimer = null;
@@ -174,8 +177,6 @@ function getClasseLletra(indexLletra) {
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
 
-  // Eventos de ganador/perdedor
-
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
@@ -186,6 +187,24 @@ onMounted(() => {
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
+    }
+  });
+
+  communicationManager.onPlayerEliminated((data) => {
+    const player = props.players.find((p) => p.id === data.playerId);
+    if (player) {
+      player.eliminado = true;
+    }
+
+    if (data.playerId === communicationManager.id) {
+      perdedor.value = true;
+      perdidoMensaje.value = data.message || "Te has equivocado, ¡estás eliminado!";
+      window.removeEventListener("keydown", handleKeyDown);
+      estatDelJoc.value.textEntrat = "";
+      if (revealTimer) {
+        clearInterval(revealTimer);
+        revealTimer = null;
+      }
     }
   });
 
@@ -215,7 +234,7 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Timer para revelar palabras periódicamente
+  // Timer para revelar palabras
   revealTimer = setInterval(() => {
     if (JuegoTerminado.value) return;
     try {
@@ -239,6 +258,7 @@ onMounted(() => {
   }, props.intervalMs || 3000);
 });
 
+
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
   if (revealTimer) {
@@ -253,7 +273,16 @@ function calculateProgress(completedWords) {
 </script>
 
 <template>
+  <div class="game-header">
+    <h2 class="modo-titulo">
+        Modo de juego: 
+      <span :class="['modo-text', props.modo]">
+        {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+      </span>
+    </h2>
+  </div>
   <div class="game-layout">
+  
     <div class="game-main">
       <TransitionGroup name="fall" tag="div" class="paraules-container">
         <div
@@ -314,13 +343,19 @@ function calculateProgress(completedWords) {
     <aside class="players-sidebar">
       <h3>Jugadors</h3>
       <ul>
-        <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+        <li
+          v-for="p in props.players"
+          :key="p.id"
+          class="player-name-inline"
+          :class="{ eliminado: p.eliminated }"
+        >
           <span class="player-name-text">{{ p.name }}</span>
           <span
-            v-if="p.eliminado"
+            v-if="p.eliminated"
             style="color: #dc3545; font-weight: bold; margin-left: 10px"
-            >Eliminado</span
           >
+            Eliminado
+          </span>
           <span class="completed-count">
             Paraules fetes: {{ p.completedWords || 0 }}
           </span>
@@ -334,6 +369,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
+      :modo="props.modo"
     />
   </div>
 </template>
@@ -435,6 +471,10 @@ function calculateProgress(completedWords) {
   font-size: 1.1rem;
   border-bottom: 1px solid var(--color-border, #e0e0e0);
   padding-bottom: 8px;
+}
+.player-name-inline.eliminado {
+  opacity: 0.5;
+  text-decoration: line-through;
 }
 
 .player-name-inline {
@@ -542,6 +582,38 @@ function calculateProgress(completedWords) {
   outline: none;
   transition: border-color 0.15s;
 }
+
+/*estilos para el header del modo de juego*/
+
+.game-header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.modo-titulo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-heading, #333);
+}
+
+.modo-text {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.modo-text.normal {
+  background-color: #007bff;
+  color: white;
+}
+
+.modo-text.muerteSubita {
+  background-color: #dc3545;
+  color: white;
+}
+
+
 .text-input:focus {
   border-color: #28a745;
 }
