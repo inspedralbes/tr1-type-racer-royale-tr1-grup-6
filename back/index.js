@@ -43,7 +43,54 @@ function allPlayersReadyInRoom(roomId) {
   if (!room || room.players.size === 0) return false;
   return Array.from(room.players.values()).every((p) => p.ready === true);
 }
+function createGamePayload() {
 
+      let words = [];
+      try {
+        const wordsPath = path.join(__dirname, "data", "words.json");
+        const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, "");
+        words = JSON.parse(raw.trim());
+        if (!Array.isArray(words)) words = [];
+      } catch (err) {
+        console.error("No se pudo leer words.json:", err.message);
+        words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
+      }
+
+      function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      const wordsPerPlayer = Math.max(
+        20,
+        Math.floor(words.length / Math.max(1, room.players.size))
+      );
+
+      const wordsByPlayer = {};
+      const shuffled = shuffle(words);
+      const players = Array.from(room.players.keys());
+
+      for (let i = 0; i < players.length; i++) {
+        const playerId = players[i];
+        const playerWords = [];
+        for (let j = 0; j < wordsPerPlayer; j++) {
+          playerWords.push(shuffled[(j + i) % shuffled.length]);
+        }
+        wordsByPlayer[playerId] = playerWords;
+      }
+
+      const gamePayload = {
+        wordsByPlayer,
+        maxStack: 20,
+        intervalMs: 2000,
+        startAt: Date.now() + 1500,
+      };
+    }   
+let modoActual = "normal"; // modo de juego actual: "normal" o "muerteSubita" 
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
 
@@ -288,8 +335,6 @@ io.on("connection", (socket) => {
       console.log(`Room ${roomId} not found`);
       return;
     }
-
-    // Verificar que es el host de la sala
     if (socket.id !== room.hostId) {
       console.log(
         `Usuario ${socket.id} intentó iniciar la partida en room ${roomId} pero no es host`
@@ -313,52 +358,10 @@ io.on("connection", (socket) => {
       );
       return;
     }
+    modoActual = payload?.modo || "normal";
 
-    // Crear payload específico para esta sala
-    let words = [];
-    try {
-      const wordsPath = path.join(__dirname, "data", "words.json");
-      const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, "");
-      words = JSON.parse(raw.trim());
-      if (!Array.isArray(words)) words = [];
-    } catch (err) {
-      console.error("No se pudo leer words.json:", err.message);
-      words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
-    }
-
-    function shuffle(arr) {
-      const a = arr.slice();
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    const wordsPerPlayer = Math.max(
-      20,
-      Math.floor(words.length / Math.max(1, room.players.size))
-    );
-
-    const wordsByPlayer = {};
-    const shuffled = shuffle(words);
-    const players = Array.from(room.players.keys());
-
-    for (let i = 0; i < players.length; i++) {
-      const playerId = players[i];
-      const playerWords = [];
-      for (let j = 0; j < wordsPerPlayer; j++) {
-        playerWords.push(shuffled[(j + i) % shuffled.length]);
-      }
-      wordsByPlayer[playerId] = playerWords;
-    }
-
-    const gamePayload = {
-      wordsByPlayer,
-      maxStack: 20,
-      intervalMs: 2000,
-      startAt: Date.now() + 1500,
-    };
+    const gamePayload = createGamePayload();
+    gamePayload.modo = modoActual;
 
     // Marcar la sala como iniciada
     room.gameState.started = true;
@@ -420,16 +423,49 @@ io.on("connection", (socket) => {
             });
           }
         });
-
-        // Emitimos evento de fin de partida SOLO a la room
         io.to(roomId).emit("gameOver", {
           winnerId: ganador.id,
           winnerName: ganador.name,
           message: `${ganador.name} ha ganado la partida.`,
         });
+        // Emitimos evento de fin de partida SOLO a la room
+        
       }
 
       break;
+    }
+  });
+  socket.on("playerEliminated", () => {
+    if (modoActual !== "muerteSubita") return;
+    const player = jugadors[socket.id];
+    if (!player || player.eliminated) return;
+    player.eliminated = true;
+
+    socket.emit("playerEliminated", {
+      playerId: player.id,
+      playerName: player.name,
+      message: "Te has equivocado, ¡estás eliminado!",
+    });
+    broadcastPlayerList();
+
+    const activos = Object.values(jugadors).filter((p) => !p.eliminated);
+    if (activos.length === 1) {
+      const ganador = activos[0];
+      io.to(ganador.id).emit("playerWon", {
+        message: "¡Eres el último jugador en pie!",
+      });
+      Object.values(jugadors).forEach((j) => {
+        if (j.id !== ganador.id) {
+          io.to(j.id).emit("playerEliminated", {
+            message: `Has perdido. El ganador es ${ganador.name}.`,
+          });
+        }
+      });
+      io.to(roomId).emit("gameOver", {
+          winnerId: ganador.id,
+          winnerName: ganador.name,
+          message: `${ganador.name} ha ganado la partida.`,
+      });
     }
   });
 });

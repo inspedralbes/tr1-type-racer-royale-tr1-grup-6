@@ -52,11 +52,14 @@ const communicationManager = {
   },
 
   // Sol·licitud explícita del host per iniciar la partida
-  requestStart() {
-    socket.emit("startGame");
+  requestStart(options) {
+    socket.emit("startGame", options);
   },
   reportPlayerLost() {
     socket.emit("playerLost");
+  },
+  reportPlayerEliminated() {
+    socket.emit("playerEliminated");
   },
 
   // Enviar que l'usuari ha completat una paraula

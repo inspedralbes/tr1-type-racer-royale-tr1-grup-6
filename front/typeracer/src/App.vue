@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import GameEngine from "./components/GameEngine.vue";
+import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
 import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
@@ -16,6 +17,7 @@ const isReady = ref(false);
 const playerWords = ref([]);
 const gameIntervalMs = ref(3000);
 const gameMaxStack = ref(5);
+const modoJuego = ref("normal");
 const currentRoom = ref(null);
 
 const jugadors = computed(() => playersPayload.value.players || []);
@@ -57,8 +59,10 @@ function connectarAlServidor() {
       playerWords.value = payload.wordsByPlayer[ownId];
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
       gameMaxStack.value = payload.maxStack || 5;
+      modoJuego.value = payload.modo || "normal";
     } else {
       playerWords.value = [];
+      modoJuego.value = payload.modo || "normal";
     }
     // Cambiar a vista de juego
     vistaActual.value = "joc";
@@ -84,13 +88,12 @@ function toggleReady() {
 }
 
 function startGameByHost() {
-  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
-  communicationManager.requestStart();
+  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready y elegirá modo de juego
+  communicationManager.requestStart({ modo: modoJuego.value });
 }
 </script>
 
 <template>
-  <div class="app">
     <main>
       <DarkModeToggle />
 
@@ -125,30 +128,48 @@ function startGameByHost() {
             {{ isReady ? "Unready" : "Ready" }}
           </button>
 
-          <!-- Start visible only to host; server will check que todos estén ready -->
-          <button
-            v-if="isHost"
-            @click="startGameByHost"
-            :disabled="!allReady || jugadors.length < 2"
-            style="margin-left: 8px"
-            class="btn-host"
-          >
-            Start (host)
-          </button>
+        <!-- Start visible only to host; server will check que todos estén ready -->
+        <button
+          v-if="isHost"
+          @click="startGameByHost"
+          :disabled="!allReady || jugadors.length < 2"
+          style="margin-left: 8px"
+          class="btn-host"
+        >
+          Start (host)
+        </button>
+        <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
+          <h3>Selecciona el modo de juego</h3>
+          <div class="modo-buttons">
+            <label class="modo-btn" :class="{ active: modoJuego === 'normal' }">
+              <input type="radio" value="normal" v-model="modoJuego" />
+              <span>🎯 Normal</span>
+            </label>
+
+            <label
+              class="modo-btn muerte"
+              :class="{ active: modoJuego === 'muerteSubita' }"
+            >
+              <input type="radio" value="muerteSubita" v-model="modoJuego" />
+              <span>💀 Muerte Súbita</span>
+            </label>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- VISTA 3: JOC (no centered stage, full layout) -->
-      <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
-        <GameEngine
-          :initialWords="playerWords"
-          :intervalMs="gameIntervalMs"
-          :maxStack="gameMaxStack"
-          :players="jugadors"
-        />
-      </div>
-    </main>
-  </div>
+    <!-- VISTA 3: JOC (no centered stage, full layout) -->
+    <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
+      <GameEngine
+        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine" 
+        :initialWords="playerWords"
+        :intervalMs="gameIntervalMs"
+        :maxStack="gameMaxStack"
+        :players="jugadors"
+        :modo="modoJuego"
+      />
+    </div>
+  </main>
 </template>
 <style scoped>
 .app {
@@ -213,5 +234,82 @@ button {
 button.btn-host {
   background-color: var(--color-success, #28a745);
   margin-left: 8px;
+}
+/* Modo selector styles */
+.modo-selector {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.modo-selector h3 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  color: var(--color-heading, #333);
+}
+
+.modo-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.modo-btn {
+  position: relative;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: linear-gradient(145deg, #e3e3e3, #f9f9f9);
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.modo-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.modo-btn input {
+  display: none;
+}
+
+.modo-btn span {
+  position: relative;
+  z-index: 2;
+}
+
+.modo-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, #007bff, #00d4ff);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 12px;
+  z-index: 1;
+}
+
+.modo-btn.active::before {
+  opacity: 1;
+}
+
+.modo-btn.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Colores específicos para muerte súbita */
+.modo-btn.muerte::before {
+  background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
+}
+.modo-btn.muerte.active {
+  color: white;
+}
+
+/* Animación sutil al hacer hover */
+.modo-btn:active {
+  transform: scale(0.98);
 }
 </style>

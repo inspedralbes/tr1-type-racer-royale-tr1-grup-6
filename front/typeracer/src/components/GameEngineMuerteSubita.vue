@@ -9,6 +9,7 @@ const props = defineProps({
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
+  modo: { type: String, default: "normal" },
 });
 
 // Estado ganador y perdedor
@@ -101,37 +102,15 @@ function validarProgres() {
     );
   }
 
-  let errorCount = 0;
-
-  for (let i = 0; i < typed.length; i++) {
-    if (i >= paraula.text.length) break;
-    const isError = typed[i] !== paraula.text[i];
-    if (isError) {
-      // Solo incrementa errores totales si el error en esta letra no estaba marcado antes
-      if (!paraula.letterErrors[i]) {
-        totalErrors.value++;
-      }
-      paraula.letterErrors[i] = true;
-      errorCount++;
-    } else {
-      // Si la letra es correcta, aseguramos que no hay error ahí
-      paraula.letterErrors[i] = false;
-    }
-  }
-  paraula.errors = errorCount; // Enviar progreso y errores acumulados al servidor
-
-  communicationManager.updatePlayerProgress({
-    completedWords: palabrasCompletadas.value,
-    totalErrors: totalErrors.value,
-  });
-
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
+    const self = props.players.find((p) => p.id === communicationManager.id);
+    if (self) self.completedWords = (self.completedWords || 0) + 1;
 
-    // Enviar progreso actualizado justo al completar la palabra
+    paraula.estat = "completada";
+
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
-      totalErrors: totalErrors.value,
     });
 
     estatDelJoc.value.paraules.pop();
@@ -150,6 +129,32 @@ function validarProgres() {
         );
         nextParaula.errors = 0;
       }
+    }
+  }
+
+  // Lógica conteo errores para modo muerte súbita
+  for (let i = 0; i < typed.length; i++) {
+    if (i >= paraula.text.length) break;
+    const isError = typed[i] !== paraula.text[i];
+    if (isError && !paraula.letterErrors[i]) {
+      totalErrors.value++;
+      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
+        perdedor.value = true;
+        perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
+        communicationManager.reportPlayerEliminated();
+        // El jugador local ya no puede escribir
+        estatDelJoc.value.textEntrat = "";
+        window.removeEventListener("keydown", handleKeyDown);
+        estatDelJoc.value.textEntrat = "";
+        if (revealTimer) {
+          clearInterval(revealTimer);
+          revealTimer = null;
+        }
+        return;
+      }
+      paraula.letterErrors[i] = true;
+    } else {
+      paraula.letterErrors[i] = false;
     }
   }
 }
@@ -175,20 +180,6 @@ function getClasseLletra(indexLletra) {
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
 
-  // Eventos de ganador/perdedor
-  communicationManager.onPlayerEliminated((data) => {
-    if (JuegoTerminado.value) return;
-    perdedor.value = true;
-    ganador.value = false;
-    JuegoTerminado.value = true;
-    perdidoMensaje.value =
-      data?.message || "Has perdido: demasiadas palabras acumuladas.";
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
-    }
-  });
-
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
@@ -199,6 +190,25 @@ onMounted(() => {
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
+    }
+  });
+
+  communicationManager.onPlayerEliminated((data) => {
+    const player = props.players.find((p) => p.id === data.playerId);
+    if (player) {
+      player.eliminado = true;
+    }
+
+    if (data.playerId === communicationManager.id) {
+      perdedor.value = true;
+      perdidoMensaje.value =
+        data.message || "Te has equivocado, ¡estás eliminado!";
+      window.removeEventListener("keydown", handleKeyDown);
+      estatDelJoc.value.textEntrat = "";
+      if (revealTimer) {
+        clearInterval(revealTimer);
+        revealTimer = null;
+      }
     }
   });
 
@@ -228,7 +238,7 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Timer para revelar palabras periódicamente
+  // Timer para revelar palabras
   revealTimer = setInterval(() => {
     if (JuegoTerminado.value) return;
     try {
@@ -245,20 +255,6 @@ onMounted(() => {
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
         estatDelJoc.value.paraules.unshift(newParaula);
-      }
-      if (
-        estatDelJoc.value.paraules.length >= props.maxStack &&
-        !perdedor.value
-      ) {
-        perdedor.value = true;
-        JuegoTerminado.value = true;
-        perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
-        communicationManager.reportPlayerLost();
-
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
       }
     } catch (e) {
       console.error("Error en revealTimer:", e);
@@ -282,9 +278,9 @@ function calculateProgress(completedWords) {
 <template>
   <div class="game-header">
     <h2 class="modo-titulo">
-        Modo de juego: 
+      Modo de juego:
       <span :class="['modo-text', props.modo]">
-        {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
       </span>
     </h2>
   </div>
@@ -349,8 +345,19 @@ function calculateProgress(completedWords) {
     <aside class="players-sidebar">
       <h3>Jugadors</h3>
       <ul>
-        <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+        <li
+          v-for="p in props.players"
+          :key="p.id"
+          class="player-name-inline"
+          :class="{ eliminado: p.eliminated }"
+        >
           <span class="player-name-text">{{ p.name }}</span>
+          <span
+            v-if="p.eliminated"
+            style="color: #dc3545; font-weight: bold; margin-left: 10px"
+          >
+            Eliminado
+          </span>
           <span class="completed-count">
             Paraules fetes: {{ p.completedWords || 0 }}
           </span>
@@ -364,7 +371,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
-      :modo="props.modo" 
+      :modo="props.modo"
     />
   </div>
 </template>
@@ -466,6 +473,10 @@ function calculateProgress(completedWords) {
   font-size: 1.1rem;
   border-bottom: 1px solid var(--color-border, #e0e0e0);
   padding-bottom: 8px;
+}
+.player-name-inline.eliminado {
+  opacity: 0.5;
+  text-decoration: line-through;
 }
 
 .player-name-inline {
@@ -573,6 +584,37 @@ function calculateProgress(completedWords) {
   outline: none;
   transition: border-color 0.15s;
 }
+
+/*estilos para el header del modo de juego*/
+
+.game-header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.modo-titulo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-heading, #333);
+}
+
+.modo-text {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.modo-text.normal {
+  background-color: #007bff;
+  color: white;
+}
+
+.modo-text.muerteSubita {
+  background-color: #dc3545;
+  color: white;
+}
+
 .text-input:focus {
   border-color: #28a745;
 }
