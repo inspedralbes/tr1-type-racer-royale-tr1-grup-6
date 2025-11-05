@@ -306,6 +306,7 @@ io.on("connection", (socket) => {
   // Actualizaciones de progreso desde clientes: { completedWords, totalErrors }
   socket.on("updatePlayerProgress", (payload) => {
     if (!payload) return;
+
     for (const [roomId, room] of rooms.entries()) {
       if (room.players.has(socket.id)) {
         const player = room.players.get(socket.id);
@@ -318,7 +319,6 @@ io.on("connection", (socket) => {
         broadcastRoomPlayerList(roomId);
         break; // updated the room containing this player
       }
-    }
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida

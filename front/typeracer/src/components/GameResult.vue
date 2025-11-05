@@ -2,11 +2,32 @@
 import communicationManager from "@/services/communicationManager";
 import DarkModeToggle from "./DarkModeToggle.vue";
 import { ref, computed } from "vue";
+
+
 const showRanking = ref(false);
+const showStats = ref(false);
 
 function toggleRanking() {
   showRanking.value = !showRanking.value;
 }
+function toggleStats() {
+  showStats.value = !showStats.value;
+}
+
+function calcularWPM(player) {
+  if (!player.playTime || player.playTime === 0) return 0;
+  const minutes = player.playTime / 60000;
+  if (minutes === 0) return 0;
+  return Math.round(player.completedWords / minutes);
+}
+
+function calcularPrecision(player) {
+  const totalTyped = (player.completedWords || 0) * 5 + (player.totalErrors || 0);
+  if (!totalTyped) return 0; // Quan no ha tipejat res, mostra 0%
+  return Math.round(100 * ((player.completedWords * 5) / totalTyped));
+}
+
+
 
 const props = defineProps({
   winner: { type: Boolean, default: false },
@@ -38,6 +59,11 @@ const displayedMessage = computed(() => {
   return "";
 });
 
+const sortedPlayers = computed(() =>
+  [...props.players].sort((a, b) => (b.completedWords ?? 0) - (a.completedWords ?? 0))
+);
+
+
 // Opciones: recargar para volver a lobby / reiniciar
 function volverLobby() {
   window.location.reload();
@@ -53,21 +79,41 @@ function volverLobby() {
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="volverLobby">Volver al lobby</button>
-        <button @click="toggleRanking">
-          {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
-        </button>
+        <button @click="toggleRanking">{{ showRanking ? "Ocultar ranking" : "Ver ranking" }}</button>
+        <button @click="toggleStats">{{ showStats ? "Ocultar estadísticas" : "Estadísticas" }}</button>
       </div>
       <div v-if="showRanking" class="ranking-table">
         <table>
           <thead>
             <tr>
+              <th>Posició</th>
               <th>Jugador</th>
-              <th>Palabras completadas</th>
-              <th>Errores totales</th>
+              <th>Palabras</th>
+              <th>Errores</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="player in players" :key="player.id">
+            <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
+              <td>{{ idx + 1 }}</td>
+              <td>{{ player.name }}</td>
+              <td>{{ player.completedWords || 0 }}</td>
+              <td>{{ player.totalErrors || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div><div v-if="showStats" style="display: flex; justify-content: center;">
+        <table class="ranking-table" style="width: 100%; max-width: 500px;">
+          <thead>
+            <tr>
+              <th>Posició</th>
+              <th>Jugador</th>
+              <th>Velocidad (WPM)</th>
+              <th>Precisión (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
+              <td>{{ idx + 1 }}</td>
               <td>{{ player.name }}</td>
               <td>{{ player.completedWords || 0 }}</td>
               <td>{{ player.totalErrors || 0 }}</td>
