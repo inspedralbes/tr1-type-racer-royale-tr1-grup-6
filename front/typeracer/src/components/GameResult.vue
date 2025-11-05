@@ -1,7 +1,8 @@
 <script setup>
 import communicationManager from "@/services/communicationManager";
 import DarkModeToggle from "./DarkModeToggle.vue";
-import { ref, computed } from "vue";
+import { ref, computed, defineEmits } from "vue";
+const emit = defineEmits(["volverInicio"]);
 const showRanking = ref(false);
 
 function toggleRanking() {
@@ -29,9 +30,8 @@ const displayedMessage = computed(() =>
     : ""
 );
 
-// Opciones: recargar para volver a lobby / reiniciar
-function volverLobby() {
-  window.location.reload();
+function emitirVolverInicio() {
+  emit("volverInicio");
 }
 </script>
 
@@ -42,7 +42,10 @@ function volverLobby() {
       <h1>{{ title }}</h1>
       <p>{{ displayedMessage }}</p>
       <div class="actions">
-        <button @click="volverLobby">Volver al lobby</button>
+        <button @click="emitirVolverInicio" style="margin-left: 8px">
+          Tornar a L'inici
+        </button>
+
         <button @click="toggleRanking">
           {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
         </button>

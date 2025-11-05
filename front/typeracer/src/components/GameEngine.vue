@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, defineEmits } from "vue";
 import communicationManager from "../services/communicationManager.js";
 import GameResult from "@/components/GameResult.vue";
 
+const emit = defineEmits(["volverInicio"]);
 // Props
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
@@ -45,6 +46,9 @@ const paraulaActiva = computed(() => {
 });
 
 const totalErrors = ref(0);
+function handleVolverInicio() {
+  emit("volverInicio");
+}
 
 // Manejo teclado
 function handleKeyDown(event) {
@@ -174,8 +178,73 @@ function getClasseLletra(indexLletra) {
 // Ciclo vida
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
+  // Al inicio (onMounted)
+  if (
+    estatDelJoc.value.paraules.length === 0 &&
+    Array.isArray(props.initialWords) &&
+    props.initialWords.length > 0
+  ) {
+    remainingWords.value = props.initialWords.slice();
+  }
 
-  // Eventos de ganador/perdedor
+  // Actualiza marcador propio para la sidebar
+  const ownPlayer = props.players.find((p) => p.id === communicationManager.id);
+  if (ownPlayer) {
+    ownPlayer.completedWords = palabrasCompletadas.value;
+  }
+
+  // Reporta al backend si tienes el stack lleno tras recargar (pero NO marques tú el estado final)
+  if (
+    !JuegoTerminado.value &&
+    estatDelJoc.value.paraules.length >= props.maxStack
+  ) {
+    communicationManager.reportPlayerLost();
+  }
+
+  // Inicializa palabras si no tienes estado guardado
+  if (
+    estatDelJoc.value.paraules.length === 0 &&
+    Array.isArray(props.initialWords) &&
+    props.initialWords.length > 0
+  ) {
+    remainingWords.value = props.initialWords.slice();
+  }
+
+  // Timer solo si no has perdido ni se ha acabado el juego
+  if (
+    !JuegoTerminado.value &&
+    estatDelJoc.value.paraules.length < props.maxStack
+  ) {
+    revealTimer = setInterval(() => {
+      if (JuegoTerminado.value) return;
+      try {
+        if (
+          remainingWords.value.length > 0 &&
+          estatDelJoc.value.paraules.length < props.maxStack
+        ) {
+          const nextText = remainingWords.value.shift();
+          const newParaula = {
+            id: Date.now() + Math.random(),
+            text: nextText,
+            estat: "pendent",
+            errors: 0,
+            letterErrors: Array.from({ length: nextText.length }, () => false),
+          };
+          estatDelJoc.value.paraules.unshift(newParaula);
+        }
+        if (
+          estatDelJoc.value.paraules.length >= props.maxStack &&
+          !perdedor.value
+        ) {
+          communicationManager.reportPlayerLost();
+        }
+      } catch (e) {
+        console.error("Error en revealTimer:", e);
+      }
+    }, props.intervalMs || 3000);
+  }
+
+  // SOLO estos eventos gestionan la pantalla final
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
     perdedor.value = true;
@@ -223,47 +292,6 @@ onMounted(() => {
       revealTimer = null;
     }
   });
-
-  if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
-    remainingWords.value = props.initialWords.slice();
-  }
-
-  // Timer para revelar palabras periódicamente
-  revealTimer = setInterval(() => {
-    if (JuegoTerminado.value) return;
-    try {
-      if (
-        remainingWords.value.length > 0 &&
-        estatDelJoc.value.paraules.length < props.maxStack
-      ) {
-        const nextText = remainingWords.value.shift();
-        const newParaula = {
-          id: Date.now() + Math.random(),
-          text: nextText,
-          estat: "pendent",
-          errors: 0,
-          letterErrors: Array.from({ length: nextText.length }, () => false),
-        };
-        estatDelJoc.value.paraules.unshift(newParaula);
-      }
-      if (
-        estatDelJoc.value.paraules.length >= props.maxStack &&
-        !perdedor.value
-      ) {
-        perdedor.value = true;
-        JuegoTerminado.value = true;
-        perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
-        communicationManager.reportPlayerLost();
-
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
-      }
-    } catch (e) {
-      console.error("Error en revealTimer:", e);
-    }
-  }, props.intervalMs || 3000);
 });
 
 onUnmounted(() => {
@@ -356,6 +384,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
+      @volverInicio="handleVolverInicio"
     />
   </div>
 </template>
