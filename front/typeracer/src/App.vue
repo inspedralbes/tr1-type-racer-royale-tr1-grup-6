@@ -127,10 +127,7 @@ function startGameByHost() {
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el modo de juego</h3>
           <div class="modo-buttons">
-            <label
-              class="modo-btn"
-              :class="{ active: modoJuego === 'normal' }"
-            >
+            <label class="modo-btn" :class="{ active: modoJuego === 'normal' }">
               <input type="radio" value="normal" v-model="modoJuego" />
               <span>🎯 Normal</span>
             </label>
@@ -300,5 +297,4 @@ button.btn-host {
 .modo-btn:active {
   transform: scale(0.98);
 }
-
 </style>

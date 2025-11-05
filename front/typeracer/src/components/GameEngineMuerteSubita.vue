@@ -104,6 +104,14 @@ function validarProgres() {
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
+    const self = props.players.find((p) => p.id === communicationManager.id);
+    if (self) self.completedWords = (self.completedWords || 0) + 1;
+
+    paraula.estat = "completada";
+
+    communicationManager.updatePlayerProgress({
+      completedWords: palabrasCompletadas.value,
+    });
 
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
@@ -130,11 +138,7 @@ function validarProgres() {
     const isError = typed[i] !== paraula.text[i];
     if (isError && !paraula.letterErrors[i]) {
       totalErrors.value++;
-      if (
-        props.modo === "muerteSubita" &&
-        !perdedor.value&&
-        !ganador.value
-      ) {
+      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
         perdedor.value = true;
         perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
         communicationManager.reportPlayerEliminated();
@@ -149,7 +153,6 @@ function validarProgres() {
         return;
       }
       paraula.letterErrors[i] = true;
-      errorCount++;
     } else {
       paraula.letterErrors[i] = false;
     }
@@ -198,7 +201,8 @@ onMounted(() => {
 
     if (data.playerId === communicationManager.id) {
       perdedor.value = true;
-      perdidoMensaje.value = data.message || "Te has equivocado, ¡estás eliminado!";
+      perdidoMensaje.value =
+        data.message || "Te has equivocado, ¡estás eliminado!";
       window.removeEventListener("keydown", handleKeyDown);
       estatDelJoc.value.textEntrat = "";
       if (revealTimer) {
@@ -258,7 +262,6 @@ onMounted(() => {
   }, props.intervalMs || 3000);
 });
 
-
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
   if (revealTimer) {
@@ -275,14 +278,13 @@ function calculateProgress(completedWords) {
 <template>
   <div class="game-header">
     <h2 class="modo-titulo">
-        Modo de juego: 
+      Modo de juego:
       <span :class="['modo-text', props.modo]">
-        {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
       </span>
     </h2>
   </div>
   <div class="game-layout">
-  
     <div class="game-main">
       <TransitionGroup name="fall" tag="div" class="paraules-container">
         <div
@@ -612,7 +614,6 @@ function calculateProgress(completedWords) {
   background-color: #dc3545;
   color: white;
 }
-
 
 .text-input:focus {
   border-color: #28a745;
