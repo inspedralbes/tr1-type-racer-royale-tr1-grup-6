@@ -17,10 +17,9 @@ const io = new Server(server, {
   },
 });
 
-// Estado de jugadores y rooms
-const jugadors = {};
+// Estado de rooms y jugadores
 const rooms = new Map(); // Map to store rooms: { id, name, players: Map<socketId, playerData>, hostId }
-let hostId = null;
+const playerNames = new Map(); // Map to store player names by socket ID
 
 // Genera un ID único para una room
 function generateRoomId() {
@@ -38,11 +37,6 @@ function broadcastRoomPlayerList(roomId) {
 
 console.log("Servidor Socket.IO listo en el puerto 3000");
 
-function assignNewHost() {
-  const ids = Object.keys(jugadors);
-  hostId = ids.length > 0 ? ids[0] : null;
-}
-
 // Devuelve true si todos los jugadores (no eliminados) están ready
 function allPlayersReadyInRoom(roomId) {
   const room = rooms.get(roomId);
@@ -50,79 +44,8 @@ function allPlayersReadyInRoom(roomId) {
   return Array.from(room.players.values()).every((p) => p.ready === true);
 }
 
-// Crea un payload simple de palabras para cada jugador (mismo set para todos por ahora)
-function createGamePayload() {
-  let words = [];
-  try {
-    // Ruta al archivo words.json relativa a este archivo
-    const wordsPath = path.join(__dirname, "data", "words.json");
-    console.log("Intentando leer words.json desde:", wordsPath);
-    const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, ""); // Eliminar BOM si existe
-    words = JSON.parse(raw.trim());
-    console.log(`Leídas ${words.length} palabras de words.json`);
-    if (!Array.isArray(words)) words = [];
-  } catch (err) {
-    console.error("No se pudo leer words.json:", err.message);
-    words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
-  }
-  // Mezcla (Fisher-Yates)
-  function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
-  // Configuración del juego
-  const maxStack = 20; // cuantas palabras visibles a la vez
-  const intervalMs = 2000; // cada cuánto aparecen palabras
-  const wordsPerPlayer = Math.max(
-    20,
-    Math.floor(words.length / Math.max(1, Object.keys(jugadors).length))
-  );
-
-  const wordsByPlayer = {};
-  const shuffled = shuffle(words);
-  for (const id of Object.keys(jugadors)) {
-    // Asignamos un bloque de palabras para cada jugador (puede repetirse si hay pocos)
-    const playerWords = [];
-    for (let i = 0; i < wordsPerPlayer; i++) {
-      playerWords.push(
-        shuffled[(i + Object.keys(jugadors).indexOf(id)) % shuffled.length]
-      );
-    }
-    wordsByPlayer[id] = playerWords;
-  }
-
-  return {
-    wordsByPlayer,
-    maxStack,
-    intervalMs,
-    // startAt da un pequeño margen para que clientes preparen la UI
-    startAt: Date.now() + 1500,
-  };
-}
-
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
-
-  // Inicializamos el jugador con valores por defecto
-  jugadors[socket.id] = {
-    id: socket.id,
-    name: `Jugador-${socket.id.slice(0, 4)}`,
-    ready: false,
-    eliminated: false,
-    completedWords: 0,
-    totalErrors: 0, // contador total de errores
-  };
-
-  // Si no hay host, este será el host (primer usuario)
-  if (!hostId) {
-    hostId = socket.id;
-  }
-
 
   // Room management events
   socket.on("listRooms", () => {
@@ -152,7 +75,7 @@ io.on("connection", (socket) => {
 
     room.players.set(socket.id, {
       id: socket.id,
-      name: `Jugador-${socket.id.slice(0, 4)}`,
+      name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
       ready: false,
       eliminated: false,
       completedWords: 0,
@@ -192,7 +115,7 @@ io.on("connection", (socket) => {
       // Añadir jugador a la room
       room.players.set(socket.id, {
         id: socket.id,
-        name: jugadors[socket.id]?.name || `Jugador-${socket.id.slice(0, 4)}`,
+        name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
         ready: false,
         eliminated: false,
         completedWords: 0,
@@ -259,20 +182,18 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`Usuario desconectado: ${socket.id}`);
 
-    // Clean up room membership
+    // Clean up room membership: remove player from any room they were in
     for (const [roomId, room] of rooms.entries()) {
       if (room.players.has(socket.id)) {
         room.players.delete(socket.id);
+        socket.leave(roomId);
+        // If room empty, delete it; otherwise notify remaining players
         if (room.players.size === 0) {
           rooms.delete(roomId);
+        } else {
+          broadcastRoomPlayerList(roomId);
         }
       }
-    }
-
-    delete jugadors[socket.id];
-    // Si el host se desconecta, reasignar
-    if (hostId === socket.id) {
-      assignNewHost();
     }
 
     // Update room list for all clients
@@ -287,9 +208,17 @@ io.on("connection", (socket) => {
   });
 
   socket.on("setPlayerName", (name) => {
-    if (jugadors[socket.id]) {
-      jugadors[socket.id].name = name;
-      console.log(`Jugador ${socket.id} se llama: ${name}`);
+    // Store the player name globally
+    playerNames.set(socket.id, name);
+    console.log(`Jugador ${socket.id} se llama: ${name}`);
+
+    // Also update name in any room they're currently in
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        const player = room.players.get(socket.id);
+        player.name = name;
+        broadcastRoomPlayerList(roomId);
+      }
     }
   });
 
@@ -328,17 +257,21 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Actualizaciones de progreso desde clientes: { completedWords } o número
+  // Actualizaciones de progreso desde clientes: { completedWords, totalErrors }
   socket.on("updatePlayerProgress", (payload) => {
     if (!payload) return;
-
-    if (jugadors[socket.id]) {
-      if (typeof payload.completedWords === "number") {
-        jugadors[socket.id].completedWords = payload.completedWords;
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        const player = room.players.get(socket.id);
+        if (typeof payload.completedWords === "number") {
+          player.completedWords = payload.completedWords;
+        }
+        if (typeof payload.totalErrors === "number") {
+          player.totalErrors = payload.totalErrors;
+        }
+        broadcastRoomPlayerList(roomId);
+        break; // updated the room containing this player
       }
-      if (typeof payload.totalErrors === "number") {
-        jugadors[socket.id].totalErrors = payload.totalErrors;
-      } // Emitir lista actualizada para reflejar cambios
     }
   });
 
@@ -437,51 +370,66 @@ io.on("connection", (socket) => {
   });
 
   socket.on("completeWord", (word) => {
-    if (jugadors[socket.id]) {
-      jugadors[socket.id].completedWords += 1;
-      console.log(`Jugador ${socket.id} completó la palabra: ${word}`);
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        const player = room.players.get(socket.id);
+        player.completedWords = (player.completedWords || 0) + 1;
+        console.log(`Jugador ${socket.id} completó la palabra: ${word}`);
+        broadcastRoomPlayerList(roomId);
+        break;
+      }
     }
   });
-  // Cuando un jugador pierde (por acumular maxStack palabras)
-  // Cuando un jugador pierde (por acumular maxStack palabras)
+  // Cuando un jugador pierde (por acumular maxStack palabras) - por room
   socket.on("playerLost", () => {
-    const player = jugadors[socket.id];
-    if (!player || player.eliminated) return;
+    for (const [roomId, room] of rooms.entries()) {
+      if (!room.players.has(socket.id)) continue;
 
-    player.eliminated = true;
-    console.log(
-      `Jugador ${player.name} ha sido eliminado por acumulación de palabras.`
-    );
-    socket.emit("playerEliminated", {
-      message: "Has perdido: demasiadas palabras acumuladas.",
-    });
+      const player = room.players.get(socket.id);
+      if (!player || player.eliminated) return;
 
-    // Comprobamos si queda solo un jugador no eliminado → ese gana
-    const activos = Object.values(jugadors).filter((p) => !p.eliminated);
-
-    if (activos.length === 1) {
-      const ganador = activos[0];
-
-      // Enviamos mensaje de victoria al ganador
-      io.to(ganador.id).emit("playerWon", {
-        message: "¡Enhorabuena! Has ganado a todos los jugadores.",
+      player.eliminated = true;
+      console.log(
+        `Jugador ${player.name} ha sido eliminado por acumulación de palabras.`
+      );
+      socket.emit("playerEliminated", {
+        message: "Has perdido: demasiadas palabras acumuladas.",
       });
 
-      // Enviamos mensaje de derrota a los demás
-      Object.values(jugadors).forEach((j) => {
-        if (j.id !== ganador.id) {
-          io.to(j.id).emit("playerEliminated", {
-            message: `Has perdido. El ganador es ${ganador.name}.`,
-          });
-        }
-      });
+      // Actualizar la lista de la room
+      broadcastRoomPlayerList(roomId);
 
-      // Emitimos evento global de fin de partida
-      io.emit("gameOver", {
-        winnerId: ganador.id,
-        winnerName: ganador.name,
-        message: `${ganador.name} ha ganado la partida.`,
-      });
+      // Comprobamos si queda solo un jugador no eliminado → ese gana
+      const activos = Array.from(room.players.values()).filter(
+        (p) => !p.eliminated
+      );
+
+      if (activos.length === 1) {
+        const ganador = activos[0];
+
+        // Enviamos mensaje de victoria al ganador
+        io.to(ganador.id).emit("playerWon", {
+          message: "¡Enhorabuena! Has ganado a todos los jugadores.",
+        });
+
+        // Enviamos mensaje de derrota a los demás
+        Array.from(room.players.values()).forEach((j) => {
+          if (j.id !== ganador.id) {
+            io.to(j.id).emit("playerEliminated", {
+              message: `Has perdido. El ganador es ${ganador.name}.`,
+            });
+          }
+        });
+
+        // Emitimos evento de fin de partida SOLO a la room
+        io.to(roomId).emit("gameOver", {
+          winnerId: ganador.id,
+          winnerName: ganador.name,
+          message: `${ganador.name} ha ganado la partida.`,
+        });
+      }
+
+      break;
     }
   });
 });

@@ -63,9 +63,23 @@ const communicationManager = {
   updatePlayerProgress(progress) {
     // progress puede ser un número (completedWords) o un objeto
     if (typeof progress === "number") {
-      socket.emit("updatePlayerProgress", { completedWords: progress });
+      if (currentRoom) {
+        socket.emit("updatePlayerProgress", {
+          completedWords: progress,
+          roomId: currentRoom,
+        });
+      } else {
+        socket.emit("updatePlayerProgress", { completedWords: progress });
+      }
     } else {
-      socket.emit("updatePlayerProgress", progress);
+      if (currentRoom) {
+        socket.emit("updatePlayerProgress", {
+          ...progress,
+          roomId: currentRoom,
+        });
+      } else {
+        socket.emit("updatePlayerProgress", progress);
+      }
     }
   },
 
