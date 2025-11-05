@@ -88,45 +88,45 @@ function toggleReady() {
 }
 
 function startGameByHost() {
-  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready y elegirá modo de juego
-  communicationManager.requestStart({ modo: modoJuego.value });
+  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
+  communicationManager.requestStart(modoJuego.value);
 }
 </script>
 
 <template>
-    <main>
-      <DarkModeToggle />
+  <main>
+    <DarkModeToggle />
 
-      <!-- VISTA 1: SALA D'ESPERA -->
-      <div v-if="vistaActual === 'salaEspera'" class="vista-container">
-        <h1>Type Racer Royale</h1>
-        <input
-          type="text"
-          v-model="nomJugador"
-          placeholder="Introdueix el teu nom"
-        />
-        <button @click="connectarAlServidor">Entra al Lobby</button>
-      </div>
+    <!-- VISTA 1: SALA D'ESPERA -->
+    <div v-if="vistaActual === 'salaEspera'" class="vista-container">
+      <h1>Type Racer Royale</h1>
+      <input
+        type="text"
+        v-model="nomJugador"
+        placeholder="Introdueix el teu nom"
+      />
+      <button @click="connectarAlServidor">Entra al Lobby</button>
+    </div>
 
-      <!-- VISTA 2: ROOMS -->
-      <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
-        <RoomSelector @joined="onRoomJoined" />
-      </div>
+    <!-- VISTA 2: ROOMS -->
+    <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
+      <RoomSelector @joined="onRoomJoined" />
+    </div>
 
-      <!-- VISTA 3: LOBBY -->
+    <!-- VISTA 3: LOBBY -->
 
-      <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
-        <h2>Jugadors Connectats</h2>
-        <ul>
-          <li v-for="jugador in jugadors" :key="jugador.id">
-            {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
-            <span v-if="jugador.id === hostId"> — host</span>
-          </li>
-        </ul>
-        <div style="margin-top: 10px">
-          <button @click="toggleReady">
-            {{ isReady ? "Unready" : "Ready" }}
-          </button>
+    <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
+      <h2>Jugadors Connectats</h2>
+      <ul>
+        <li v-for="jugador in jugadors" :key="jugador.id">
+          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
+          <span v-if="jugador.id === hostId"> — host</span>
+        </li>
+      </ul>
+      <div style="margin-top: 10px">
+        <button @click="toggleReady">
+          {{ isReady ? "Unready" : "Ready" }}
+        </button>
 
         <!-- Start visible only to host; server will check que todos estén ready -->
         <button
@@ -161,7 +161,7 @@ function startGameByHost() {
     <!-- VISTA 3: JOC (no centered stage, full layout) -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <GameEngine
-        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine" 
+        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"

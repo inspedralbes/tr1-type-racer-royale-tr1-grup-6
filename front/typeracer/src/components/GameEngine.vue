@@ -9,6 +9,7 @@ const props = defineProps({
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
+  modo: { type: String, default: "normal" },
 });
 
 // Estado ganador y perdedor
@@ -110,6 +111,10 @@ function validarProgres() {
       // Solo incrementa errores totales si el error en esta letra no estaba marcado antes
       if (!paraula.letterErrors[i]) {
         totalErrors.value++;
+        if (props.modo === "muerteSubita") {
+          // En muerte súbita, cualquier error elimina al jugador
+          communicationManager.reportMuerteSubitaElimination();
+        }
       }
       paraula.letterErrors[i] = true;
       errorCount++;
@@ -282,9 +287,9 @@ function calculateProgress(completedWords) {
 <template>
   <div class="game-header">
     <h2 class="modo-titulo">
-        Modo de juego: 
+      Modo de juego:
       <span :class="['modo-text', props.modo]">
-        {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
       </span>
     </h2>
   </div>
@@ -364,7 +369,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
-      :modo="props.modo" 
+      :modo="props.modo"
     />
   </div>
 </template>

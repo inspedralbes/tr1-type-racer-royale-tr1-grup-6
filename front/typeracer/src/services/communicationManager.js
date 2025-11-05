@@ -134,9 +134,16 @@ const communicationManager = {
   },
 
   // Sol·licitud explícita del host per iniciar la partida en la sala actual
-  requestStart() {
+  requestStart(modo = "normal") {
     if (currentRoom) {
-      socket.emit("startGame", { roomId: currentRoom });
+      socket.emit("startGame", { roomId: currentRoom, modo });
+    }
+  },
+
+  // Reportar eliminación en modo muerte súbita
+  reportMuerteSubitaElimination() {
+    if (currentRoom) {
+      socket.emit("muerteSubitaElimination", { roomId: currentRoom });
     }
   },
 

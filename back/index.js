@@ -43,54 +43,53 @@ function allPlayersReadyInRoom(roomId) {
   if (!room || room.players.size === 0) return false;
   return Array.from(room.players.values()).every((p) => p.ready === true);
 }
-function createGamePayload() {
+function createGamePayload(room) {
+  let words = [];
+  try {
+    const wordsPath = path.join(__dirname, "data", "words.json");
+    const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, "");
+    words = JSON.parse(raw.trim());
+    if (!Array.isArray(words)) words = [];
+  } catch (err) {
+    console.error("No se pudo leer words.json:", err.message);
+    words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
+  }
 
-      let words = [];
-      try {
-        const wordsPath = path.join(__dirname, "data", "words.json");
-        const raw = fs.readFileSync(wordsPath, "utf8").replace(/^\uFEFF/, "");
-        words = JSON.parse(raw.trim());
-        if (!Array.isArray(words)) words = [];
-      } catch (err) {
-        console.error("No se pudo leer words.json:", err.message);
-        words = ["palabra", "ejemplo", "prueba", "texto", "vite"];
-      }
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
-      function shuffle(arr) {
-        const a = arr.slice();
-        for (let i = a.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [a[i], a[j]] = [a[j], a[i]];
-        }
-        return a;
-      }
+  const wordsPerPlayer = Math.max(
+    20,
+    Math.floor(words.length / Math.max(1, room.players.size))
+  );
 
-      const wordsPerPlayer = Math.max(
-        20,
-        Math.floor(words.length / Math.max(1, room.players.size))
-      );
+  const wordsByPlayer = {};
+  const shuffled = shuffle(words);
+  const players = Array.from(room.players.keys());
 
-      const wordsByPlayer = {};
-      const shuffled = shuffle(words);
-      const players = Array.from(room.players.keys());
+  for (let i = 0; i < players.length; i++) {
+    const playerId = players[i];
+    const playerWords = [];
+    for (let j = 0; j < wordsPerPlayer; j++) {
+      playerWords.push(shuffled[(j + i) % shuffled.length]);
+    }
+    wordsByPlayer[playerId] = playerWords;
+  }
 
-      for (let i = 0; i < players.length; i++) {
-        const playerId = players[i];
-        const playerWords = [];
-        for (let j = 0; j < wordsPerPlayer; j++) {
-          playerWords.push(shuffled[(j + i) % shuffled.length]);
-        }
-        wordsByPlayer[playerId] = playerWords;
-      }
-
-      const gamePayload = {
-        wordsByPlayer,
-        maxStack: 20,
-        intervalMs: 2000,
-        startAt: Date.now() + 1500,
-      };
-    }   
-let modoActual = "normal"; // modo de juego actual: "normal" o "muerteSubita" 
+  return {
+    wordsByPlayer,
+    maxStack: 20,
+    intervalMs: 2000,
+    startAt: Date.now() + 1500,
+  };
+}
+// modo de juego se guarda por sala en room.gameState.modo
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
 
@@ -358,14 +357,16 @@ io.on("connection", (socket) => {
       );
       return;
     }
-    modoActual = payload?.modo || "normal";
+    const modo = payload?.modo || "normal";
+    console.log(`Starting game in mode: ${modo}`);
 
-    const gamePayload = createGamePayload();
-    gamePayload.modo = modoActual;
+    const gamePayload = createGamePayload(room);
+    gamePayload.modo = modo;
 
     // Marcar la sala como iniciada
     room.gameState.started = true;
-    room.gameState.wordsByPlayer = wordsByPlayer;
+    room.gameState.modo = modo;
+    room.gameState.wordsByPlayer = gamePayload.wordsByPlayer;
 
     // Emitir solo a los jugadores de esta sala
     io.to(roomId).emit("gameStart", gamePayload);
@@ -429,42 +430,62 @@ io.on("connection", (socket) => {
           message: `${ganador.name} ha ganado la partida.`,
         });
         // Emitimos evento de fin de partida SOLO a la room
-        
       }
 
       break;
     }
   });
-  socket.on("playerEliminated", () => {
-    if (modoActual !== "muerteSubita") return;
-    const player = jugadors[socket.id];
-    if (!player || player.eliminated) return;
-    player.eliminated = true;
+  socket.on("muerteSubitaElimination", (payload) => {
+    const roomId = payload?.roomId;
+    if (!roomId) return;
 
+    const room = rooms.get(roomId);
+    if (!room || room.gameState.modo !== "muerteSubita") return;
+
+    const player = room.players.get(socket.id);
+    if (!player || player.eliminated) return;
+
+    // Marcar al jugador como eliminado
+    player.eliminated = true;
+    console.log(`Jugador ${player.name} eliminado en muerte súbita por error`);
+
+    // Notificar al jugador que ha sido eliminado
     socket.emit("playerEliminated", {
       playerId: player.id,
       playerName: player.name,
-      message: "Te has equivocado, ¡estás eliminado!",
+      message: "¡Te has equivocado! En muerte súbita, estás eliminado.",
     });
-    broadcastPlayerList();
 
-    const activos = Object.values(jugadors).filter((p) => !p.eliminated);
+    // Actualizar la lista de jugadores en la sala
+    broadcastRoomPlayerList(roomId);
+
+    // Comprobar si solo queda un jugador activo
+    const activos = Array.from(room.players.values()).filter(
+      (p) => !p.eliminated
+    );
+
     if (activos.length === 1) {
       const ganador = activos[0];
+
+      // Notificar al ganador
       io.to(ganador.id).emit("playerWon", {
         message: "¡Eres el último jugador en pie!",
       });
-      Object.values(jugadors).forEach((j) => {
+
+      // Notificar a los demás jugadores
+      Array.from(room.players.values()).forEach((j) => {
         if (j.id !== ganador.id) {
           io.to(j.id).emit("playerEliminated", {
             message: `Has perdido. El ganador es ${ganador.name}.`,
           });
         }
       });
+
+      // Notificar el fin del juego a toda la sala
       io.to(roomId).emit("gameOver", {
-          winnerId: ganador.id,
-          winnerName: ganador.name,
-          message: `${ganador.name} ha ganado la partida.`,
+        winnerId: ganador.id,
+        winnerName: ganador.name,
+        message: `${ganador.name} ha ganado la partida en modo muerte súbita.`,
       });
     }
   });
