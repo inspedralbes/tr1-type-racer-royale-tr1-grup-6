@@ -89,7 +89,7 @@ function iniciarCronometreParaula() {
 function validarProgres() {
   if (JuegoTerminado.value) return; // Bloqueja tot si la partida ha finalitzat
 
-  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
+  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === on) {
     iniciarCronometreParaula();
   }
   if (!startTime.value && estatDelJoc.value.textEntrat.length === 1) {
@@ -145,7 +145,7 @@ function validarProgres() {
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-    
+
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
       // Registrar tiempo final y enviar progreso final
@@ -153,7 +153,8 @@ function validarProgres() {
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
         totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        playTime:
+          (endTime.value || Date.now()) - (startTime.value || Date.now()),
       });
       // Qualsevol acció extra: mostrar resultats, deshabilitar input, etc.
     } else {
@@ -161,7 +162,8 @@ function validarProgres() {
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
         totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        playTime:
+          (endTime.value || Date.now()) - (startTime.value || Date.now()),
       });
     }
 
@@ -349,50 +351,6 @@ onMounted(() => {
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     remainingWords.value = props.initialWords.slice();
   }
-
-  // Timer para revelar palabras periódicamente
-  revealTimer = setInterval(() => {
-    if (JuegoTerminado.value) return;
-    try {
-      if (
-        remainingWords.value.length > 0 &&
-        estatDelJoc.value.paraules.length < props.maxStack
-      ) {
-        const nextText = remainingWords.value.shift();
-        const newParaula = {
-          id: Date.now() + Math.random(),
-          text: nextText,
-          estat: "pendent",
-          errors: 0,
-          letterErrors: Array.from({ length: nextText.length }, () => false),
-        };
-        estatDelJoc.value.paraules.unshift(newParaula);
-      }
-      if (
-        estatDelJoc.value.paraules.length >= props.maxStack &&
-        !perdedor.value
-      ) {
-        perdedor.value = true;
-        JuegoTerminado.value = true;
-        perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
-        // Registrar tiempo final y enviar progreso final antes de notificar al servidor
-        onGameEnd();
-        communicationManager.updatePlayerProgress({
-          completedWords: palabrasCompletadas.value,
-          totalErrors: totalErrors.value,
-          playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-        });
-        communicationManager.reportPlayerLost();
-
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
-      }
-    } catch (e) {
-      console.error("Error en revealTimer:", e);
-    }
-  }, props.intervalMs || 3000);
 });
 
 onUnmounted(() => {
