@@ -7,13 +7,15 @@ const socket = io("http://localhost:3000", {
 let onConnectCb = null;
 let currentRoom = null;
 
+// Evento de conexión
 socket.on("connect", () => {
   console.log("Socket connected, id=", socket.id);
   if (typeof onConnectCb === "function") onConnectCb(socket.id);
 });
 
 const communicationManager = {
-  connect(playerData) { // playerData es { name, color }
+  // Conectar al servidor y unirse como jugador
+  connect(playerData) {
     socket.connect();
     socket.emit("join", playerData);
 
@@ -28,93 +30,97 @@ const communicationManager = {
     return currentRoom;
   },
 
-  // Registrar callback per quan s'estableix la connexió i tenim socket.id
+  // Registrar callback al conectar
   onConnect(callback) {
     onConnectCb = callback;
   },
 
-  // Funcions per ESCOLTAR esdeveniments del servidor
+  // Escuchar lista de jugadores
   onUpdatePlayerList(callback) {
     socket.on("updatePlayerList", callback);
   },
 
+  // Escuchar inicio del juego
   onGameStart(callback) {
     socket.on("gameStart", callback);
   },
 
-  // Envia que l'usuari està ready / no-ready
+  // Marcar usuario como ready / no-ready (con sala actual)
   setReady(ready) {
-    socket.emit("clientReady", { ready });
+    if (currentRoom) {
+      socket.emit("clientReady", { ready, roomId: currentRoom });
+    } else {
+      socket.emit("clientReady", { ready });
+    }
   },
 
-  // Sol·licitud explícita del host per iniciar la partida
-  requestStart(options) {
-    socket.emit("startGame", options);
+  // Solicitar inicio de partida (modo normal o muerte súbita)
+  requestStart(modo = "normal") {
+    if (currentRoom) {
+      socket.emit("startGame", { roomId: currentRoom, modo });
+    } else {
+      socket.emit("startGame", { modo });
+    }
   },
+
+  // Reportar que un jugador ha perdido
   reportPlayerLost() {
     socket.emit("playerLost");
   },
+
+  // Reportar eliminación de un jugador
   reportPlayerEliminated() {
     socket.emit("playerEliminated");
   },
 
-  // Enviar que l'usuari ha completat una paraula
+  // Enviar progreso del jugador (palabras completadas)
   updatePlayerProgress(progress) {
-    // progress puede ser un número (completedWords) o un objeto
     if (typeof progress === "number") {
-      if (currentRoom) {
-        socket.emit("updatePlayerProgress", {
-          completedWords: progress,
-          roomId: currentRoom,
-        });
-      } else {
-        socket.emit("updatePlayerProgress", { completedWords: progress });
-      }
+      socket.emit("updatePlayerProgress", {
+        completedWords: progress,
+        roomId: currentRoom,
+      });
     } else {
-      if (currentRoom) {
-        socket.emit("updatePlayerProgress", {
-          ...progress,
-          roomId: currentRoom,
-        });
-      } else {
-        socket.emit("updatePlayerProgress", progress);
-      }
+      socket.emit("updatePlayerProgress", {
+        ...progress,
+        roomId: currentRoom,
+      });
     }
   },
 
-  // Escoltar actualitzacions del progrés dels jugadors
+  // Escuchar actualizaciones del progreso de jugadores
   onPlayerProgressUpdate(callback) {
     socket.on("playerProgressUpdate", callback);
   },
 
-  // Exemple de funció per enviar un missatge (es podrà ampliar)
+  // Enviar evento genérico
   sendEvent(eventName, data) {
     socket.emit(eventName, data);
   },
 
-  // Exemple de funció per escoltar un esdeveniment arbitrari
+  // Escuchar evento genérico
   onEvent(eventName, callback) {
     socket.on(eventName, callback);
   },
 
-  // --- Rooms convenience API ---
-  // Request server to list rooms
+  // --- Gestión de salas (rooms) ---
+
+  // Pedir al servidor la lista de salas
   listRooms() {
     socket.emit("listRooms");
   },
 
-  // Create a new room with a name
+  // Crear una nueva sala
   createRoom(name) {
     socket.emit("createRoom", { name });
   },
 
-  // Join an existing room by id
+  // Unirse a una sala existente
   joinRoom(roomId) {
     socket.emit("joinRoom", { roomId });
-    // No establecemos currentRoom aquí, esperamos la confirmación del servidor
   },
 
-  // Leave current room
+  // Salir de la sala actual
   leaveRoom() {
     if (currentRoom) {
       socket.emit("leaveRoom");
@@ -122,36 +128,28 @@ const communicationManager = {
     }
   },
 
-  // Envia que l'usuari está ready en la sala actual
-  setReady(ready) {
-    if (currentRoom) {
-      socket.emit("clientReady", { ready, roomId: currentRoom });
-    }
-  },
-
-  // Sol·licitud explícita del host per iniciar la partida en la sala actual
-  requestStart(modo = "normal") {
-    if (currentRoom) {
-      socket.emit("startGame", { roomId: currentRoom, modo });
-    }
-  },
-
   // Reportar eliminación en modo muerte súbita
   reportMuerteSubitaElimination() {
     if (currentRoom) {
       socket.emit("muerteSubitaElimination", { roomId: currentRoom });
+      console.log("Enviando eliminación muerte súbita para sala:", currentRoom);
+    } else {
+      console.error(
+        "Error: No se encontró roomId actual al reportar eliminación muerte súbita"
+      );
     }
   },
 
-  // Convenience listeners for rooms
+  // --- Listeners relacionados con salas ---
   onRoomList(callback) {
     socket.on("roomList", callback);
   },
 
   onJoinedRoom(callback) {
     socket.on("joinedRoom", (data) => {
-      if (data.success) {
+      if (data.success && data.roomId) {
         currentRoom = data.roomId;
+        console.log("Establecida sala actual:", currentRoom);
       }
       callback(data);
     });
@@ -166,13 +164,7 @@ const communicationManager = {
     });
   },
 
-  // Funció per desconnectar-se del servidor
-  disconnect() {
-    if (socket.connected) {
-      socket.disconnect();
-    }
-  },
-
+  // --- Otros eventos del juego ---
   onPlayerEliminated(callback) {
     socket.on("playerEliminated", callback);
   },
@@ -183,6 +175,13 @@ const communicationManager = {
 
   onGameOver(callback) {
     socket.on("gameOver", callback);
+  },
+
+  // Desconectarse del servidor
+  disconnect() {
+    if (socket.connected) {
+      socket.disconnect();
+    }
   },
 };
 
