@@ -67,8 +67,11 @@ function handleKeyDown(event) {
     event.preventDefault();
     estatDelJoc.value.textEntrat += key;
   } else {
+    // Prevenir otras teclas (como Enter, Tab, etc.) si no son alfabéticas
+    event.preventDefault();
     return;
   }
+  // Se llama a validarProgres aquí, manualmente, tras actualizar el modelo
   validarProgres();
 }
 function iniciarCronometreParaula() {
@@ -186,9 +189,12 @@ function getClasseLletra(indexLletra) {
   }
   return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
 }
+
 onMounted(() => {
+  // 1. Afegir listener de tecles
   window.addEventListener("keydown", handleKeyDown);
-  // Al inicio (onMounted)
+  
+  // 2. Inicialitzar paraules (UNA SOLA VEGADA)
   if (
     estatDelJoc.value.paraules.length === 0 &&
     Array.isArray(props.initialWords) &&
@@ -197,13 +203,13 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Actualiza marcador propio para la sidebar
+  // 3. Actualitzar marcador propi per a la sidebar
   const ownPlayer = props.players.find((p) => p.id === communicationManager.id);
   if (ownPlayer) {
     ownPlayer.completedWords = palabrasCompletadas.value;
   }
 
-  // Reporta al backend si tienes el stack lleno tras recargar (pero NO marques tú el estado final)
+  // 4. Reportar si es té l'stack ple després de recarregar (però NO marcar l'estat final)
   if (
     !JuegoTerminado.value &&
     estatDelJoc.value.paraules.length >= props.maxStack
@@ -211,56 +217,12 @@ onMounted(() => {
     communicationManager.reportPlayerLost();
   }
 
-  // Inicializa palabras si no tienes estado guardado
-  if (
-    estatDelJoc.value.paraules.length === 0 &&
-    Array.isArray(props.initialWords) &&
-    props.initialWords.length > 0
-  ) {
-    remainingWords.value = props.initialWords.slice();
-  }
-
-  // Timer solo si no has perdido ni se ha acabado el juego
-  if (
-    !JuegoTerminado.value &&
-    estatDelJoc.value.paraules.length < props.maxStack
-  ) {
-    revealTimer = setInterval(() => {
-      if (JuegoTerminado.value) return;
-      try {
-        if (
-          remainingWords.value.length > 0 &&
-          estatDelJoc.value.paraules.length < props.maxStack
-        ) {
-          const nextText = remainingWords.value.shift();
-          const newParaula = {
-            id: Date.now() + Math.random(),
-            text: nextText,
-            estat: "pendent",
-            errors: 0,
-            letterErrors: Array.from({ length: nextText.length }, () => false),
-          };
-          estatDelJoc.value.paraules.unshift(newParaula);
-        }
-        if (
-          estatDelJoc.value.paraules.length >= props.maxStack &&
-          !perdedor.value
-        ) {
-          communicationManager.reportPlayerLost();
-        }
-      } catch (e) {
-        console.error("Error en revealTimer:", e);
-      }
-    }, props.intervalMs || 3000);
-  }
-
-  // SOLO estos eventos gestionan la pantalla final
+  // 5. Configurar TOTS els listeners d'estat del joc (la font de la veritat)
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
     perdedor.value = true;
     ganador.value = false;
     JuegoTerminado.value = true;
-    // Registrar fin y enviar playTime
     onGameEnd();
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
@@ -269,24 +231,27 @@ onMounted(() => {
     });
     perdidoMensaje.value =
       data?.message || "Has perdido: demasiadas palabras acumuladas.";
+    playSound('gameLose');
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
+
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
     perdedor.value = false;
     JuegoTerminado.value = true;
-
     perdidoMensaje.value =
       data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
+    playSound('gameWin');
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
+
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
     onGameEnd();
@@ -312,46 +277,44 @@ onMounted(() => {
       revealTimer = null;
     }
   });
-  if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
-    remainingWords.value = props.initialWords.slice();
-  }
 
-  // Timer para revelar palabras periódicamente
-  revealTimer = setInterval(() => {
-    if (JuegoTerminado.value) return;
-    try {
-      if (
-        remainingWords.value.length > 0 &&
-        estatDelJoc.value.paraules.length < props.maxStack
-      ) {
-        const nextText = remainingWords.value.shift();
-        const newParaula = {
-          id: Date.now() + Math.random(),
-          text: nextText,
-          estat: "pendent",
-          errors: 0,
-          letterErrors: Array.from({ length: nextText.length }, () => false),
-        };
-        estatDelJoc.value.paraules.unshift(newParaula);
-        playSound('newWord');
-      }
-      if (estatDelJoc.value.paraules.length >= props.maxStack && !perdedor.value) {
-        perdedor.value = true;
-        JuegoTerminado.value = true;
-        perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
-        playSound('gameLose');
-        communicationManager.reportPlayerLost();
-
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
+  // 6. Iniciar el timer per revelar paraules (UNA SOLA VEGADA)
+  if (!JuegoTerminado.value) {
+    revealTimer = setInterval(() => {
+      if (JuegoTerminado.value) return; // Comprovació de seguretat
+      try {
+        if (
+          remainingWords.value.length > 0 &&
+          estatDelJoc.value.paraules.length < props.maxStack
+        ) {
+          const nextText = remainingWords.value.shift();
+          const newParaula = {
+            id: Date.now() + Math.random(),
+            text: nextText,
+            estat: "pendent",
+            errors: 0,
+            letterErrors: Array.from({ length: nextText.length }, () => false),
+          };
+          estatDelJoc.value.paraules.unshift(newParaula);
+          playSound('newWord');
         }
+        
+        // **CORRECCIÓ CLAU:**
+        // Només reportar la pèrdua. No canviar l'estat localment.
+        // El listener 'onPlayerEliminated' s'encarregarà de gestionar la fi del joc.
+        if (
+          estatDelJoc.value.paraules.length >= props.maxStack &&
+          !perdedor.value && !JuegoTerminado.value // Evita enviaments múltiples
+        ) {
+          communicationManager.reportPlayerLost();
+        }
+      } catch (e) {
+        console.error("Error en revealTimer:", e);
       }
-    } catch (e) {
-      console.error("Error en revealTimer:", e);
-    }
-  }, props.intervalMs || 3000);
+    }, props.intervalMs || 3000);
+  }
 });
+
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
   if (revealTimer) {
@@ -359,88 +322,88 @@ onUnmounted(() => {
     revealTimer = null;
   }
 });
-function calculateProgress(completedWords) {
-  return (completedWords / estatDelJoc.value.paraules.length) * 100;
-}
+
+// Funció 'calculateProgress' eliminada perquè no s'utilitzava.
 </script>
 
 <template>
-  <div class="game-header">
-    <h2 class="modo-titulo">
-      Modo de juego:
-      <span :class="['modo-text', props.modo]">
-        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
-      </span>
-    </h2>
-  </div>
-  <div class="game-layout">
-    <div class="game-main">
-      <TransitionGroup name="fall" tag="div" class="paraules-container">
-        <div
-          v-for="(paraula, index) in estatDelJoc.paraules"
-          :key="paraula.id"
-          class="paraula"
-          :class="{
-            'paraula-activa': index === estatDelJoc.paraules.length - 1
-          }"
-        >
-          <template v-if="index === estatDelJoc.paraules.length - 1">
-            <span
-              v-for="(lletra, i) in paraula.text.split('')"
-              :key="i"
-              class="lletra"
-              :class="getClasseLletra(i)"
+  <div> 
+    <div class="game-header">
+      <h2 class="modo-titulo">
+        Modo de juego:
+        <span :class="['modo-text', props.modo]">
+          {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+        </span>
+      </h2>
+    </div>
+    <div class="game-layout">
+      <div class="game-main">
+        <TransitionGroup name="fall" tag="div" class="paraules-container">
+          <div
+            v-for="(paraula, index) in estatDelJoc.paraules"
+            :key="paraula.id"
+            class="paraula"
+            :class="{
+              'paraula-activa': index === estatDelJoc.paraules.length - 1
+            }"
+          >
+            <template v-if="index === estatDelJoc.paraules.length - 1">
+              <span
+                v-for="(lletra, i) in paraula.text.split('')"
+                :key="i"
+                class="lletra"
+                :class="getClasseLletra(i)"
+              >
+                {{ lletra }}
+              </span>
+            </template>
+            <template v-else>
+              {{ paraula.text }}
+            </template>
+          </div>
+        </TransitionGroup>
+
+        <input
+          type="text"
+          class="text-input"
+          :class="{ 'shake-animation': isShaking }"
+          v-model="estatDelJoc.textEntrat"
+          placeholder="> Comença a escriure..."
+          :disabled="JuegoTerminado"
+        />
+
+        <div class="teclat">
+          <div
+            v-for="(fila, fIndex) in filesDelTeclat"
+            :key="fIndex"
+            class="fila"
+          >
+            <div
+              v-for="lletra in fila"
+              :key="lletra"
+              class="tecla"
+              :class="{ 'tecla-premuda': teclaPremuda === lletra }"
             >
               {{ lletra }}
-            </span>
-          </template>
-          <template v-else>
-            {{ paraula.text }}
-          </template>
-        </div>
-      </TransitionGroup>
-
-      <input
-        type="text"
-        class="text-input"
-        :class="{ 'shake-animation': isShaking }"
-        v-model="estatDelJoc.textEntrat"
-        @input="validarProgres"
-        placeholder="> Comença a escriure..."
-        :disabled="JuegoTerminado"
-      />
-
-      <div class="teclat">
-        <div
-          v-for="(fila, fIndex) in filesDelTeclat"
-          :key="fIndex"
-          class="fila"
-        >
-          <div
-            v-for="lletra in fila"
-            :key="lletra"
-            class="tecla"
-            :class="{ 'tecla-premuda': teclaPremuda === lletra }"
-          >
-            {{ lletra }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <aside class="players-sidebar">
-      <h3>[REFUGIATS]</h3>
-      <ul>
-        <li v-for="p in props.players" :key="p.id" class="player-name-inline">
-          <span class="color-dot" :style="{ backgroundColor: p.color, filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})` }"></span>
-          <span class="player-name-text">{{ p.name }}</span>
-          <span class="completed-count">
-            [Paraules: {{ p.completedWords || 0 }}]
-          </span>
-        </li>
-      </ul>
-    </aside>
+      <aside class="players-sidebar">
+        <h3>[REFUGIATS]</h3>
+        <ul>
+          <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+            <span class="color-dot" :style="{ backgroundColor: p.color, filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})` }"></span>
+            <span class="player-name-text">{{ p.name }}</span>
+            <span class="completed-count">
+              [Paraules: {{ p.completedWords || 0 }}]
+            </span>
+          </li>
+        </ul>
+      </aside>
 
+      </div>
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"
@@ -454,6 +417,7 @@ function calculateProgress(completedWords) {
 </template>
 
 <style scoped>
+/* [... Els teus estils romanen iguals ...] */
 .correcte {
   color: var(--color-success);
   font-weight: bold;
