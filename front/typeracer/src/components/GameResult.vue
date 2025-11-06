@@ -115,8 +115,8 @@ function volverLobby() {
             <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
               <td>{{ idx + 1 }}</td>
               <td>{{ player.name }}</td>
-              <td>{{ player.completedWords || 0 }}</td>
-              <td>{{ player.totalErrors || 0 }}</td>
+              <td>{{ calcularWPM(player) }}</td>
+              <td>{{ calcularPrecision(player) }}</td>
             </tr>
           </tbody>
         </table>

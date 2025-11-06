@@ -144,14 +144,22 @@ function validarProgres() {
     
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
+      // Registrar tiempo final y enviar progreso final
+      onGameEnd();
+      communicationManager.updatePlayerProgress({
+        completedWords: palabrasCompletadas.value,
+        totalErrors: totalErrors.value,
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+      });
       // Qualsevol acció extra: mostrar resultats, deshabilitar input, etc.
+    } else {
+      // Enviar progreso actualizado justo al completar la palabra (tiempo parcial)
+      communicationManager.updatePlayerProgress({
+        completedWords: palabrasCompletadas.value,
+        totalErrors: totalErrors.value,
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+      });
     }
-
-    // Enviar progreso actualizado justo al completar la palabra
-    communicationManager.updatePlayerProgress({
-      completedWords: palabrasCompletadas.value,
-      totalErrors: totalErrors.value,
-    });
 
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
@@ -205,6 +213,13 @@ onMounted(() => {
     perdedor.value = true;
     ganador.value = false;
     JuegoTerminado.value = true;
+    // Registrar fin y enviar playTime
+    onGameEnd();
+    communicationManager.updatePlayerProgress({
+      completedWords: palabrasCompletadas.value,
+      totalErrors: totalErrors.value,
+      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+    });
     perdidoMensaje.value =
       data?.message || "Has perdido: demasiadas palabras acumuladas.";
     if (revealTimer) {
@@ -218,6 +233,13 @@ onMounted(() => {
     ganador.value = true;
     perdedor.value = false;
     JuegoTerminado.value = true;
+    // Registrar fin y enviar playTime
+    onGameEnd();
+    communicationManager.updatePlayerProgress({
+      completedWords: palabrasCompletadas.value,
+      totalErrors: totalErrors.value,
+      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+    });
     perdidoMensaje.value =
       data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
     if (revealTimer) {
@@ -228,6 +250,13 @@ onMounted(() => {
 
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
+    // Registro de fin y envío de tiempo final
+    onGameEnd();
+    communicationManager.updatePlayerProgress({
+      completedWords: palabrasCompletadas.value,
+      totalErrors: totalErrors.value,
+      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+    });
 
     if (data.winnerId === communicationManager.id) {
       ganador.value = true;
@@ -277,6 +306,13 @@ onMounted(() => {
         perdedor.value = true;
         JuegoTerminado.value = true;
         perdidoMensaje.value = "Has perdido: demasiadas palabras acumuladas.";
+        // Registrar tiempo final y enviar progreso final antes de notificar al servidor
+        onGameEnd();
+        communicationManager.updatePlayerProgress({
+          completedWords: palabrasCompletadas.value,
+          totalErrors: totalErrors.value,
+          playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        });
         communicationManager.reportPlayerLost();
 
         if (revealTimer) {

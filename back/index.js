@@ -316,9 +316,14 @@ io.on("connection", (socket) => {
         if (typeof payload.totalErrors === "number") {
           player.totalErrors = payload.totalErrors;
         }
+        // Si el cliente manda playTime (ms), lo guardamos para mostrar WPM
+        if (typeof payload.playTime === "number") {
+          player.playTime = payload.playTime;
+        }
         broadcastRoomPlayerList(roomId);
         break; // updated the room containing this player
       }
+    }
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida
