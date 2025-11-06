@@ -1,7 +1,5 @@
-// src/services/communicationManager.js
 import { io } from "socket.io-client";
 
-// Creem una única instància del socket per a tota l'aplicació
 const socket = io("http://localhost:3000", {
   autoConnect: false,
 });
@@ -15,12 +13,10 @@ socket.on("connect", () => {
 });
 
 const communicationManager = {
-  // Funció per connectar-se i enviar el nom del jugador
-  connect(playerName) {
+  connect(playerData) { // playerData es { name, color }
     socket.connect();
-    socket.emit("setPlayerName", playerName);
+    socket.emit("join", playerData);
 
-    // Opcional: escoltem la desconnexió
     socket.on("disconnect", () => {
       console.log("Desconnectat del servidor");
       currentRoom = null;

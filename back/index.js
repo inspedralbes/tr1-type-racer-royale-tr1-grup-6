@@ -1,4 +1,3 @@
-// servidor.js
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -122,6 +121,7 @@ io.on("connection", (socket) => {
     room.players.set(socket.id, {
       id: socket.id,
       name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
+      color: '#9E9E9E', 
       ready: false,
       eliminated: false,
       completedWords: 0,
@@ -260,7 +260,15 @@ io.on("connection", (socket) => {
       }))
     );
   });
-
+  // 🎨 CAMBIO: Acepta nombre y color en el evento 'join'
+  socket.on("join", (playerData) => {
+    if (jugadors[socket.id] && playerData) {
+      jugadors[socket.id].name = playerData.name || `Jugador-${socket.id.slice(0, 4)}`;
+      jugadors[socket.id].color = playerData.color || '#9E9E9E'; // Asigna el color
+      console.log(`Jugador ${socket.id} s'ha unit: ${jugadors[socket.id].name} (${jugadors[socket.id].color})`);
+      broadcastPlayerList();
+    }
+  });
   socket.on("setPlayerName", (name) => {
     // Store the player name globally
     playerNames.set(socket.id, name);
