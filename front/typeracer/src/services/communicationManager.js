@@ -1,6 +1,5 @@
 import { io } from "socket.io-client";
 
-// Creem una única instància del socket per a tota l'aplicació
 const socket = io("http://localhost:3000", {
   autoConnect: false,
 });
@@ -13,14 +12,10 @@ socket.on("connect", () => {
 });
 
 const communicationManager = {
-  // 🎨 CAMBIO: Ara accepta 'playerData' (un objecte) i emet 'join'
-  // Funció per connectar-se i enviar les dades del jugador
-  connect(playerData) { // L'argument ara és 'playerData' (que conté { name, color })
+  connect(playerData) { // playerData es { name, color }
     socket.connect();
-    // L'esdeveniment ara és 'join' i enviem l'objecte sencer
     socket.emit("join", playerData);
 
-    // Opcional: escoltem la desconnexió
     socket.on("disconnect", () => {
       console.log("Desconnectat del servidor");
     });

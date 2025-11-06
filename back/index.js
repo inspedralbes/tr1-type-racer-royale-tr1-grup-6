@@ -1,4 +1,3 @@
-// servidor.js
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -17,7 +16,7 @@ const io = new Server(server, {
   },
 });
 
-// Estado de jugadores: { [socketId]: { id, name, ready, eliminated } }
+// Estado de jugadores: { [socketId]: { id, name, color, ready, eliminated ... } }
 const jugadors = {};
 let hostId = null;
 
@@ -102,7 +101,7 @@ io.on("connection", (socket) => {
   jugadors[socket.id] = {
     id: socket.id,
     name: `Jugador-${socket.id.slice(0, 4)}`,
-    color: '#9E9E9E',
+    color: '#9E9E9E', // 🎨 Color por defecto
     ready: false,
     eliminated: false,
     completedWords: 0,
@@ -127,6 +126,7 @@ io.on("connection", (socket) => {
     broadcastPlayerList();
   });
 
+  // 🎨 CAMBIO: Acepta nombre y color en el evento 'join'
   socket.on("join", (playerData) => {
     if (jugadors[socket.id] && playerData) {
       jugadors[socket.id].name = playerData.name || `Jugador-${socket.id.slice(0, 4)}`;
@@ -198,7 +198,7 @@ io.on("connection", (socket) => {
       broadcastPlayerList();
     }
   });
-  // Cuando un jugador pierde (por acumular maxStack palabras)
+  
   // Cuando un jugador pierde (por acumular maxStack palabras)
   socket.on("playerLost", () => {
     const player = jugadors[socket.id];
