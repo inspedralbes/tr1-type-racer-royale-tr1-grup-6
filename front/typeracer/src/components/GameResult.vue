@@ -1,8 +1,8 @@
 <script setup>
 import communicationManager from "@/services/communicationManager";
 import DarkModeToggle from "./DarkModeToggle.vue";
-import { ref, computed } from "vue";
-
+import { ref, computed, defineEmits } from "vue";
+const emit = defineEmits(["volverInicio"]);
 
 const showRanking = ref(false);
 const showStats = ref(false);
@@ -22,12 +22,11 @@ function calcularWPM(player) {
 }
 
 function calcularPrecision(player) {
-  const totalTyped = (player.completedWords || 0) * 5 + (player.totalErrors || 0);
+  const totalTyped =
+    (player.completedWords || 0) * 5 + (player.totalErrors || 0);
   if (!totalTyped) return 0; // Quan no ha tipejat res, mostra 0%
   return Math.round(100 * ((player.completedWords * 5) / totalTyped));
 }
-
-
 
 const props = defineProps({
   winner: { type: Boolean, default: false },
@@ -58,15 +57,13 @@ const displayedMessage = computed(() => {
 
   return "";
 });
-
 const sortedPlayers = computed(() =>
-  [...props.players].sort((a, b) => (b.completedWords ?? 0) - (a.completedWords ?? 0))
+  [...props.players].sort(
+    (a, b) => (b.completedWords ?? 0) - (a.completedWords ?? 0)
+  )
 );
-
-
-// Opciones: recargar para volver a lobby / reiniciar
-function volverLobby() {
-  window.location.reload();
+function emitirVolverInicio() {
+  emit("volverInicio");
 }
 </script>
 
@@ -78,9 +75,15 @@ function volverLobby() {
       <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
       <p>{{ displayedMessage }}</p>
       <div class="actions">
-        <button @click="volverLobby">Volver al lobby</button>
-        <button @click="toggleRanking">{{ showRanking ? "Ocultar ranking" : "Ver ranking" }}</button>
-        <button @click="toggleStats">{{ showStats ? "Ocultar estadísticas" : "Estadísticas" }}</button>
+        <button @click="emitirVolverInicio" style="margin-left: 8px">
+          Volver al lobby
+        </button>
+        <button @click="toggleRanking">
+          {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
+        </button>
+        <button @click="toggleStats">
+          {{ showStats ? "Ocultar estadísticas" : "Estadísticas" }}
+        </button>
       </div>
       <div v-if="showRanking" class="ranking-table">
         <table>
@@ -101,8 +104,9 @@ function volverLobby() {
             </tr>
           </tbody>
         </table>
-      </div><div v-if="showStats" style="display: flex; justify-content: center;">
-        <table class="ranking-table" style="width: 100%; max-width: 500px;">
+      </div>
+      <div v-if="showStats" style="display: flex; justify-content: center">
+        <table class="ranking-table" style="width: 100%; max-width: 500px">
           <thead>
             <tr>
               <th>Posició</th>
@@ -202,8 +206,6 @@ function volverLobby() {
   font-size: 0.85rem;
   margin-bottom: 8px;
 }
-
-
 
 .actions button {
   padding: 10px 16px;

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import GameEngine from "./components/GameEngine.vue";
 import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
@@ -7,7 +7,7 @@ import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js"; // Importem el gestor
 
 // Control de vista
-const vistaActual = ref("salaEspera"); // 'salaEspera', 'lobby', 'joc'
+const vistaActual = ref("salaEspera");
 
 // Estado de conexión
 const nomJugador = ref("");
@@ -30,13 +30,83 @@ const allReady = computed(() => {
   return p.length > 0 && p.every((x) => x.ready === true);
 });
 
+function saveStateToLocalStorage() {
+  localStorage.setItem(
+    "typeRacerUser",
+    JSON.stringify({
+      nomJugador: nomJugador.value,
+      vistaActual: vistaActual.value,
+      isReady: isReady.value,
+    })
+  );
+}
+// Al cargar, solo actualiza esas refs locales
+function loadStateFromLocalStorage() {
+  const saved = localStorage.getItem("typeRacerUser");
+  if (saved) {
+    const data = JSON.parse(saved);
+    if (data.nomJugador) nomJugador.value = data.nomJugador;
+    if (data.vistaActual) vistaActual.value = data.vistaActual;
+    if (typeof data.isReady === "boolean") isReady.value = data.isReady;
+  }
+}
+// Nunca guardes ni restaures playersPayload de localStorage
+
+function volverInicio() {
+  localStorage.removeItem("typeRacerUser");
+  communicationManager.disconnect();
+  // Reestablece todos los estados importantes
+  nomJugador.value = "";
+  isReady.value = false;
+  vistaActual.value = "salaEspera";
+  playersPayload.value = { players: [], hostId: null };
+  socketId.value = null;
+  playerWords.value = [];
+  gameIntervalMs.value = 3000;
+  gameMaxStack.value = 5;
+}
+
+// <<< IMPORTANTE >>>
+// Esta lógica permite reconectar sin cambiar la vista si ya estás en partida
+onMounted(() => {
+  loadStateFromLocalStorage();
+  const entries = performance.getEntriesByType("navigation");
+  const justStarted = sessionStorage.getItem("justStartedGame") === "true";
+
+  if (
+    entries.length > 0 &&
+    entries[0].type === "reload" &&
+    vistaActual.value === "joc" &&
+    !justStarted
+  ) {
+    localStorage.removeItem("typeRacerUser");
+
+    // Cambia el estado inmediatamente
+    vistaActual.value = "salaEspera";
+    nomJugador.value = "";
+    isReady.value = false;
+    communicationManager.disconnect();
+  } else if (nomJugador.value) {
+    connectarAlServidor();
+    communicationManager.setReady(isReady.value);
+  }
+
+  if (justStarted) {
+    sessionStorage.removeItem("justStartedGame");
+  }
+});
+
+watch([nomJugador, vistaActual, isReady], () => {
+  saveStateToLocalStorage();
+});
+
+// Modificado para NO forzar vista "lobby" si ya estás en "joc"
 function connectarAlServidor() {
   if (nomJugador.value.trim() === "") {
     alert("Si us plau, introdueix un nom vàlid.");
     return;
   }
 
-  // Registrar callbacks
   communicationManager.onConnect((id) => {
     socketId.value = id;
   });
@@ -48,12 +118,10 @@ function connectarAlServidor() {
   });
 
   communicationManager.onUpdatePlayerList((payload) => {
-    // payload: { players: [...], hostId }
     playersPayload.value = payload;
   });
 
   communicationManager.onGameStart((payload) => {
-    // payload: { wordsByPlayer: { [id]: [...] }, maxStack, startAt }
     const ownId = socketId.value;
     if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
       playerWords.value = payload.wordsByPlayer[ownId];
@@ -64,14 +132,13 @@ function connectarAlServidor() {
       playerWords.value = [];
       modoJuego.value = payload.modo || "normal";
     }
-    // Cambiar a vista de juego
+    sessionStorage.setItem("justStartedGame", "true");
     vistaActual.value = "joc";
   });
 
-  // Connecta i envia el nom
   communicationManager.connect(nomJugador.value);
 
-  // Go to rooms selector so user can pick/create a room
+  // Canvia la vista al lobby
   vistaActual.value = "rooms";
 }
 
@@ -86,7 +153,6 @@ function toggleReady() {
   isReady.value = !isReady.value;
   communicationManager.setReady(isReady.value);
 }
-
 function startGameByHost() {
   // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
   communicationManager.requestStart(modoJuego.value);
@@ -104,6 +170,7 @@ function startGameByHost() {
         type="text"
         v-model="nomJugador"
         placeholder="Introdueix el teu nom"
+        @input="saveStateToLocalStorage"
       />
       <button @click="connectarAlServidor">Entra al Lobby</button>
     </div>
@@ -119,16 +186,15 @@ function startGameByHost() {
       <h2>Jugadors Connectats</h2>
       <ul>
         <li v-for="jugador in jugadors" :key="jugador.id">
-          {{ jugador.name }} <span v-if="jugador.ready">(ready)</span>
+          {{ jugador.name }}
+          <span v-if="jugador.ready">(ready)</span>
           <span v-if="jugador.id === hostId"> — host</span>
         </li>
       </ul>
       <div style="margin-top: 10px">
-        <button @click="toggleReady">
+        <button @click="toggleReady" :class="{ ready: isReady }">
           {{ isReady ? "Unready" : "Ready" }}
         </button>
-
-        <!-- Start visible only to host; server will check que todos estén ready -->
         <button
           v-if="isHost"
           @click="startGameByHost"
@@ -138,6 +204,7 @@ function startGameByHost() {
         >
           Start (host)
         </button>
+        <button @click="volverInicio" style="margin-left: 8px"></button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el modo de juego</h3>
           <div class="modo-buttons">
@@ -155,10 +222,11 @@ function startGameByHost() {
             </label>
           </div>
         </div>
+
       </div>
     </div>
 
-    <!-- VISTA 3: JOC (no centered stage, full layout) -->
+    <!-- VISTA 3: JOC -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <GameEngine
         :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
@@ -166,6 +234,7 @@ function startGameByHost() {
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"
         :players="jugadors"
+        @volverInicio="volverInicio"
         :modo="modoJuego"
       />
     </div>
@@ -230,6 +299,9 @@ button {
   background-color: var(--color-primary, #007bff);
   color: white;
   cursor: pointer;
+}
+button.ready {
+  background-color: #28a745; /* Verde para estado ready */
 }
 button.btn-host {
   background-color: var(--color-success, #28a745);
