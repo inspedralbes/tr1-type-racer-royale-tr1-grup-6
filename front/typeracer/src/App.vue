@@ -166,10 +166,9 @@ function startGameByHost() {
       <input
         type="text"
         v-model="nomJugador"
-        placeholder="Introdueix el teu nom"
+        placeholder="Introdueix el teu nom (Refugiat)"
         @input="saveStateToLocalStorage"
-      />
-      
+      />      
       <div class="color-picker-container">
         <label>Tria el teu color (Pip-Boy):</label>
         <div class="color-picker">
@@ -193,7 +192,6 @@ function startGameByHost() {
     </div>
 
     <!-- VISTA 3: LOBBY -->
-
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
       <h2>Refugiats Connectats</h2>
       <ul>
@@ -224,7 +222,7 @@ function startGameByHost() {
           <div class="modo-buttons">
             <label class="modo-btn" :class="{ active: modoJuego === 'normal' }">
               <input type="radio" value="normal" v-model="modoJuego" />
-              <span>🎯 Normal</span>
+              <span>Normal</span>
             </label>
 
             <label
@@ -310,15 +308,6 @@ input[type="text"] {
   text-align: center;
 }
 
-/* Stage wrapper centers entry views on wide screens */
-.stage {
-  width: 100%;
-  /* make the stage take the full viewport so it centers regardless of parent layout */
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-}
 button {
   width: 100%;
 }
@@ -381,6 +370,9 @@ button {
   background-color: var(--color-primary, #007bff);
   color: white;
   cursor: pointer;
+}
+button.ready {
+  background-color: #28a745; /* Verde para estado ready */
 }
 button.btn-host {
   background-color: var(--color-success, #28a745);
