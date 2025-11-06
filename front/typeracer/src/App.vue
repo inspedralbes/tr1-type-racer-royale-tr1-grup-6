@@ -3,8 +3,9 @@ import { ref, computed, onMounted, watch } from "vue";
 import GameEngine from "./components/GameEngine.vue";
 import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
+import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js";
-import { useSounds } from '@/composables/useSounds';
+import { useSounds } from "@/composables/useSounds";
 
 const { playSound, setVolume } = useSounds();
 // Control de vista
@@ -21,8 +22,14 @@ const gameMaxStack = ref(5);
 const modoJuego = ref("normal");
 const currentRoom = ref(null);
 const colorsDisponibles = ref([
-  '#20ff20', '#a0ffa0', '#F0A000', '#E53935', 
-  '#1E88E5', '#D81B60', '#8E24AA', '#FB8C00'
+  "#20ff20",
+  "#a0ffa0",
+  "#F0A000",
+  "#E53935",
+  "#1E88E5",
+  "#D81B60",
+  "#8E24AA",
+  "#FB8C00",
 ]);
 const colorJugador = ref(colorsDisponibles.value[0]);
 const jugadors = computed(() => playersPayload.value.players || []);
@@ -138,7 +145,7 @@ function connectarAlServidor() {
   // Connecta i envia el nom
   communicationManager.connect({
     name: nomJugador.value,
-    color: colorJugador.value 
+    color: colorJugador.value,
   });
   // Canvia la vista al lobby
   if (vistaActual.value === "salaEspera") {
@@ -154,6 +161,11 @@ function startGameByHost() {
   // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
   communicationManager.requestStart(modoJuego.value);
 }
+
+function onRoomJoined(room) {
+  currentRoom.value = room;
+  vistaActual.value = "lobby";
+}
 </script>
 
 <template>
@@ -168,7 +180,7 @@ function startGameByHost() {
         v-model="nomJugador"
         placeholder="Introdueix el teu nom (Refugiat)"
         @input="saveStateToLocalStorage"
-      />      
+      />
       <div class="color-picker-container">
         <label>Tria el teu color (Pip-Boy):</label>
         <div class="color-picker">
@@ -176,13 +188,19 @@ function startGameByHost() {
             v-for="color in colorsDisponibles"
             :key="color"
             class="color-swatch"
-            :class="{ 'selected': color === colorJugador }"
-            :style="{ backgroundColor: color, filter: color === colorJugador ? `brightness(1.5) drop-shadow(0 0 5px ${color})` : 'none' }"
+            :class="{ selected: color === colorJugador }"
+            :style="{
+              backgroundColor: color,
+              filter:
+                color === colorJugador
+                  ? `brightness(1.5) drop-shadow(0 0 5px ${color})`
+                  : 'none',
+            }"
             @click="colorJugador = color"
           ></span>
         </div>
       </div>
-      
+
       <button @click="connectarAlServidor">Entra al Refugi</button>
     </div>
 
@@ -196,10 +214,18 @@ function startGameByHost() {
       <h2>Refugiats Connectats</h2>
       <ul>
         <li v-for="jugador in jugadors" :key="jugador.id">
-          <span class="color-dot" :style="{ backgroundColor: jugador.color, filter: `brightness(1.5) drop-shadow(0 0 5px ${jugador.color})` }"></span>
-          {{ jugador.name }} 
+          <span
+            class="color-dot"
+            :style="{
+              backgroundColor: jugador.color,
+              filter: `brightness(1.5) drop-shadow(0 0 5px ${jugador.color})`,
+            }"
+          ></span>
+          {{ jugador.name }}
           <span v-if="jugador.ready" class="ready-status">[PREPARAT]</span>
-          <span v-if="jugador.id === hostId" class="host-status"> — [Supervisor]</span>
+          <span v-if="jugador.id === hostId" class="host-status">
+            — [Supervisor]</span
+          >
         </li>
       </ul>
       <div class="lobby-actions">
@@ -239,7 +265,7 @@ function startGameByHost() {
 
     <!-- VISTA 3: JOC -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
-      <GameEngine
+      <component
         :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"

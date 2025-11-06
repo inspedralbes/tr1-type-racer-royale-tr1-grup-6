@@ -121,7 +121,7 @@ io.on("connection", (socket) => {
     room.players.set(socket.id, {
       id: socket.id,
       name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
-      color: '#9E9E9E', 
+      color: "#9E9E9E",
       ready: false,
       eliminated: false,
       completedWords: 0,
@@ -260,13 +260,26 @@ io.on("connection", (socket) => {
       }))
     );
   });
-  // 🎨 CAMBIO: Acepta nombre y color en el evento 'join'
   socket.on("join", (playerData) => {
-    if (jugadors[socket.id] && playerData) {
-      jugadors[socket.id].name = playerData.name || `Jugador-${socket.id.slice(0, 4)}`;
-      jugadors[socket.id].color = playerData.color || '#9E9E9E'; // Asigna el color
-      console.log(`Jugador ${socket.id} s'ha unit: ${jugadors[socket.id].name} (${jugadors[socket.id].color})`);
-      broadcastPlayerList();
+    if (playerData) {
+      // Guardar el nombre del jugador globalmente
+      playerNames.set(
+        socket.id,
+        playerData.name || `Jugador-${socket.id.slice(0, 4)}`
+      );
+      console.log(
+        `Jugador ${socket.id} s'ha unit: ${playerNames.get(socket.id)}`
+      );
+
+      // Actualizar el nombre en cualquier sala donde esté el jugador
+      for (const [roomId, room] of rooms.entries()) {
+        if (room.players.has(socket.id)) {
+          const player = room.players.get(socket.id);
+          player.name = playerNames.get(socket.id);
+          player.color = playerData.color || "#9E9E9E";
+          broadcastRoomPlayerList(roomId);
+        }
+      }
     }
   });
   socket.on("setPlayerName", (name) => {
