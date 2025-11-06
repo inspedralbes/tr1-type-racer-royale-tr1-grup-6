@@ -233,6 +233,14 @@ io.on("connection", (socket) => {
       if (room.players.has(socket.id)) {
         room.players.delete(socket.id);
         socket.leave(roomId);
+
+        // >>> Aquí añade el fix de host <<<
+        if (room.hostId === socket.id && room.players.size > 0) {
+          // El nuevo host es el primero que queda en la sala
+          room.hostId = Array.from(room.players.keys())[0];
+        }
+        // <<< fin del fix host >>>
+
         // If room empty, delete it; otherwise notify remaining players
         if (room.players.size === 0) {
           rooms.delete(roomId);

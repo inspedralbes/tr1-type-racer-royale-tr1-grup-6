@@ -81,11 +81,11 @@ onMounted(() => {
   ) {
     localStorage.removeItem("typeRacerUser");
 
-    // Cambia el estado inmediatamente
-    vistaActual.value = "salaEspera";
+    // Aquí no forzamos a salaEspera, mejor limpiar estados y desconectar
     nomJugador.value = "";
     isReady.value = false;
     communicationManager.disconnect();
+    vistaActual.value = "salaEspera";
   } else if (nomJugador.value) {
     connectarAlServidor();
     communicationManager.setReady(isReady.value);
@@ -96,11 +96,6 @@ onMounted(() => {
   }
 });
 
-watch([nomJugador, vistaActual, isReady], () => {
-  saveStateToLocalStorage();
-});
-
-// Modificado para NO forzar vista "lobby" si ya estás en "joc"
 function connectarAlServidor() {
   if (nomJugador.value.trim() === "") {
     alert("Si us plau, introdueix un nom vàlid.");
@@ -138,8 +133,10 @@ function connectarAlServidor() {
 
   communicationManager.connect(nomJugador.value);
 
-  // Canvia la vista al lobby
-  vistaActual.value = "rooms";
+  // Solo cambia a rooms si la vista actual no es lobby o juego
+  if (vistaActual.value === "salaEspera") {
+    vistaActual.value = "rooms";
+  }
 }
 
 function onRoomJoined(payload) {
@@ -204,7 +201,9 @@ function startGameByHost() {
         >
           Start (host)
         </button>
-        <button @click="volverInicio" style="margin-left: 8px"></button>
+        <button @click="volverInicio" style="margin-left: 8px">
+          Tornar a l'Inici
+        </button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el modo de juego</h3>
           <div class="modo-buttons">
@@ -222,7 +221,6 @@ function startGameByHost() {
             </label>
           </div>
         </div>
-
       </div>
     </div>
 
