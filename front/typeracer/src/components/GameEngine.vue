@@ -89,7 +89,7 @@ function iniciarCronometreParaula() {
 function validarProgres() {
   if (JuegoTerminado.value) return; // Bloqueja tot si la partida ha finalitzat
 
-  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === on) {
+  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
   if (!startTime.value && estatDelJoc.value.textEntrat.length === 1) {
@@ -188,8 +188,9 @@ function validarProgres() {
 }
 
 function onGameEnd() {
-  endTime.value = Date.now();
-  const playTime = endTime.value - startTime.value; // Temps total jugat en ms
+  if (!endTime.value) {
+    endTime.value = Date.now();
+  }
 }
 
 // Lógica colores letras
