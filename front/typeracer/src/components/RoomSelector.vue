@@ -83,7 +83,7 @@ onUnmounted(() => {
 <style scoped>
 .room-selector {
   width: 100%;
-  max-width: 640px;
+  max-width: 560px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
   padding: 18px;
@@ -113,6 +113,7 @@ onUnmounted(() => {
   color: var(--color-text);
   opacity: 0.8;
 }
+
 .create-room {
   display: flex;
   gap: 8px;

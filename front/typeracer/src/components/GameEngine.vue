@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, defineEmits } from "vue";
+import { ref, computed, onMounted, onUnmounted, defineEmits } from "vue";
 import communicationManager from "../services/communicationManager.js";
 import GameResult from "@/components/GameResult.vue";
 import { useSounds } from '@/composables/useSounds';
@@ -176,18 +176,30 @@ function onGameEnd() {
     endTime.value = Date.now();
   }
 }
-// Lógica colores letras
+
+// Lógica colores letras (CORREGIDA - solo una versión)
 function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return "";
   const typed = estatDelJoc.value.textEntrat;
   const target = paraulaActiva.value.text;
+  
+  const classes = []; // Usar un array para las clases
+
+  // 1. Añadir la clase 'caret'
+  if (indexLletra === typed.length) {
+    classes.push('caret');
+  }
+
+  // 2. Añadir clases 'correcte' o 'incorrecte'
   if (indexLletra >= typed.length) {
     if (paraulaActiva.value.letterErrors[indexLletra]) {
-      return "incorrecte";
+      classes.push("incorrecte");
     }
-    return "";
+  } else {
+    classes.push(typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte");
   }
-  return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
+  
+  return classes.join(' '); // Devuelve "caret", "incorrecte", "caret incorrecte", etc.
 }
 
 onMounted(() => {
@@ -323,7 +335,6 @@ onUnmounted(() => {
   }
 });
 
-// Funció 'calculateProgress' eliminada perquè no s'utilitzava.
 </script>
 
 <template>
@@ -338,7 +349,7 @@ onUnmounted(() => {
     </div>
     <div class="game-layout">
       <div class="game-main">
-        <TransitionGroup name="fall" tag="div" class="paraules-container">
+        <TransitionGroup name="fall" tag="div" class="paraules-container" :class="{ 'danger-zone': estatDelJoc.paraules.length > (props.maxStack * 0.75) }">
           <div
             v-for="(paraula, index) in estatDelJoc.paraules"
             :key="paraula.id"
@@ -649,5 +660,91 @@ onUnmounted(() => {
   20%, 80% { transform: translate3d(2px, 0, 0); }
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* === NUEVOS ESTILOS === */
+
+.modo-text {
+  display: inline-block;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--color-border);
+  transition: all 0.3s ease;
+}
+
+/* Estilo específico para MUERTE SÚBITA */
+.modo-text.muerteSubita {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  text-shadow: 0 0 5px var(--color-error);
+  
+  /* Animación de parpadeo sutil para dar "peligro" */
+  animation: flicker-danger 2s infinite;
+}
+
+@keyframes flicker-danger {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 5px var(--color-error);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 10px var(--color-error);
+  }
+}
+
+.lletra {
+  position: relative; /* Necesario para el pseudoelemento si lo usas */
+  transition: all 0.1s ease;
+}
+
+.lletra.caret {
+  /* Opción A: Borde (más simple) */
+  border-left: 3px solid var(--color-primary);
+  animation: blink-caret 1s step-end infinite;
+}
+
+@keyframes blink-caret {
+  0%, 100% { border-left-color: var(--color-primary); }
+  50% { border-left-color: transparent; }
+}
+
+.paraules-container.danger-zone {
+  /* Hacemos que el borde y la sombra parpadeen con el color de error */
+  border-color: var(--color-error);
+  animation: pulse-danger-border 1s infinite alternate;
+}
+
+@keyframes pulse-danger-border {
+  from {
+    box-shadow: inset 0 0 10px var(--shadow-color);
+  }
+  to {
+    border-color: var(--color-error);
+    box-shadow: inset 0 0 20px var(--color-error), 0 0 10px var(--color-error);
+  }
+}
+
+@keyframes pulse-focus {
+  0% { 
+    box-shadow: 0 0 20px var(--shadow-color); 
+    border-color: var(--color-success);
+  }
+  50% { 
+    box-shadow: 0 0 30px var(--color-success), 0 0 20px var(--shadow-color);
+    border-color: var(--color-success);
+  }
+  100% { 
+    box-shadow: 0 0 20px var(--shadow-color);
+    border-color: var(--color-success);
+  }
+}
+
+.text-input:focus {
+  /* Sobrescribe el estilo :focus simple */
+  /* y añade una animación de pulsación */
+  animation: pulse-focus 1.5s infinite;
 }
 </style>

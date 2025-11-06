@@ -7,7 +7,13 @@ import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js";
 import { useSounds } from "@/composables/useSounds";
 
-const { playSound, setVolume } = useSounds();
+const { 
+  playSound, 
+  setVolume, 
+  playMenuMusic, 
+  playGameMusic, 
+  stopAllMusic 
+} = useSounds();
 // Control de vista
 const vistaActual = ref("salaEspera"); // 'salaEspera', 'lobby', 'joc'
 
@@ -42,6 +48,14 @@ const allReady = computed(() => {
   return p.length > 0 && p.every((x) => x.ready === true);
 });
 
+watch(vistaActual, (newVista, oldVista) => {
+  if (newVista === 'joc') {
+    playGameMusic();
+  } else if (newVista === 'lobby' || newVista === 'rooms' || newVista === 'salaEspera') {
+    playMenuMusic();
+  }
+});
+
 function saveStateToLocalStorage() {
   localStorage.setItem(
     "typeRacerUser",
@@ -62,12 +76,10 @@ function loadStateFromLocalStorage() {
     if (typeof data.isReady === "boolean") isReady.value = data.isReady;
   }
 }
-// Nunca guardes ni restaures playersPayload de localStorage
 
 function volverInicio() {
   localStorage.removeItem("typeRacerUser");
   communicationManager.disconnect();
-  // Reestablece todos los estados importantes
   nomJugador.value = "";
   isReady.value = false;
   vistaActual.value = "salaEspera";
@@ -76,10 +88,9 @@ function volverInicio() {
   playerWords.value = [];
   gameIntervalMs.value = 3000;
   gameMaxStack.value = 5;
+  stopAllMusic();
 }
 
-// <<< IMPORTANTE >>>
-// Esta lógica permite reconectar sin cambiar la vista si ya estás en partida
 onMounted(() => {
   loadStateFromLocalStorage();
   const entries = performance.getEntriesByType("navigation");
@@ -93,7 +104,6 @@ onMounted(() => {
   ) {
     localStorage.removeItem("typeRacerUser");
 
-    // Aquí no forzamos a salaEspera, mejor limpiar estados y desconectar
     nomJugador.value = "";
     isReady.value = false;
     communicationManager.disconnect();
@@ -114,6 +124,8 @@ function connectarAlServidor() {
     return;
   }
   setVolume(0.5);
+
+  playMenuMusic();
 
   communicationManager.onConnect((id) => {
     socketId.value = id;
@@ -137,17 +149,14 @@ function connectarAlServidor() {
       playerWords.value = [];
       modoJuego.value = payload.modo || "normal";
     }
-    // Cambiar a vista de juego
     sessionStorage.setItem("justStartedGame", "true");
     vistaActual.value = "joc";
   });
 
-  // Connecta i envia el nom
   communicationManager.connect({
     name: nomJugador.value,
     color: colorJugador.value,
   });
-  // Canvia la vista al lobby
   if (vistaActual.value === "salaEspera") {
     vistaActual.value = "rooms";
   }
@@ -158,7 +167,6 @@ function toggleReady() {
   communicationManager.setReady(isReady.value);
 }
 function startGameByHost() {
-  // Sólo el host puede solicitar el inicio; el servidor validará que todos estén ready
   communicationManager.requestStart(modoJuego.value);
 }
 
@@ -172,7 +180,6 @@ function onRoomJoined(room) {
   <main>
     <DarkModeToggle />
 
-    <!-- VISTA 1: SALA D'ESPERA -->
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Type Racer Royale</h1>
       <input
@@ -200,16 +207,13 @@ function onRoomJoined(room) {
           ></span>
         </div>
       </div>
-
       <button @click="connectarAlServidor">Entra al Refugi</button>
     </div>
 
-    <!-- VISTA 2: ROOMS -->
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
       <RoomSelector @joined="onRoomJoined" />
     </div>
 
-    <!-- VISTA 3: LOBBY -->
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
       <h2>Refugiats Connectats</h2>
       <ul>
@@ -224,8 +228,8 @@ function onRoomJoined(room) {
           {{ jugador.name }}
           <span v-if="jugador.ready" class="ready-status">[PREPARAT]</span>
           <span v-if="jugador.id === hostId" class="host-status">
-            — [Supervisor]</span
-          >
+            — [Supervisor]
+          </span>
         </li>
       </ul>
       <div class="lobby-actions">
@@ -240,7 +244,7 @@ function onRoomJoined(room) {
         >
           [INICIAR] (Supervisor)
         </button>
-        <button @click="volverInicio" style="margin-left: 8px">
+        <button @click="volverInicio">
           Tornar a l'Inici
         </button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
@@ -256,14 +260,13 @@ function onRoomJoined(room) {
               :class="{ active: modoJuego === 'muerteSubita' }"
             >
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
-              <span>💀 Muerte Súbita</span>
+              <span>Muerte Súbita</span>
             </label>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- VISTA 3: JOC -->
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <component
         :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
@@ -287,17 +290,18 @@ function onRoomJoined(room) {
     Roboto, "Helvetica Neue", Arial;
 }
 .vista-container {
-  max-width: 400px;
-  margin: 40px auto;
+  max-width: 600px;
+  margin: 70px auto;
   padding: 20px;
   border: 1px solid var(--color-border, #ccc);
+  background: var(--color-background-soft);
   border-radius: 8px;
   text-align: center;
   align-items: center;
 }
 .vista-container-lobby {
-  max-width: 550px;
-  margin: 80px auto;
+  max-width: 700px; /* Ancho aumentado */
+  margin: 100px auto;
   padding: 24px;
   border: 2px solid var(--color-border);
   background: var(--color-background-soft);
@@ -332,16 +336,40 @@ input[type="text"] {
   box-sizing: border-box;
   font-size: 1.8rem;
   text-align: center;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
 }
 
 button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  cursor: pointer;
+  font-family: var(--font-main);
+  font-size: 1.5rem;
+  text-shadow: 0 0 5px var(--color-heading);
+  
+  width: auto; 
+}
+
+.vista-container button {
   width: 100%;
 }
+
 
 .lobby-actions {
   display: flex;
   gap: 16px;
   margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.lobby-actions button {
+  flex-grow: 1;
+  flex-basis: 200px;
+  margin-left: 0;
 }
 
 .color-picker-container {
@@ -376,42 +404,21 @@ button {
   transform: scale(1.1);
 }
 
-/* Reduce default margins inside the centered containers so they don't add extra offset */
-.vista-container,
-.vista-container-lobby,
-.vista-container-joc {
-  margin: 0 auto;
-}
-input[type="text"] {
-  width: 80%;
-  padding: 8px;
-  margin-bottom: 12px;
-  border: 1px solid var(--color-border, #ccc);
-  border-radius: 4px;
-}
-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  background-color: var(--color-primary, #007bff);
-  color: white;
-  cursor: pointer;
-}
 button.ready {
-  background-color: #28a745; /* Verde para estado ready */
+  background-color: #28a745;
 }
 button.btn-host {
   background-color: var(--color-success, #28a745);
-  margin-left: 8px;
 }
 .host-status {
   color: var(--color-text-muted);
   margin-left: 8px;
 }
-/* Modo selector styles */
+
 .modo-selector {
   margin-top: 20px;
   text-align: center;
+  width: 100%;
 }
 
 .modo-selector h3 {
@@ -473,7 +480,6 @@ button.btn-host {
   transform: scale(1.05);
 }
 
-/* Colores específicos para muerte súbita */
 .modo-btn.muerte::before {
   background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
 }
@@ -481,7 +487,6 @@ button.btn-host {
   color: white;
 }
 
-/* Animación sutil al hacer hover */
 .modo-btn:active {
   transform: scale(0.98);
 }
