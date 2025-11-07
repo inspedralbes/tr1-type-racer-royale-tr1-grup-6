@@ -31,7 +31,12 @@ function broadcastRoomPlayerList(roomId) {
   if (!room) return;
 
   const players = Array.from(room.players.values());
-  io.to(roomId).emit("updatePlayerList", { players, hostId: room.hostId });
+  // Include current game mode so clients can show it in the lobby
+  io.to(roomId).emit("updatePlayerList", {
+    players,
+    hostId: room.hostId,
+    modo: room.gameState?.modo || "normal",
+  });
 }
 
 console.log("Servidor Socket.IO listo en el puerto 3000");
@@ -98,6 +103,7 @@ io.on("connection", (socket) => {
       id: room.id,
       name: room.name,
       count: room.players.size,
+      modo: room.gameState?.modo || "normal",
     }));
     socket.emit("roomList", roomsList);
   });
@@ -257,6 +263,7 @@ io.on("connection", (socket) => {
         id: r.id,
         name: r.name,
         count: r.players.size,
+        modo: r.gameState?.modo || "normal",
       }))
     );
   });
@@ -405,6 +412,24 @@ io.on("connection", (socket) => {
     // Emitir solo a los jugadores de esta sala
     io.to(roomId).emit("gameStart", gamePayload);
     console.log(`gameStart emitido para room ${roomId}`);
+  });
+
+  // Allow the host to change the room mode (normal / muerteSubita) before starting
+  socket.on("setRoomMode", (payload) => {
+    const roomId = payload?.roomId;
+    const modo = payload?.modo;
+    if (!roomId || !modo) return;
+    const room = rooms.get(roomId);
+    if (!room) return;
+    // Only the host can change the mode
+    if (socket.id !== room.hostId) return;
+
+    room.gameState.modo = modo;
+    console.log(`Room ${roomId} mode changed to: ${modo} by host ${socket.id}`);
+
+    // Notify all clients in the room about the mode change and updated player list
+    io.to(roomId).emit("roomModeUpdated", { modo });
+    broadcastRoomPlayerList(roomId);
   });
 
   socket.on("completeWord", (word) => {

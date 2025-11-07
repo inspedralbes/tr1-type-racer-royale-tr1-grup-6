@@ -10,7 +10,15 @@
         <li v-for="r in rooms" :key="r.id" class="room-item">
           <div class="room-info">
             <div class="room-name">{{ r.name }}</div>
-            <div class="room-meta">Jugadors: {{ r.count || 0 }}</div>
+            <div class="room-meta">
+              <span>Jugadors: {{ r.count || 0 }}</span>
+              <span class="mode-info"
+                >Mode:
+                {{
+                  r.modo === "muerteSubita" ? "Muerte Súbita" : "Normal"
+                }}</span
+              >
+            </div>
           </div>
           <div class="room-actions">
             <button @click="joinRoom(r.id)">Entrar</button>
@@ -112,6 +120,15 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--color-text);
   opacity: 0.8;
+  display: flex;
+  gap: 12px;
+}
+
+.mode-info {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
 }
 
 .create-room {

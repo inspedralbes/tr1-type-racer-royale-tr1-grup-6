@@ -7,13 +7,8 @@ import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js";
 import { useSounds } from "@/composables/useSounds";
 
-const { 
-  playSound, 
-  setVolume, 
-  playMenuMusic, 
-  playGameMusic, 
-  stopAllMusic 
-} = useSounds();
+const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
+  useSounds();
 // Control de vista
 const vistaActual = ref("salaEspera"); // 'salaEspera', 'lobby', 'joc'
 
@@ -49,9 +44,13 @@ const allReady = computed(() => {
 });
 
 watch(vistaActual, (newVista, oldVista) => {
-  if (newVista === 'joc') {
+  if (newVista === "joc") {
     playGameMusic();
-  } else if (newVista === 'lobby' || newVista === 'rooms' || newVista === 'salaEspera') {
+  } else if (
+    newVista === "lobby" ||
+    newVista === "rooms" ||
+    newVista === "salaEspera"
+  ) {
     playMenuMusic();
   }
 });
@@ -137,6 +136,19 @@ function connectarAlServidor() {
   });
   communicationManager.onUpdatePlayerList((payload) => {
     playersPayload.value = payload;
+    // If the server sends the room mode, update local modoJuego for non-hosts
+    if (payload && payload.modo) {
+      // Only overwrite local modo if you're not the host (host controls it)
+      if (!isHost.value) {
+        modoJuego.value = payload.modo;
+      }
+    }
+  });
+  // Listen explicitly to mode change events
+  communicationManager.onRoomModeUpdated((data) => {
+    if (data && data.modo) {
+      modoJuego.value = data.modo;
+    }
   });
   communicationManager.onGameStart((payload) => {
     const ownId = socketId.value;
@@ -169,6 +181,14 @@ function toggleReady() {
 function startGameByHost() {
   communicationManager.requestStart(modoJuego.value);
 }
+
+// When the host changes the selected mode in the lobby, notify server
+watch(modoJuego, (newModo, oldModo) => {
+  if (!newModo || newModo === oldModo) return;
+  if (isHost.value && playersPayload.value && playersPayload.value.hostId) {
+    communicationManager.setRoomMode(newModo);
+  }
+});
 
 function onRoomJoined(room) {
   currentRoom.value = room;
@@ -216,6 +236,17 @@ function onRoomJoined(room) {
 
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
       <h2>Refugiats Connectats</h2>
+      <div class="lobby-header" v-if="!isHost">
+        <div class="game-mode-display">
+          Mode actual:
+          <span
+            class="mode-badge"
+            :class="{ 'muerte-subita': modoJuego === 'muerteSubita' }"
+          >
+            {{ modoJuego === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+          </span>
+        </div>
+      </div>
       <ul>
         <li v-for="jugador in jugadors" :key="jugador.id">
           <span
@@ -244,9 +275,7 @@ function onRoomJoined(room) {
         >
           [INICIAR] (Supervisor)
         </button>
-        <button @click="volverInicio">
-          Tornar a l'Inici
-        </button>
+        <button @click="volverInicio">Tornar a l'Inici</button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el modo de juego</h3>
           <div class="modo-buttons">
@@ -350,14 +379,13 @@ button {
   font-family: var(--font-main);
   font-size: 1.5rem;
   text-shadow: 0 0 5px var(--color-heading);
-  
-  width: auto; 
+
+  width: auto;
 }
 
 .vista-container button {
   width: 100%;
 }
-
 
 .lobby-actions {
   display: flex;
@@ -413,6 +441,31 @@ button.btn-host {
 .host-status {
   color: var(--color-text-muted);
   margin-left: 8px;
+}
+
+.lobby-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.game-mode-display {
+  font-size: 1.2rem;
+  margin: 10px 0;
+}
+
+.mode-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #007bff, #00d4ff);
+  color: white;
+  font-weight: 600;
+  margin-left: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.mode-badge.muerte-subita {
+  background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
 }
 
 .modo-selector {
