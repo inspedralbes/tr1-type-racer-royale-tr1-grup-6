@@ -68,9 +68,13 @@ const communicationManager = {
     socket.emit("playerLost");
   },
 
-  // Reportar eliminación de un jugador
   reportPlayerEliminated() {
-    socket.emit("playerEliminated");
+    if (currentRoom) {
+      socket.emit("muerteSubitaEliminacion", { roomId: currentRoom });
+      console.log("Reportando eliminación para sala:", currentRoom);
+    } else {
+      console.error("No hay roomId actual al reportar eliminación.");
+    }
   },
 
   // Enviar progreso del jugador (palabras completadas)

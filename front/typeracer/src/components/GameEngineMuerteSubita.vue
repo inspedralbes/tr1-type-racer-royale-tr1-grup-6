@@ -32,11 +32,14 @@ const estatDelJoc = ref({
   textEntrat: "",
   estadistiques: [],
 });
+const emit = defineEmits(["volverInicio"]);
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
-
+function handleVolverInicio() {
+  emit("volverInicio");
+}
 // Computed: palabra activa
 const paraulaActiva = computed(() => {
   if (estatDelJoc.value.paraules.length === 0) {
@@ -141,7 +144,7 @@ function validarProgres() {
       if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
         perdedor.value = true;
         perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
-        communicationManager.reportPlayerEliminated();
+        communicationManager.reportMuerteSubitaElimination();
         // El jugador local ya no puede escribir
         estatDelJoc.value.textEntrat = "";
         window.removeEventListener("keydown", handleKeyDown);
@@ -196,7 +199,7 @@ onMounted(() => {
   communicationManager.onPlayerEliminated((data) => {
     const player = props.players.find((p) => p.id === data.playerId);
     if (player) {
-      player.eliminado = true;
+      player.eliminated = true;
     }
 
     if (data.playerId === communicationManager.id) {
@@ -371,6 +374,7 @@ function calculateProgress(completedWords) {
       :loser="perdedor"
       :message="perdidoMensaje"
       :players="props.players"
+      @volverInicio="handleVolverInicio"
       :modo="props.modo"
     />
   </div>
