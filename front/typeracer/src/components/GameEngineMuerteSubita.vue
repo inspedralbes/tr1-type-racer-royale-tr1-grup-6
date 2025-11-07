@@ -278,9 +278,9 @@ function calculateProgress(completedWords) {
 <template>
   <div class="game-header">
     <h2 class="modo-titulo">
-      Modo de juego:
+      Mode de joc:
       <span :class="['modo-text', props.modo]">
-        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+        {{ props.modo === "muerteSubita" ? "Mort Súbita" : "Normal" }}
       </span>
     </h2>
   </div>
@@ -356,7 +356,7 @@ function calculateProgress(completedWords) {
             v-if="p.eliminated"
             style="color: #dc3545; font-weight: bold; margin-left: 10px"
           >
-            Eliminado
+            Eliminat
           </span>
           <span class="completed-count">
             Paraules fetes: {{ p.completedWords || 0 }}

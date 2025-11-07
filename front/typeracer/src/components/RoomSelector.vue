@@ -1,10 +1,10 @@
 <template>
   <div class="room-selector">
-    <h2>Rooms disponibles</h2>
+    <h2>Sales disponibles</h2>
 
     <div class="rooms-list">
       <div v-if="rooms.length === 0" class="empty">
-        No hi ha rooms disponibles
+        No hi ha sales disponibles
       </div>
       <ul>
         <li v-for="r in rooms" :key="r.id" class="room-item">
@@ -20,8 +20,8 @@
     </div>
 
     <div class="create-room">
-      <input v-model="newRoomName" placeholder="Nom de la room" />
-      <button @click="createRoom">Crear room</button>
+      <input v-model="newRoomName" placeholder="Nom de la sala" />
+      <button @click="createRoom">Crear sala</button>
     </div>
   </div>
 </template>

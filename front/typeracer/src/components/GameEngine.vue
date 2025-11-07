@@ -242,7 +242,7 @@ onMounted(() => {
       playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
     });
     perdidoMensaje.value =
-      data?.message || "Has perdido: demasiadas palabras acumuladas.";
+      data?.message || "Has perdut: massa paraules acumulades.";
     playSound('gameLose');
     if (revealTimer) {
       clearInterval(revealTimer);
@@ -256,7 +256,7 @@ onMounted(() => {
     perdedor.value = false;
     JuegoTerminado.value = true;
     perdidoMensaje.value =
-      data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
+      data?.message || "Has guanyat! Tots els altres han estat eliminats.";
     playSound('gameWin');
     if (revealTimer) {
       clearInterval(revealTimer);
@@ -276,12 +276,12 @@ onMounted(() => {
       ganador.value = true;
       perdedor.value = false;
       playSound('gameWin');
-      perdidoMensaje.value = data.message || "¡Has ganado! Todos los demás fueron eliminados.";
+      perdidoMensaje.value = data.message || "Has guanyat! Tots els altres han estat eliminats.";
     } else {
       ganador.value = false;
       perdedor.value = true;
       playSound('gameLose');
-      perdidoMensaje.value = data.message || `Has perdido. ${data.winnerName} ha ganado.`;
+      perdidoMensaje.value = data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
     }
     JuegoTerminado.value = true;
     if (revealTimer) {
