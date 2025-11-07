@@ -80,8 +80,6 @@ function iniciarCronometreParaula() {
 
 // Validar progreso en palabra actual
 function validarProgres() {
-  if (JuegoTerminado.value) return;
-
   if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
@@ -104,40 +102,6 @@ function validarProgres() {
     );
   }
 
-  // --- INICIO DE LA CORRECCIÓN DEL BUG ---
-  let errorEncontradoEsteTick = false;
-
-  // Lógica conteo errores
-  for (let i = 0; i < typed.length; i++) {
-    if (i >= paraula.text.length) break;
-    const isError = typed[i] !== paraula.text[i];
-    if (isError) {
-      errorEncontradoEsteTick = true;
-      if (!paraula.letterErrors[i]) {
-        // Error nuevo
-        totalErrors.value++;
-
-        // ¡CORREGIDO!
-        // 1. Comprueba si es muerte súbita
-        // 2. ¡SOLO REPORTA! No cambies 'perdedor.value' aquí.
-        if (props.modo === "muerteSubita") {
-          // Usamos el evento correcto que el servidor espera (el mismo que GameEngine)
-          communicationManager.reportMuerteSubitaElimination();
-        }
-        paraula.letterErrors[i] = true;
-      }
-    } else {
-      paraula.letterErrors[i] = false;
-    }
-  }
-
-  // Si el jugador cometió un error, salimos para que no complete la palabra
-  if (errorEncontradoEsteTick) {
-    return;
-  }
-  // --- FIN DE LA CORRECCIÓN DEL BUG ---
-
-  // Esta lógica ahora solo se ejecuta si NO hay errores
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
     const self = props.players.find((p) => p.id === communicationManager.id);
@@ -165,6 +129,32 @@ function validarProgres() {
         );
         nextParaula.errors = 0;
       }
+    }
+  }
+
+  // Lógica conteo errores para modo muerte súbita
+  for (let i = 0; i < typed.length; i++) {
+    if (i >= paraula.text.length) break;
+    const isError = typed[i] !== paraula.text[i];
+    if (isError && !paraula.letterErrors[i]) {
+      totalErrors.value++;
+      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
+        perdedor.value = true;
+        perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
+        communicationManager.reportPlayerEliminated();
+        // El jugador local ya no puede escribir
+        estatDelJoc.value.textEntrat = "";
+        window.removeEventListener("keydown", handleKeyDown);
+        estatDelJoc.value.textEntrat = "";
+        if (revealTimer) {
+          clearInterval(revealTimer);
+          revealTimer = null;
+        }
+        return;
+      }
+      paraula.letterErrors[i] = true;
+    } else {
+      paraula.letterErrors[i] = false;
     }
   }
 }
@@ -206,7 +196,7 @@ onMounted(() => {
   communicationManager.onPlayerEliminated((data) => {
     const player = props.players.find((p) => p.id === data.playerId);
     if (player) {
-      player.eliminado = true; // El servidor ya debe enviar 'eliminated', pero esto es un fallback
+      player.eliminado = true;
     }
 
     if (data.playerId === communicationManager.id) {
@@ -286,114 +276,105 @@ function calculateProgress(completedWords) {
 </script>
 
 <template>
-  <div>
-    <div class="game-header">
-      <h2 class="modo-titulo">
-        Modo de juego:
-        <span :class="['modo-text', props.modo]">
-          {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
-        </span>
-      </h2>
-    </div>
-    <div class="game-layout">
-      <div class="game-main">
-        <TransitionGroup name="fall" tag="div" class="paraules-container">
-          <div
-            v-for="(paraula, index) in estatDelJoc.paraules"
-            :key="paraula.id"
-            class="paraula"
-            :class="{
-              'paraula-activa': index === estatDelJoc.value.paraules.length - 1,
-              'completada-correcta':
-                paraula.estat === 'completada' && paraula.errors === 0,
-              'completada-incorrecta':
-                paraula.estat === 'completada' && paraula.errors > 0,
-            }"
-          >
-            <template v-if="index === estatDelJoc.value.paraules.length - 1">
-              <span
-                v-for="(lletra, i) in paraula.text.split('')"
-                :key="i"
-                class="lletra"
-                :class="getClasseLletra(i)"
-              >
-                {{ lletra }}
-              </span>
-            </template>
-            <template v-else>
-              {{ paraula.text }}
-            </template>
-          </div>
-        </TransitionGroup>
-
-        <input
-          type="text"
-          class="text-input"
-          v-model="estatDelJoc.textEntrat"
-          placeholder="Comença a escriure..."
-          :disabled="JuegoTerminado"
-        />
-
-        <div class="teclat">
-          <div
-            v-for="(fila, fIndex) in filesDelTeclat"
-            :key="fIndex"
-            class="fila"
-          >
-            <div
-              v-for="lletra in fila"
-              :key="lletra"
-              class="tecla"
-              :class="{ 'tecla-premuda': teclaPremuda === lletra }"
+  <div class="game-header">
+    <h2 class="modo-titulo">
+      Modo de juego:
+      <span :class="['modo-text', props.modo]">
+        {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+      </span>
+    </h2>
+  </div>
+  <div class="game-layout">
+    <div class="game-main">
+      <TransitionGroup name="fall" tag="div" class="paraules-container">
+        <div
+          v-for="(paraula, index) in estatDelJoc.paraules"
+          :key="paraula.id"
+          class="paraula"
+          :class="{
+            'paraula-activa': index === estatDelJoc.paraules.length - 1,
+            'completada-correcta':
+              paraula.estat === 'completada' && paraula.errors === 0,
+            'completada-incorrecta':
+              paraula.estat === 'completada' && paraula.errors > 0,
+          }"
+        >
+          <template v-if="index === estatDelJoc.paraules.length - 1">
+            <span
+              v-for="(lletra, i) in paraula.text.split('')"
+              :key="i"
+              class="lletra"
+              :class="getClasseLletra(i)"
             >
               {{ lletra }}
-            </div>
+            </span>
+          </template>
+          <template v-else>
+            {{ paraula.text }}
+          </template>
+        </div>
+      </TransitionGroup>
+
+      <input
+        type="text"
+        class="text-input"
+        v-model="estatDelJoc.textEntrat"
+        @input="validarProgres"
+        placeholder="Comença a escriure..."
+        :disabled="JuegoTerminado"
+      />
+
+      <div class="teclat">
+        <div
+          v-for="(fila, fIndex) in filesDelTeclat"
+          :key="fIndex"
+          class="fila"
+        >
+          <div
+            v-for="lletra in fila"
+            :key="lletra"
+            class="tecla"
+            :class="{ 'tecla-premuda': teclaPremuda === lletra }"
+          >
+            {{ lletra }}
           </div>
         </div>
       </div>
-
-      <aside class="players-sidebar">
-        <h3>Jugadors</h3>
-        <ul>
-          <li
-            v-for="p in props.players"
-            :key="p.id"
-            class="player-name-inline"
-            :class="{ eliminado: p.eliminated }"
-          >
-            <span
-              class="color-dot"
-              :style="{
-                backgroundColor: p.color,
-                filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})`,
-              }"
-            ></span>
-
-            <span class="player-name-text">{{ p.name }}</span>
-
-            <span
-              v-if="p.eliminated"
-              style="color: #dc3545; font-weight: bold; margin-left: 10px"
-            >
-              Eliminado
-            </span>
-            <span class="completed-count">
-              Paraules fetes: {{ p.completedWords || 0 }}
-            </span>
-          </li>
-        </ul>
-      </aside>
-      <GameResult
-        v-if="JuegoTerminado"
-        :winner="ganador"
-        :loser="perdedor"
-        :message="perdidoMensaje"
-        :players="props.players"
-        :modo="props.modo"
-      />
     </div>
+
+    <aside class="players-sidebar">
+      <h3>Jugadors</h3>
+      <ul>
+        <li
+          v-for="p in props.players"
+          :key="p.id"
+          class="player-name-inline"
+          :class="{ eliminado: p.eliminated }"
+        >
+          <span class="player-name-text">{{ p.name }}</span>
+          <span
+            v-if="p.eliminated"
+            style="color: #dc3545; font-weight: bold; margin-left: 10px"
+          >
+            Eliminado
+          </span>
+          <span class="completed-count">
+            Paraules fetes: {{ p.completedWords || 0 }}
+          </span>
+        </li>
+      </ul>
+    </aside>
+
+    <GameResult
+      v-if="JuegoTerminado"
+      :winner="ganador"
+      :loser="perdedor"
+      :message="perdidoMensaje"
+      :players="props.players"
+      :modo="props.modo"
+    />
   </div>
-  </template>
+</template>
 
 <style scoped>
 .correcte {
@@ -513,7 +494,6 @@ function calculateProgress(completedWords) {
 .player-name-text {
   font-weight: 700;
   color: var(--color-heading, #333);
-  flex-grow: 1; /* Para que empuje el contador al final */
 }
 .completed-count {
   font-size: 12px;
@@ -523,20 +503,7 @@ function calculateProgress(completedWords) {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: bold;
-  flex-shrink: 0; /* Evita que se encoja */
 }
-
-/* === CLASE AÑADIDA === */
-.color-dot {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  margin-right: 8px;
-  flex-shrink: 0;
-  border: 1px solid var(--color-text-muted);
-}
-/* === FIN CLASE AÑADIDA === */
 
 .paraules-container {
   /* Make the word stack scroll inside this box instead of growing the page */
