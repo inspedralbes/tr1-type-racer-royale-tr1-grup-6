@@ -19,6 +19,8 @@ const io = new Server(server, {
 // Estado de rooms y jugadores
 const rooms = new Map(); // Map to store rooms: { id, name, players: Map<socketId, playerData>, hostId }
 const playerNames = new Map(); // Map to store player names by socket ID
+const playerColors = new Map(); // Map to store player colors by socket ID
+
 
 // Genera un ID único para una room
 function generateRoomId() {
@@ -108,6 +110,7 @@ io.on("connection", (socket) => {
     const room = {
       id: roomId,
       name: data.name,
+      color: playerColors.get(socket.id) || "#9E9E9E",
       players: new Map(),
       hostId: socket.id,
       gameState: {
@@ -121,7 +124,9 @@ io.on("connection", (socket) => {
     room.players.set(socket.id, {
       id: socket.id,
       name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
-      color: "#9E9E9E",
+      // --- ESTA ES LA LÍNEA CORREGIDA ---
+      color: playerColors.get(socket.id) || "#9E9E9E", 
+      // --- ANTES ESTABA FIJADO A: color: "#9E9E9E", ---
       ready: false,
       eliminated: false,
       completedWords: 0,
@@ -162,6 +167,7 @@ io.on("connection", (socket) => {
       room.players.set(socket.id, {
         id: socket.id,
         name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
+        color: playerColors.get(socket.id) || "#9E9E9E",
         ready: false,
         eliminated: false,
         completedWords: 0,
@@ -267,6 +273,7 @@ io.on("connection", (socket) => {
         socket.id,
         playerData.name || `Jugador-${socket.id.slice(0, 4)}`
       );
+      playerColors.set(socket.id, playerData.color || "#9E9E9E");
       console.log(
         `Jugador ${socket.id} s'ha unit: ${playerNames.get(socket.id)}`
       );
@@ -277,6 +284,7 @@ io.on("connection", (socket) => {
           const player = room.players.get(socket.id);
           player.name = playerNames.get(socket.id);
           player.color = playerData.color || "#9E9E9E";
+          player.color = playerColors.get(socket.id);
           broadcastRoomPlayerList(roomId);
         }
       }
