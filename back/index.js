@@ -104,6 +104,7 @@ io.on("connection", (socket) => {
       name: room.name,
       count: room.players.size,
       modo: room.gameState?.modo || "normal",
+      inGame: room.gameState?.started || false,
     }));
     socket.emit("roomList", roomsList);
   });
@@ -146,6 +147,8 @@ io.on("connection", (socket) => {
         id: r.id,
         name: r.name,
         count: r.players.size,
+        modo: r.gameState?.modo || "normal",
+        inGame: r.gameState?.started || false,
       }))
     );
 
@@ -156,10 +159,13 @@ io.on("connection", (socket) => {
     const room = rooms.get(data.roomId);
     if (room) {
       // No permitir unirse si el juego ya comenzó
-      if (room.gameState.started) {
+      if (room.gameState?.started) {
+        console.log(
+          `Player ${socket.id} tried to join room ${data.roomId} but game already started`
+        );
         socket.emit("joinedRoom", {
           success: false,
-          error: "Game already started",
+          error: "No puedes unirte a una partida en curso",
         });
         return;
       }
@@ -264,6 +270,7 @@ io.on("connection", (socket) => {
         name: r.name,
         count: r.players.size,
         modo: r.gameState?.modo || "normal",
+        inGame: r.gameState?.started || false,
       }))
     );
   });

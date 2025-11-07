@@ -9,7 +9,10 @@
       <ul>
         <li v-for="r in rooms" :key="r.id" class="room-item">
           <div class="room-info">
-            <div class="room-name">{{ r.name }}</div>
+            <div class="room-name">
+              {{ r.name }}
+              <span v-if="r.inGame" class="in-game-badge">En juego</span>
+            </div>
             <div class="room-meta">
               <span>Jugadors: {{ r.count || 0 }}</span>
               <span class="mode-info"
@@ -21,7 +24,14 @@
             </div>
           </div>
           <div class="room-actions">
-            <button @click="joinRoom(r.id)">Entrar</button>
+            <button
+              @click="joinRoom(r.id)"
+              :disabled="r.inGame"
+              :class="{ disabled: r.inGame }"
+              :title="r.inGame ? 'No puedes unirte a una partida en curso' : ''"
+            >
+              {{ r.inGame ? "En juego" : "Entrar" }}
+            </button>
           </div>
         </li>
       </ul>
@@ -60,6 +70,15 @@ function createRoom() {
 function joinRoom(id) {
   communicationManager.joinRoom(id);
 }
+
+// Añadimos el manejador de errores al unirse a una sala
+onMounted(() => {
+  communicationManager.onEvent("joinedRoom", (data) => {
+    if (!data.success && data.error) {
+      alert(data.error);
+    }
+  });
+});
 
 function onRoomList(payload) {
   // payload expected: [{ id, name, count }]
@@ -149,5 +168,27 @@ onUnmounted(() => {
   color: var(--color-text);
   opacity: 0.8;
   padding: 8px 0;
+}
+
+.in-game-badge {
+  display: inline-block;
+  font-size: 0.75em;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+  margin-left: 6px;
+  border-radius: 12px;
+  background-color: var(--color-warning, #ffc107);
+  color: var(--color-text-dark, #000);
+}
+
+button.disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: var(--color-background-muted, #6c757d);
+}
+
+button.disabled:hover {
+  opacity: 0.7;
+  transform: none;
 }
 </style>
