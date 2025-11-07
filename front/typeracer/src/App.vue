@@ -138,20 +138,37 @@ function connectarAlServidor() {
   communicationManager.onUpdatePlayerList((payload) => {
     playersPayload.value = payload;
   });
+
+  // --- SECCIÓN CORREGIDA ---
   communicationManager.onGameStart((payload) => {
-    const ownId = socketId.value;
+    // FIX: Obtenemos el ID directamente del servicio (fuente de la verdad)
+    // en lugar del ref 'socketId.value' que puede no estar actualizado.
+    const ownId = communicationManager.id;
+
+    // Logs de depuración (muy importantes)
+    console.log("GAME START PAYLOAD RECIBIDO:", payload);
+    console.log("MI SOCKET ID (from comms):", ownId);
+    if (payload.wordsByPlayer) {
+      console.log("Palabras para mi ID:", payload.wordsByPlayer[ownId]);
+    }
+
     if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
+      // Éxito
       playerWords.value = payload.wordsByPlayer[ownId];
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
       gameMaxStack.value = payload.maxStack || 5;
       modoJuego.value = payload.modo || "normal";
     } else {
-      playerWords.value = [];
+      // Fallo: Asignamos palabras de fallback para que el juego no se rompa
+      // y el usuario vea que algo ha fallado.
+      console.error("¡No se recibieron palabras para este jugador! Usando fallback.");
+      playerWords.value = ["error", "palabras", "no", "recibidas", "revisa", "servidor"];
       modoJuego.value = payload.modo || "normal";
     }
     sessionStorage.setItem("justStartedGame", "true");
     vistaActual.value = "joc";
   });
+  // --- FIN DE LA SECCIÓN CORREGIDA ---
 
   communicationManager.connect({
     name: nomJugador.value,
