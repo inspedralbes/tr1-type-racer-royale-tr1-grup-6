@@ -1,15 +1,16 @@
-FROM node:20-alpine
+FROM node:18
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
-# Install deps (production). If you need dev deps for development, adjust accordingly.
+
+# Copia los package.json y package-lock.json
 COPY package*.json ./
-# Install production dependencies from package.json
-RUN npm install --production
 
+# Instala todas las dependencias, incluidas las de desarrollo (como nodemon)
+RUN npm install --omit=dev
+
+
+# Copia el resto de la aplicación
 COPY . .
 
 EXPOSE 3000
-
-# Default command - update if your entrypoint is different (e.g., server.js or src/index.js)
-CMD ["node", "index.js"]

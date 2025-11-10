@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -10,10 +11,25 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
+const nodeEnv = process.env.NODE_ENV;
+
+// Define la configuración de CORS (Cross-Origin Resource Sharing) basada en el entorno.
+const corsOptions = {
+  methods: ["GET", "POST","PUT", "DELETE"],
+};
+
+// En producción, solo permite peticiones desde la URL del frontend definida en .env
+if (nodeEnv === 'production') {
+  console.log('Running in production mode');
+  corsOptions.origin = process.env.FRONTEND_URL;
+} else {
+  console.log('Running in development mode');
+  // En desarrollo, permite cualquier origen
+  corsOptions.origin = "*";
+}
+
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
+  cors: corsOptions,
 });
 
 // Estado de rooms y jugadores
