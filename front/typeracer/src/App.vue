@@ -432,6 +432,16 @@ button {
   transform: scale(1.1);
 }
 
+.color-dot {
+  display: inline-block;
+  width: 14px;            /* Ancho del punto */
+  height: 14px;           /* Alto del punto */
+  border-radius: 50%;     /* Lo hace redondo */
+  margin-right: 10px;     /* Espacio a la derecha */
+  vertical-align: middle; /* Se alinea con el texto */
+  border: 1px solid rgba(0, 0, 0, 0.2); /* Borde sutil */
+}
+
 button.ready {
   background-color: #28a745;
 }
