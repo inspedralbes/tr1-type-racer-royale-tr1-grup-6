@@ -446,11 +446,6 @@ onUnmounted(() => {
   display: block;
   max-width: 100%;
   padding: 10px 0 16px;
-  background: linear-gradient(
-    to top,
-    var(--color-background-soft),
-    transparent
-  );
   z-index: 30;
 }
 .fila {
