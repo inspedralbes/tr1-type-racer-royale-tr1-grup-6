@@ -17,9 +17,9 @@ const io = new Server(server, {
 });
 
 // Estado de rooms y jugadores
-const rooms = new Map(); // Map to store rooms: { id, name, players: Map<socketId, playerData>, hostId }
-const playerNames = new Map(); // Map to store player names by socket ID
-const playerColors = new Map(); // Map to store player colors by socket ID
+const rooms = new Map();
+const playerNames = new Map();
+const playerColors = new Map();
 
 // Genera un ID único para una room
 function generateRoomId() {
@@ -47,6 +47,7 @@ function allPlayersReadyInRoom(roomId) {
   if (!room || room.players.size === 0) return false;
   return Array.from(room.players.values()).every((p) => p.ready === true);
 }
+
 function createGamePayload(room) {
   let words = [];
   try {
@@ -68,31 +69,16 @@ function createGamePayload(room) {
     return a;
   }
 
-  const wordsPerPlayer = Math.max(
-    20,
-    Math.floor(words.length / Math.max(1, room.players.size))
-  );
-
-  const wordsByPlayer = {};
-  const shuffled = shuffle(words);
-  const players = Array.from(room.players.keys());
-
-  for (let i = 0; i < players.length; i++) {
-    const playerId = players[i];
-    const playerWords = [];
-    for (let j = 0; j < wordsPerPlayer; j++) {
-      playerWords.push(shuffled[(j + i) % shuffled.length]);
-    }
-    wordsByPlayer[playerId] = playerWords;
-  }
+  const gameWords = shuffle(words);
 
   return {
-    wordsByPlayer,
+    gameWords: gameWords,
     maxStack: 20,
     intervalMs: 2000,
     startAt: Date.now() + 1500,
   };
 }
+
 // modo de juego se guarda por sala en room.gameState.modo
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
@@ -120,7 +106,7 @@ io.on("connection", (socket) => {
       hostId: socket.id,
       gameState: {
         started: false,
-        wordsByPlayer: {},
+        gameWords: [], // <-- AQUÍ (canvi de nom)
         maxStack: 20,
         intervalMs: 2000,
       },
@@ -255,9 +241,7 @@ io.on("connection", (socket) => {
           // El nuevo host es el primero que queda en la sala
           room.hostId = Array.from(room.players.keys())[0];
         }
-        // <<< fin del fix host >>>
 
-        // If room empty, delete it; otherwise notify remaining players
         if (room.players.size === 0) {
           rooms.delete(roomId);
         } else {
@@ -420,10 +404,12 @@ io.on("connection", (socket) => {
     // Marcar la sala como iniciada
     room.gameState.started = true;
     room.gameState.modo = modo;
-    room.gameState.wordsByPlayer = gamePayload.wordsByPlayer;
+    room.gameState.gameWords = gamePayload.gameWords; // <-- AQUÍ (canvi de nom)
 
     // Emitir solo a los jugadores de esta sala
     io.to(roomId).emit("gameStart", gamePayload);
+    // =================================================================
+
     console.log(`gameStart emitido para room ${roomId}`);
   });
   // Allow the host to change the room mode (normal / muerteSubita) before starting

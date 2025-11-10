@@ -438,6 +438,7 @@ onUnmounted(() => {
                 backgroundColor: p.color,
                 filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})`,
               }"
+              aria-hidden="true"
             ></span>
             <span class="player-name-text">{{ p.name }}</span>
             <span class="completed-count">
