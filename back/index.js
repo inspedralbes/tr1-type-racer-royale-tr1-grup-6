@@ -514,23 +514,36 @@ io.on("connection", (socket) => {
     if (!room || room.gameState.modo !== "muerteSubita") return;
 
     const player = room.players.get(socket.id);
-    if (!player || player.eliminated) return;
+    if (!player) return;
 
-    // Marcar al jugador como eliminado
-    player.eliminated = true;
-    console.log(`Jugador ${player.name} eliminat en mort súbita per error`);
+    if (player.lives === undefined) player.lives = 3; // Tres vidas por jugador
 
-    // Notificar al jugador que ha sido eliminado
-    socket.emit("playerEliminated", {
-      playerId: player.id,
-      playerName: player.name,
-      message: "¡T'has equivocat! En mort súbita, estàs eliminat.",
-    });
+    // Restar una vida
+    player.lives--;
 
-    // Actualizar la lista de jugadores en la sala
+    if (player.lives <= 0) {
+      player.eliminated = true;
+      console.log(`Jugador ${player.name} eliminado en mort súbita`);
+
+      // Notificar al jugador eliminado
+      socket.emit("playerEliminated", {
+        playerId: player.id,
+        playerName: player.name,
+        message: "Has perdido todas tus vidas. Estás eliminado!",
+      });
+    } else {
+      // Notificar al jugador que perdió una vida pero sigue vivo
+      socket.emit("vidasActualizadas", {
+        playerId: player.id,
+        lives: player.lives,
+        message: `¡Te has equivocado! Te quedan ${player.lives} vidas.`,
+      });
+    }
+
+    // Actualizar lista de jugadores en la sala
     broadcastRoomPlayerList(roomId);
 
-    // Comprobar si solo queda un jugador activo
+    // Comprobar si queda un solo jugador activo
     const activos = Array.from(room.players.values()).filter(
       (p) => !p.eliminated
     );
@@ -540,14 +553,14 @@ io.on("connection", (socket) => {
 
       // Notificar al ganador
       io.to(ganador.id).emit("playerWon", {
-        message: "¡Ets l'últim jugador dret!",
+        message: "¡Eres el último jugador en pie!",
       });
 
-      // Notificar a los demás jugadores
+      // Notificar a los demás jugadores eliminados
       Array.from(room.players.values()).forEach((j) => {
         if (j.id !== ganador.id) {
           io.to(j.id).emit("playerEliminated", {
-            message: `Has perdut. El guanyador és ${ganador.name}.`,
+            message: `Has perdido. El ganador es ${ganador.name}.`,
           });
         }
       });
@@ -556,7 +569,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("gameOver", {
         winnerId: ganador.id,
         winnerName: ganador.name,
-        message: `${ganador.name} ha guanyat la partida en mode mort súbita.`,
+        message: `${ganador.name} ha ganado la partida en modo muerte súbita.`,
       });
     }
   });

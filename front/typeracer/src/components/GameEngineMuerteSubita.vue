@@ -50,6 +50,11 @@ const paraulaActiva = computed(() => {
 
 const totalErrors = ref(0);
 
+//variables corazones
+const vidasRestantes = ref(3); //  Dos vidas por jugador
+const tiempoRestante = ref(5); // 5 segundos
+let countdownTimer = null;
+
 // Manejo teclado
 function handleKeyDown(event) {
   const key = event.key;
@@ -83,18 +88,18 @@ function iniciarCronometreParaula() {
 
 // Validar progreso en palabra actual
 function validarProgres() {
-  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
-    iniciarCronometreParaula();
-  }
+  if (JuegoTerminado.value) return;
 
   const typed = estatDelJoc.value.textEntrat;
   const paraula = paraulaActiva.value;
 
   if (!paraula) {
     estatDelJoc.value.textEntrat = "";
+    reiniciarCronometro();
     return;
   }
 
+  // Inicializar errores de letras si no existen
   if (
     !Array.isArray(paraula.letterErrors) ||
     paraula.letterErrors.length !== paraula.text.length
@@ -105,6 +110,7 @@ function validarProgres() {
     );
   }
 
+  // Si completó la palabra correctamente
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
     const self = props.players.find((p) => p.id === communicationManager.id);
@@ -116,46 +122,26 @@ function validarProgres() {
       completedWords: palabrasCompletadas.value,
     });
 
+    // Limpiar input y reiniciar cronómetro
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
-    tempsIniciParaula = 0;
-
-    const nextParaula = paraulaActiva.value;
-    if (nextParaula) {
-      if (
-        !Array.isArray(nextParaula.letterErrors) ||
-        nextParaula.letterErrors.length !== nextParaula.text.length
-      ) {
-        nextParaula.letterErrors = Array.from(
-          { length: nextParaula.text.length },
-          () => false
-        );
-        nextParaula.errors = 0;
-      }
-    }
+    reiniciarCronometro();
+    return;
   }
 
-  // Lógica conteo errores para modo muerte súbita
+  // Validar cada letra y manejar errores
   for (let i = 0; i < typed.length; i++) {
     if (i >= paraula.text.length) break;
+
     const isError = typed[i] !== paraula.text[i];
     if (isError && !paraula.letterErrors[i]) {
-      totalErrors.value++;
-      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
-        perdedor.value = true;
-        perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
-        communicationManager.reportMuerteSubitaElimination();
-        // El jugador local ya no puede escribir
-        estatDelJoc.value.textEntrat = "";
-        window.removeEventListener("keydown", handleKeyDown);
-        estatDelJoc.value.textEntrat = "";
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
-        return;
-      }
       paraula.letterErrors[i] = true;
+
+      // Reducir vidas si estamos en modo muerte súbita
+      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
+        vidasRestantes.value--;
+        manejarError();
+      }
     } else {
       paraula.letterErrors[i] = false;
     }
@@ -179,10 +165,60 @@ function getClasseLletra(indexLletra) {
   return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
 }
 
+function reiniciarCronometro() {
+  clearInterval(countdownTimer);
+  tiempoRestante.value = 5;
+
+  countdownTimer = setInterval(() => {
+    tiempoRestante.value -= 0.1; // decrementar suave para barra
+    if (tiempoRestante.value <= 0) {
+      clearInterval(countdownTimer);
+      manejarTiempoAgotado();
+    }
+  }, 100);
+}
+
+// Cuando se acaba el tiempo
+function manejarTiempoAgotado() {
+  if (JuegoTerminado.value) return;
+
+  vidasRestantes.value--;
+  if (vidasRestantes.value <= 0) {
+    perdedor.value = true;
+    perdidoMensaje.value = "Se acabó el tiempo y perdiste todas tus vidas.";
+    communicationManager.reportMuerteSubitaElimination();
+    finalizarJuego();
+  } else {
+    perdidoMensaje.value = ` Se acabó el tiempo. Te queda ${
+      vidasRestantes.value
+    } vida${vidasRestantes.value === 1 ? "" : "s"}.`;
+    reiniciarCronometro();
+  }
+}
+
+// Manejar error al escribir
+function manejarError() {
+  if (JuegoTerminado.value) return;
+
+  vidasRestantes.value--;
+  if (vidasRestantes.value <= 0) {
+    perdedor.value = true;
+    perdidoMensaje.value = "Has perdido todas tus vidas. ¡Estás eliminado!";
+    communicationManager.reportMuerteSubitaElimination();
+    finalizarJuego();
+  } else {
+    perdidoMensaje.value = ` Error. Te queda ${vidasRestantes.value} vida${
+      vidasRestantes.value === 1 ? "" : "s"
+    }.`;
+  }
+}
+
 // Ciclo vida
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
-
+  if (props.modo === "muerteSubita") {
+    reiniciarCronometro(); // inicia el primer cronómetro
+  }
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
@@ -271,6 +307,10 @@ onUnmounted(() => {
     clearInterval(revealTimer);
     revealTimer = null;
   }
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
 });
 
 function calculateProgress(completedWords) {
@@ -281,6 +321,32 @@ function calculateProgress(completedWords) {
 <template>
   <div>
     <div class="game-header">
+      <!-- Sidebar + corazones -->
+      <aside class="players-sidebar">
+        <h3>Jugadores</h3>
+        <ul>
+          <li
+            v-for="p in props.players"
+            :key="p.id"
+            :class="{ eliminado: p.eliminated }"
+          >
+            {{ p.name }}
+          </li>
+        </ul>
+
+        <!-- Corazones retro debajo de la sidebar -->
+        <div class="vidas-retro">
+          <span v-for="n in vidasRestantes" :key="n">❤️</span>
+        </div>
+
+        <!-- Barra de tiempo -->
+        <div class="barra-tiempo-container">
+          <div
+            class="barra-tiempo"
+            :style="{ width: (tiempoRestante / 5) * 100 + '%' }"
+          ></div>
+        </div>
+      </aside>
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
@@ -440,7 +506,28 @@ function calculateProgress(completedWords) {
   color: white;
   transform: scale(0.95);
 }
+/*STILOS RELOJ MUERTE SUBITA */
+.vidas-retro {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 14px; /* corazones pequeños */
+}
 
+.barra-tiempo-container {
+  height: 6px;
+  background: #333;
+  margin-top: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barra-tiempo {
+  height: 100%;
+  background: #dc3545;
+  transition: width 0.1s linear;
+}
 .game-layout {
   display: flex;
   gap: 24px;
