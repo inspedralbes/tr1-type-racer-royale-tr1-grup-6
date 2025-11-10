@@ -63,6 +63,15 @@ const communicationManager = {
     }
   },
 
+  // Host can set the room mode before starting
+  setRoomMode(modo) {
+    if (currentRoom) {
+      socket.emit("setRoomMode", { roomId: currentRoom, modo });
+    } else {
+      socket.emit("setRoomMode", { modo });
+    }
+  },
+
   // Reportar que un jugador ha perdido
   reportPlayerLost() {
     socket.emit("playerLost");
@@ -157,6 +166,11 @@ const communicationManager = {
       }
       callback(data);
     });
+  },
+
+  // Escuchar cambios de modo en la sala
+  onRoomModeUpdated(callback) {
+    socket.on("roomModeUpdated", callback);
   },
 
   onLeftRoom(callback) {
