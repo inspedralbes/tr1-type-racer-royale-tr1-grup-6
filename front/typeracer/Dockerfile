@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package.json and package-lock.json first to leverage Docker cache
 COPY package*.json ./
 
-# Install production dependencies only (omit devDependencies)
-RUN npm install --omit=dev
+# Install dependencies (including devDependencies needed for the build)
+RUN npm install
 
 # Copy the rest of the application code
 COPY . .
