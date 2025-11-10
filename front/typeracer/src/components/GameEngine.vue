@@ -6,20 +6,21 @@ import { useSounds } from "@/composables/useSounds";
 
 const startTime = ref(null);
 const endTime = ref(null);
-const emit = defineEmits(["volverInicio"]);
-// Props
+
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
   modo: { type: String, default: "normal" },
+  isSpectator: { type: Boolean, default: false },
+  spectatorTargetId: { type: String, default: null },
 });
+const emit = defineEmits(["volverInicio", "switchSpectatorTarget"]);
 
 const { playSound } = useSounds();
 
 const isShaking = ref(false);
-
 const perdedor = ref(false);
 const ganador = ref(false);
 const perdidoMensaje = ref("");
@@ -30,27 +31,56 @@ const filesDelTeclat = ref([
 ]);
 const teclaPremuda = ref("");
 const JuegoTerminado = ref(false);
+
 const estatDelJoc = ref({
   paraules: [],
-  textEntrat: "",
   estadistiques: [],
 });
+const textEntratLocal = ref("");
+
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
+
+const watchedPlayer = computed(() => {
+  if (!props.isSpectator || !props.spectatorTargetId) return null;
+  const target = props.players.find(p => p.id === props.spectatorTargetId);
+  return target || props.players[0] || null;
+});
+
+const wordStack = computed(() => {
+  if (props.isSpectator) {
+    return watchedPlayer.value?.wordStack || [];
+  } else {
+    return estatDelJoc.value.paraules;
+  }
+});
+
 const paraulaActiva = computed(() => {
-  if (estatDelJoc.value.paraules.length === 0) {
+  if (wordStack.value.length === 0) {
     return null;
   }
-  return estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+  return wordStack.value[wordStack.value.length - 1];
 });
+
+const displayedText = computed(() => {
+  if (props.isSpectator) {
+    return watchedPlayer.value?.currentWordProgress || "";
+  } else {
+    return textEntratLocal.value;
+  }
+});
+
 const totalErrors = ref(0);
+
 function handleVolverInicio() {
   emit("volverInicio");
 }
 
 function handleKeyDown(event) {
+  if (JuegoTerminado.value || props.isSpectator) return;
+  
   const key = event.key;
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     teclaPremuda.value = key.toUpperCase();
@@ -58,38 +88,42 @@ function handleKeyDown(event) {
       teclaPremuda.value = "";
     }, 100);
   }
-  if (JuegoTerminado.value) return;
   if (key === "Backspace") {
     event.preventDefault();
-    estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
-    playSound("keyBackspace");
+    textEntratLocal.value = textEntratLocal.value.slice(0, -1);
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
-    estatDelJoc.value.textEntrat += key;
+    textEntratLocal.value += key;
   } else {
-    // Prevenir otras teclas (como Enter, Tab, etc.) si no son alfabéticas
     event.preventDefault();
     return;
   }
-  // Se llama a validarProgres aquí, manualmente, tras actualizar el modelo
   validarProgres();
 }
 function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
-function validarProgres() {
-  if (JuegoTerminado.value) return; // Bloqueja tot si la partida ha finalitzat
 
-  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
+function validarProgres() {
+  if (JuegoTerminado.value || props.isSpectator) return;
+
+  if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
-  if (!startTime.value && estatDelJoc.value.textEntrat.length === 1) {
+  if (!startTime.value && textEntratLocal.value.length === 1) {
     startTime.value = Date.now();
   }
-  const typed = estatDelJoc.value.textEntrat;
-  const paraula = paraulaActiva.value;
+  
+  const typed = textEntratLocal.value;
+  const paraula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+
+  communicationManager.updatePlayerProgress({
+      currentWordProgress: typed,
+      wordStack: estatDelJoc.value.paraules
+  });
+
   if (!paraula) {
-    estatDelJoc.value.textEntrat = "";
+    textEntratLocal.value = "";
     return;
   }
   if (typed.length > 0) {
@@ -129,7 +163,6 @@ function validarProgres() {
       if (!paraula.letterErrors[i]) {
         totalErrors.value++;
         if (props.modo === "muerteSubita") {
-          // En muerte súbita, cualquier error elimina al jugador
           communicationManager.reportMuerteSubitaElimination();
         }
       }
@@ -140,39 +173,35 @@ function validarProgres() {
     }
   }
   paraula.errors = errorCount;
-  communicationManager.updatePlayerProgress({
-    completedWords: palabrasCompletadas.value,
-    totalErrors: totalErrors.value,
-    playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-  });
+
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
 
+    estatDelJoc.value.paraules.pop();
+    textEntratLocal.value = "";
+    tempsIniciParaula = 0;
+
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
-      // Registrar tiempo final y enviar progreso final
       onGameEnd();
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
         totalErrors: totalErrors.value,
-        playTime:
-          (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        currentWordProgress: "",
+        wordStack: estatDelJoc.value.paraules
       });
-      // Qualsevol acció extra: mostrar resultats, deshabilitar input, etc.
     } else {
-      // Enviar progreso actualizado justo al completar la palabra (tiempo parcial)
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
         totalErrors: totalErrors.value,
-        playTime:
-          (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        currentWordProgress: "",
+        wordStack: estatDelJoc.value.paraules
       });
     }
 
-    estatDelJoc.value.paraules.pop();
-    estatDelJoc.value.textEntrat = "";
-    tempsIniciParaula = 0;
-    const nextParaula = paraulaActiva.value;
+    const nextParaula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
     if (nextParaula) {
       if (
         !Array.isArray(nextParaula.letterErrors) ||
@@ -193,20 +222,17 @@ function onGameEnd() {
   }
 }
 
-// Lógica colores letras (CORREGIDA - solo una versión)
 function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return "";
-  const typed = estatDelJoc.value.textEntrat;
+  const typed = displayedText.value;
   const target = paraulaActiva.value.text;
 
-  const classes = []; // Usar un array para las clases
+  const classes = [];
 
-  // 1. Añadir la clase 'caret'
   if (indexLletra === typed.length) {
     classes.push("caret");
   }
 
-  // 2. Añadir clases 'correcte' o 'incorrecte'
   if (indexLletra >= typed.length) {
     if (paraulaActiva.value.letterErrors[indexLletra]) {
       classes.push("incorrecte");
@@ -217,15 +243,19 @@ function getClasseLletra(indexLletra) {
     );
   }
 
-  return classes.join(" "); // Devuelve "caret", "incorrecte", "caret incorrecte", etc.
+  return classes.join(" ");
 }
 
 onMounted(() => {
-  // 1. Afegir listener de tecles
-  window.addEventListener("keydown", handleKeyDown);
+  if (!props.isSpectator) {
+    window.addEventListener("keydown", handleKeyDown);
+  }
 
-  // 2. Inicialitzar paraules (UNA SOLA VEGADA)
+  // ===================================
+  // CORRECCIÓ 1: Afegit !props.isSpectator
+  // ===================================
   if (
+    !props.isSpectator &&
     estatDelJoc.value.paraules.length === 0 &&
     Array.isArray(props.initialWords) &&
     props.initialWords.length > 0
@@ -233,76 +263,103 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // 3. Actualitzar marcador propi per a la sidebar
-  const ownPlayer = props.players.find((p) => p.id === communicationManager.id);
+  const ownPlayer = props.players.find((p) => p.id === communicationManager.getId());
   if (ownPlayer) {
     ownPlayer.completedWords = palabrasCompletadas.value;
   }
 
-  // 4. Reportar si es té l'stack ple després de recarregar (però NO marcar l'estat final)
   if (
     !JuegoTerminado.value &&
     estatDelJoc.value.paraules.length >= props.maxStack
   ) {
-    communicationManager.reportPlayerLost();
+    if (!props.isSpectator) {
+      communicationManager.reportPlayerLost();
+    }
   }
 
-  // 5. Configurar TOTS els listeners d'estat del joc (la font de la veritat)
+  // ===================================
+  // CORRECCIÓ 2: Lògica 'onPlayerEliminated'
+  // ===================================
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
-    perdedor.value = true;
-    ganador.value = false;
-    JuegoTerminado.value = true;
-    onGameEnd();
-    communicationManager.updatePlayerProgress({
-      completedWords: palabrasCompletadas.value,
-      totalErrors: totalErrors.value,
-      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-    });
-    perdidoMensaje.value =
-      data?.message || "Has perdut: massa paraules acumulades.";
-    playSound("gameLose");
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
+
+    // Només s'aplica al jugador eliminat
+    if (data.playerId === communicationManager.getId() && !props.isSpectator) {
+      perdedor.value = true;
+      ganador.value = false;
+      JuegoTerminado.value = true;
+      onGameEnd();
+      communicationManager.updatePlayerProgress({
+        completedWords: palabrasCompletadas.value,
+        totalErrors: totalErrors.value,
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+      });
+      perdidoMensaje.value =
+        data?.message || "Has perdut: massa paraules acumulades.";
+      playSound("gameLose");
+      if (revealTimer) {
+        clearInterval(revealTimer);
+        revealTimer = null;
+      }
     }
   });
 
+  // ===================================
+  // CORRECCIÓ 3: Lògica 'onPlayerWon'
+  // ===================================
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
-    ganador.value = true;
-    perdedor.value = false;
+
+    // Només el jugador real pot guanyar
+    if (data.winnerId === communicationManager.getId() && !props.isSpectator) {
+      ganador.value = true;
+      perdedor.value = false;
+      perdidoMensaje.value =
+        data?.message || "Has guanyat! Tots els altres han estat eliminats.";
+      playSound("gameWin");
+    }
+    
     JuegoTerminado.value = true;
-    perdidoMensaje.value =
-      data?.message || "Has guanyat! Tots els altres han estat eliminats.";
-    playSound("gameWin");
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
 
+  // ===================================
+  // CORRECCIÓ 4: Lògica 'onGameOver'
+  // ===================================
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
     onGameEnd();
-    communicationManager.updatePlayerProgress({
-      completedWords: palabrasCompletadas.value,
-      totalErrors: totalErrors.value,
-      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-    });
-    if (data.winnerId === communicationManager.id) {
-      ganador.value = true;
-      perdedor.value = false;
-      playSound("gameWin");
-      perdidoMensaje.value =
-        data.message || "Has guanyat! Tots els altres han estat eliminats.";
-    } else {
+
+    if (props.isSpectator) {
       ganador.value = false;
-      perdedor.value = true;
-      playSound("gameLose");
-      perdidoMensaje.value =
-        data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      perdedor.value = false;
+      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
+    } else {
+      if (!props.isSpectator) {
+          communicationManager.updatePlayerProgress({
+            completedWords: palabrasCompletadas.value,
+            totalErrors: totalErrors.value,
+            playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+          });
+      }
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false;
+        playSound("gameWin");
+        perdidoMensaje.value =
+          data.message || "Has guanyat! Tots els altres han estat eliminats.";
+      } else {
+        ganador.value = false;
+        perdedor.value = true;
+        playSound("gameLose");
+        perdidoMensaje.value =
+          data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      }
     }
+    
     JuegoTerminado.value = true;
     if (revealTimer) {
       clearInterval(revealTimer);
@@ -310,10 +367,12 @@ onMounted(() => {
     }
   });
 
-  // 6. Iniciar el timer per revelar paraules (UNA SOLA VEGADA)
-  if (!JuegoTerminado.value) {
+  // ===================================
+  // CORRECCIÓ 5: Afegit !props.isSpectator al Timer
+  // ===================================
+  if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
-      if (JuegoTerminado.value) return; // Comprovació de seguretat
+      if (JuegoTerminado.value) return;
       try {
         if (
           remainingWords.value.length > 0 &&
@@ -329,15 +388,17 @@ onMounted(() => {
           };
           estatDelJoc.value.paraules.unshift(newParaula);
           playSound("newWord");
+
+          // CORRECCIÓ 6: El jugador ha d'enviar la pila quan cau una paraula
+          communicationManager.updatePlayerProgress({
+            wordStack: estatDelJoc.value.paraules
+          });
         }
 
-        // **CORRECCIÓ CLAU:**
-        // Només reportar la pèrdua. No canviar l'estat localment.
-        // El listener 'onPlayerEliminated' s'encarregarà de gestionar la fi del joc.
         if (
           estatDelJoc.value.paraules.length >= props.maxStack &&
           !perdedor.value &&
-          !JuegoTerminado.value // Evita enviaments múltiples
+          !JuegoTerminado.value
         ) {
           communicationManager.reportPlayerLost();
         }
@@ -349,7 +410,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeyDown);
+  if (!props.isSpectator) {
+    window.removeEventListener("keydown", handleKeyDown);
+  }
   if (revealTimer) {
     clearInterval(revealTimer);
     revealTimer = null;
@@ -361,7 +424,7 @@ onUnmounted(() => {
   <div>
     <div class="game-header">
       <h2 class="modo-titulo">
-        Modo de juego:
+        Mode de joc:
         <span :class="['modo-text', props.modo]">
           {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
         </span>
@@ -374,18 +437,18 @@ onUnmounted(() => {
           tag="div"
           class="paraules-container"
           :class="{
-            'danger-zone': estatDelJoc.paraules.length > props.maxStack * 0.75,
+            'danger-zone': wordStack.length > props.maxStack * 0.75,
           }"
         >
           <div
-            v-for="(paraula, index) in estatDelJoc.paraules"
+            v-for="(paraula, index) in wordStack"
             :key="paraula.id"
             class="paraula"
             :class="{
-              'paraula-activa': index === estatDelJoc.paraules.length - 1,
+              'paraula-activa': index === wordStack.length - 1,
             }"
           >
-            <template v-if="index === estatDelJoc.paraules.length - 1">
+            <template v-if="index === wordStack.length - 1">
               <span
                 v-for="(lletra, i) in paraula.text.split('')"
                 :key="i"
@@ -405,12 +468,16 @@ onUnmounted(() => {
           type="text"
           class="text-input"
           :class="{ 'shake-animation': isShaking }"
-          v-model="estatDelJoc.textEntrat"
-          placeholder="> Comença a escriure..."
+          :value="displayedText"
+          @input="textEntratLocal = $event.target.value"
+          :placeholder="
+            props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
+          "
           :disabled="JuegoTerminado"
+          :readonly="props.isSpectator"
         />
 
-        <div class="teclat">
+        <div class="teclat" v-if="!props.isSpectator">
           <div
             v-for="(fila, fIndex) in filesDelTeclat"
             :key="fIndex"
@@ -429,6 +496,24 @@ onUnmounted(() => {
       </div>
 
       <aside class="players-sidebar">
+        <h3 v-if="props.isSpectator" class="spectator-banner">
+          [MODO ESPECTADOR]
+        </h3>
+        <div v-if="props.isSpectator" class="spectator-controls">
+          <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
+          <div class="spectator-targets">
+            <button
+              v-for="p in props.players"
+              :key="p.id"
+              @click="emit('switchSpectatorTarget', p.id)"
+              :class="{ 'target-active': p.id === props.spectatorTargetId }"
+              :title="`Canviar a ${p.name}`"
+            >
+              {{ p.name.substring(0, 3) }}
+            </button>
+          </div>
+        </div>
+        
         <h3>[REFUGIATS]</h3>
         <ul>
           <li v-for="p in props.players" :key="p.id" class="player-name-inline">
@@ -448,6 +533,7 @@ onUnmounted(() => {
         </ul>
       </aside>
     </div>
+    
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"
@@ -456,12 +542,55 @@ onUnmounted(() => {
       :players="props.players"
       @volverInicio="handleVolverInicio"
       :modo="props.modo"
+      :isSpectator="props.isSpectator"
     />
   </div>
 </template>
 
 <style scoped>
-/* [... Els teus estils romanen iguals ...] */
+.spectator-banner {
+  color: var(--color-warning, #ffc107);
+  background: var(--color-background);
+  border: 1px solid var(--color-warning, #ffc107);
+  padding: 5px;
+  text-align: center;
+  border-radius: 4px;
+  margin-bottom: 10px !important;
+}
+.spectator-controls {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--color-border);
+}
+.spectator-controls h4 {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.spectator-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.spectator-targets button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background-color: var(--color-background-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.spectator-targets button:hover {
+  background-color: var(--color-border);
+}
+.spectator-targets button.target-active {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  font-weight: bold;
+}
 .correcte {
   color: var(--color-success);
   font-weight: bold;
@@ -471,7 +600,6 @@ onUnmounted(() => {
   background-color: var(--color-heading);
   border-radius: 3px;
 }
-
 .teclat {
   position: sticky;
   bottom: 0;
@@ -513,7 +641,6 @@ onUnmounted(() => {
   transform: scale(0.95);
   text-shadow: none;
 }
-
 .game-layout {
   display: flex;
   gap: 24px;
@@ -530,7 +657,6 @@ onUnmounted(() => {
   min-height: calc(60vh);
   max-height: calc(80vh);
 }
-
 .players-sidebar {
   width: 300px;
   background: var(--color-background-soft);
@@ -548,7 +674,6 @@ onUnmounted(() => {
   padding-bottom: 8px;
   text-align: center;
 }
-
 .player-name-inline {
   display: flex;
   align-items: center;
@@ -586,7 +711,6 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 1px solid var(--color-text-muted);
 }
-
 .paraules-container {
   border: 2px solid var(--color-text-muted);
   background: rgba(32, 255, 32, 0.05);
@@ -600,7 +724,6 @@ onUnmounted(() => {
   flex: 1 1 auto;
   min-height: 120px;
 }
-
 .paraula {
   padding: 8px 12px;
   margin-bottom: 6px;
@@ -614,7 +737,6 @@ onUnmounted(() => {
   text-align: center;
   font-weight: 500;
 }
-
 .paraula-activa {
   background: var(--color-background-soft);
   color: var(--color-heading);
@@ -625,7 +747,6 @@ onUnmounted(() => {
   box-shadow: 0 0 12px var(--shadow-color);
   transform: scale(1.02);
 }
-
 .text-input {
   width: 100%;
   box-sizing: border-box;
@@ -650,8 +771,6 @@ onUnmounted(() => {
   color: #b3b3b3;
   opacity: 0.7;
 }
-
-/* Animación de caída */
 .fall-enter-active {
   transition: all 0.5s ease-in;
 }
@@ -678,8 +797,6 @@ onUnmounted(() => {
 .fall-move {
   transition: transform 0.4s ease;
 }
-
-/* Animación de Shake */
 .shake-animation {
   animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
@@ -702,9 +819,6 @@ onUnmounted(() => {
     transform: translate3d(4px, 0, 0);
   }
 }
-
-/* === NUEVOS ESTILOS === */
-
 .modo-text {
   display: inline-block;
   font-weight: bold;
@@ -713,18 +827,13 @@ onUnmounted(() => {
   background-color: var(--color-border);
   transition: all 0.3s ease;
 }
-
-/* Estilo específico para MUERTE SÚBITA */
 .modo-text.muerteSubita {
   background-color: var(--color-error-bg);
   color: var(--color-error);
   border: 1px solid var(--color-error);
   text-shadow: 0 0 5px var(--color-error);
-
-  /* Animación de parpadeo sutil para dar "peligro" */
   animation: flicker-danger 2s infinite;
 }
-
 @keyframes flicker-danger {
   0%,
   100% {
@@ -736,18 +845,14 @@ onUnmounted(() => {
     box-shadow: 0 0 10px var(--color-error);
   }
 }
-
 .lletra {
-  position: relative; /* Necesario para el pseudoelemento si lo usas */
+  position: relative;
   transition: all 0.1s ease;
 }
-
 .lletra.caret {
-  /* Opción A: Borde (más simple) */
   border-left: 3px solid var(--color-primary);
   animation: blink-caret 1s step-end infinite;
 }
-
 @keyframes blink-caret {
   0%,
   100% {
@@ -757,13 +862,10 @@ onUnmounted(() => {
     border-left-color: transparent;
   }
 }
-
 .paraules-container.danger-zone {
-  /* Hacemos que el borde y la sombra parpadeen con el color de error */
   border-color: var(--color-error);
   animation: pulse-danger-border 1s infinite alternate;
 }
-
 @keyframes pulse-danger-border {
   from {
     box-shadow: inset 0 0 10px var(--shadow-color);
@@ -773,7 +875,6 @@ onUnmounted(() => {
     box-shadow: inset 0 0 20px var(--color-error), 0 0 10px var(--color-error);
   }
 }
-
 @keyframes pulse-focus {
   0% {
     box-shadow: 0 0 20px var(--shadow-color);
@@ -788,10 +889,7 @@ onUnmounted(() => {
     border-color: var(--color-success);
   }
 }
-
 .text-input:focus {
-  /* Sobrescribe el estilo :focus simple */
-  /* y añade una animación de pulsación */
   animation: pulse-focus 1.5s infinite;
 }
 </style>
