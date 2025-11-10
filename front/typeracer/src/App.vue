@@ -245,6 +245,20 @@ function onRoomJoined(room) {
           >
             {{ modoJuego === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
           </span>
+          <!-- Info for non-hosts: small help icon that shows the detailed tooltip text -->
+          <span
+            class="mode-help"
+            :class="{ muerte: modoJuego === 'muerteSubita' }"
+          >
+            <span class="mode-help-icon">i</span>
+            <span class="mode-help-tooltip">
+              {{
+                modoJuego === "muerteSubita"
+                  ? "Si comets dos errors quedes eliminat."
+                  : "Completa paraules; acumula 20 per guanyar."
+              }}
+            </span>
+          </span>
         </div>
       </div>
       <ul>
@@ -282,6 +296,10 @@ function onRoomJoined(room) {
             <label class="modo-btn" :class="{ active: modoJuego === 'normal' }">
               <input type="radio" value="normal" v-model="modoJuego" />
               <span>Normal</span>
+              <span class="tooltip"
+                >Guanya si arribes a 20 paraules, però si les acumules, quedaràs
+                eliminat.</span
+              >
             </label>
 
             <label
@@ -290,6 +308,9 @@ function onRoomJoined(room) {
             >
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
               <span>Muerte Súbita</span>
+              <span class="tooltip"
+                >Tens 2 vides — al 3r error quedes eliminat.</span
+              >
             </label>
           </div>
         </div>
@@ -311,6 +332,135 @@ function onRoomJoined(room) {
 </template>
 
 <style scoped>
+.modo-btn .tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  transition: opacity 180ms ease, transform 180ms ease,
+    visibility 0s linear 180ms;
+  z-index: 1200; /* definitely above everything */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: none; /* don't block hover */
+  min-width: 180px;
+  text-align: center;
+}
+
+.modo-btn:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+  transition-delay: 40ms;
+}
+
+/* little arrow under the tooltip */
+.modo-btn .tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 7px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+  z-index: 1201;
+}
+
+/* special color for Muerte Súbita tooltip to match danger style */
+.modo-btn.muerte .tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+  color: #fff;
+}
+
+.modo-btn.muerte .tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
+
+/* non-host mode help icon + tooltip */
+.mode-help {
+  display: inline-block;
+  position: relative;
+  margin-left: 10px;
+  cursor: pointer;
+}
+.mode-help-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #f0f0f0);
+  color: #222;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.mode-help-tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 1200;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mode-help:hover .mode-help-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mode-help .mode-help-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+}
+.mode-help.muerte .mode-help-tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+}
+.mode-help.muerte .mode-help-tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
+
 .app {
   max-width: 1200px;
   margin: 20px auto;
@@ -506,7 +656,8 @@ button.btn-host {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  overflow: hidden;
+  /* Allow tooltip to overflow outside the label so it is visible */
+  overflow: visible;
 }
 
 .modo-btn:hover {
