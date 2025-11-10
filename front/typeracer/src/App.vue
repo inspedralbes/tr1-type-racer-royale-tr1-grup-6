@@ -255,6 +255,7 @@ function onRoomJoined(room) {
               backgroundColor: jugador.color,
               filter: `brightness(1.5) drop-shadow(0 0 5px ${jugador.color})`,
             }"
+            aria-hidden="true"
           ></span>
           {{ jugador.name }}
           <span v-if="jugador.ready" class="ready-status">[PREPARAT]</span>
