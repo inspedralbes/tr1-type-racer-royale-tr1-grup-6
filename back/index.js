@@ -21,7 +21,6 @@ const rooms = new Map(); // Map to store rooms: { id, name, players: Map<socketI
 const playerNames = new Map(); // Map to store player names by socket ID
 const playerColors = new Map(); // Map to store player colors by socket ID
 
-
 // Genera un ID único para una room
 function generateRoomId() {
   return Math.random().toString(36).substr(2, 9);
@@ -131,7 +130,7 @@ io.on("connection", (socket) => {
       id: socket.id,
       name: playerNames.get(socket.id) || `Player-${socket.id.slice(0, 4)}`,
       // --- ESTA ES LA LÍNEA CORREGIDA ---
-      color: playerColors.get(socket.id) || "#9E9E9E", 
+      color: playerColors.get(socket.id) || "#9E9E9E",
       // --- ANTES ESTABA FIJADO A: color: "#9E9E9E", ---
       ready: false,
       eliminated: false,

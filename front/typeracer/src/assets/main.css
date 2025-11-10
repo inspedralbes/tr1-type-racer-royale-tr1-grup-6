@@ -2,7 +2,6 @@
   --font-main: "VT323", "Courier New", monospace;
 }
 
-
 html[data-theme="light"] {
   --color-background: #fbf0d9;
   --color-background-soft: #f5e5c0;
@@ -21,9 +20,7 @@ html[data-theme="light"] {
 
   --vignette-color: #a3916f;
   --scanline-color: rgba(255, 255, 255, 0.4);
-  --body-glow-color: var(
-    --color-background
-  );
+  --body-glow-color: var(--color-background);
 
   color-scheme: light;
 }
@@ -46,9 +43,7 @@ html[data-theme="dark"] {
 
   --vignette-color: #000000;
   --scanline-color: rgba(0, 0, 0, 0.3);
-  --body-glow-color: var(
-    --color-background
-  );
+  --body-glow-color: var(--color-background);
 
   color-scheme: dark;
 }
@@ -120,12 +115,12 @@ input[type="text"] {
   font-size: 1.8rem;
   padding: 8px 12px;
   text-shadow: 0 0 2px var(--color-heading);
-  transition: all 0.2s ease
+  transition: all 0.2s ease;
 }
 input[type="text"]::placeholder {
   color: var(--color-text-muted);
   opacity: 0.3;
-  transition: all 0.2s ease
+  transition: all 0.2s ease;
 }
 
 h1,

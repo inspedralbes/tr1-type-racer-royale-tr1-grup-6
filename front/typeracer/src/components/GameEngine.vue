@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, defineEmits } from "vue";
 import communicationManager from "../services/communicationManager.js";
 import GameResult from "@/components/GameResult.vue";
-import { useSounds } from '@/composables/useSounds';
+import { useSounds } from "@/composables/useSounds";
 
 const startTime = ref(null);
 const endTime = ref(null);
@@ -62,7 +62,7 @@ function handleKeyDown(event) {
   if (key === "Backspace") {
     event.preventDefault();
     estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
-    playSound('keyBackspace');
+    playSound("keyBackspace");
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
     estatDelJoc.value.textEntrat += key;
@@ -96,20 +96,30 @@ function validarProgres() {
     const lastCharIndex = typed.length - 1;
     if (lastCharIndex < paraula.text.length) {
       if (typed[lastCharIndex] !== paraula.text[lastCharIndex]) {
-        playSound('keyError');
+        playSound("keyError");
         isShaking.value = true;
-        setTimeout(() => { isShaking.value = false; }, 400);
+        setTimeout(() => {
+          isShaking.value = false;
+        }, 400);
       } else {
-        playSound('keyPress');
+        playSound("keyPress");
       }
     } else {
-      playSound('keyError');
+      playSound("keyError");
       isShaking.value = true;
-      setTimeout(() => { isShaking.value = false; }, 400);
+      setTimeout(() => {
+        isShaking.value = false;
+      }, 400);
     }
   }
-  if (!Array.isArray(paraula.letterErrors) || paraula.letterErrors.length !== paraula.text.length) {
-    paraula.letterErrors = Array.from({ length: paraula.text.length }, () => false);
+  if (
+    !Array.isArray(paraula.letterErrors) ||
+    paraula.letterErrors.length !== paraula.text.length
+  ) {
+    paraula.letterErrors = Array.from(
+      { length: paraula.text.length },
+      () => false
+    );
   }
   let errorCount = 0;
   for (let i = 0; i < typed.length; i++) {
@@ -164,8 +174,14 @@ function validarProgres() {
     tempsIniciParaula = 0;
     const nextParaula = paraulaActiva.value;
     if (nextParaula) {
-      if (!Array.isArray(nextParaula.letterErrors) || nextParaula.letterErrors.length !== nextParaula.text.length) {
-        nextParaula.letterErrors = Array.from({ length: nextParaula.text.length }, () => false);
+      if (
+        !Array.isArray(nextParaula.letterErrors) ||
+        nextParaula.letterErrors.length !== nextParaula.text.length
+      ) {
+        nextParaula.letterErrors = Array.from(
+          { length: nextParaula.text.length },
+          () => false
+        );
         nextParaula.errors = 0;
       }
     }
@@ -182,12 +198,12 @@ function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return "";
   const typed = estatDelJoc.value.textEntrat;
   const target = paraulaActiva.value.text;
-  
+
   const classes = []; // Usar un array para las clases
 
   // 1. Añadir la clase 'caret'
   if (indexLletra === typed.length) {
-    classes.push('caret');
+    classes.push("caret");
   }
 
   // 2. Añadir clases 'correcte' o 'incorrecte'
@@ -196,16 +212,18 @@ function getClasseLletra(indexLletra) {
       classes.push("incorrecte");
     }
   } else {
-    classes.push(typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte");
+    classes.push(
+      typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte"
+    );
   }
-  
-  return classes.join(' '); // Devuelve "caret", "incorrecte", "caret incorrecte", etc.
+
+  return classes.join(" "); // Devuelve "caret", "incorrecte", "caret incorrecte", etc.
 }
 
 onMounted(() => {
   // 1. Afegir listener de tecles
   window.addEventListener("keydown", handleKeyDown);
-  
+
   // 2. Inicialitzar paraules (UNA SOLA VEGADA)
   if (
     estatDelJoc.value.paraules.length === 0 &&
@@ -243,7 +261,7 @@ onMounted(() => {
     });
     perdidoMensaje.value =
       data?.message || "Has perdut: massa paraules acumulades.";
-    playSound('gameLose');
+    playSound("gameLose");
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
@@ -257,7 +275,7 @@ onMounted(() => {
     JuegoTerminado.value = true;
     perdidoMensaje.value =
       data?.message || "Has guanyat! Tots els altres han estat eliminats.";
-    playSound('gameWin');
+    playSound("gameWin");
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
@@ -275,13 +293,15 @@ onMounted(() => {
     if (data.winnerId === communicationManager.id) {
       ganador.value = true;
       perdedor.value = false;
-      playSound('gameWin');
-      perdidoMensaje.value = data.message || "Has guanyat! Tots els altres han estat eliminats.";
+      playSound("gameWin");
+      perdidoMensaje.value =
+        data.message || "Has guanyat! Tots els altres han estat eliminats.";
     } else {
       ganador.value = false;
       perdedor.value = true;
-      playSound('gameLose');
-      perdidoMensaje.value = data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      playSound("gameLose");
+      perdidoMensaje.value =
+        data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
     }
     JuegoTerminado.value = true;
     if (revealTimer) {
@@ -308,15 +328,16 @@ onMounted(() => {
             letterErrors: Array.from({ length: nextText.length }, () => false),
           };
           estatDelJoc.value.paraules.unshift(newParaula);
-          playSound('newWord');
+          playSound("newWord");
         }
-        
+
         // **CORRECCIÓ CLAU:**
         // Només reportar la pèrdua. No canviar l'estat localment.
         // El listener 'onPlayerEliminated' s'encarregarà de gestionar la fi del joc.
         if (
           estatDelJoc.value.paraules.length >= props.maxStack &&
-          !perdedor.value && !JuegoTerminado.value // Evita enviaments múltiples
+          !perdedor.value &&
+          !JuegoTerminado.value // Evita enviaments múltiples
         ) {
           communicationManager.reportPlayerLost();
         }
@@ -334,11 +355,10 @@ onUnmounted(() => {
     revealTimer = null;
   }
 });
-
 </script>
 
 <template>
-  <div> 
+  <div>
     <div class="game-header">
       <h2 class="modo-titulo">
         Modo de juego:
@@ -349,13 +369,20 @@ onUnmounted(() => {
     </div>
     <div class="game-layout">
       <div class="game-main">
-        <TransitionGroup name="fall" tag="div" class="paraules-container" :class="{ 'danger-zone': estatDelJoc.paraules.length > (props.maxStack * 0.75) }">
+        <TransitionGroup
+          name="fall"
+          tag="div"
+          class="paraules-container"
+          :class="{
+            'danger-zone': estatDelJoc.paraules.length > props.maxStack * 0.75,
+          }"
+        >
           <div
             v-for="(paraula, index) in estatDelJoc.paraules"
             :key="paraula.id"
             class="paraula"
             :class="{
-              'paraula-activa': index === estatDelJoc.paraules.length - 1
+              'paraula-activa': index === estatDelJoc.paraules.length - 1,
             }"
           >
             <template v-if="index === estatDelJoc.paraules.length - 1">
@@ -405,7 +432,13 @@ onUnmounted(() => {
         <h3>[REFUGIATS]</h3>
         <ul>
           <li v-for="p in props.players" :key="p.id" class="player-name-inline">
-            <span class="color-dot" :style="{ backgroundColor: p.color, filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})` }"></span>
+            <span
+              class="color-dot"
+              :style="{
+                backgroundColor: p.color,
+                filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})`,
+              }"
+            ></span>
             <span class="player-name-text">{{ p.name }}</span>
             <span class="completed-count">
               [Paraules: {{ p.completedWords || 0 }}]
@@ -413,8 +446,7 @@ onUnmounted(() => {
           </li>
         </ul>
       </aside>
-
-      </div>
+    </div>
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"
@@ -651,10 +683,23 @@ onUnmounted(() => {
   animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 @keyframes shake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(4px, 0, 0);
+  }
 }
 
 /* === NUEVOS ESTILOS === */
@@ -674,13 +719,14 @@ onUnmounted(() => {
   color: var(--color-error);
   border: 1px solid var(--color-error);
   text-shadow: 0 0 5px var(--color-error);
-  
+
   /* Animación de parpadeo sutil para dar "peligro" */
   animation: flicker-danger 2s infinite;
 }
 
 @keyframes flicker-danger {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     box-shadow: 0 0 5px var(--color-error);
   }
@@ -702,8 +748,13 @@ onUnmounted(() => {
 }
 
 @keyframes blink-caret {
-  0%, 100% { border-left-color: var(--color-primary); }
-  50% { border-left-color: transparent; }
+  0%,
+  100% {
+    border-left-color: var(--color-primary);
+  }
+  50% {
+    border-left-color: transparent;
+  }
 }
 
 .paraules-container.danger-zone {
@@ -723,15 +774,15 @@ onUnmounted(() => {
 }
 
 @keyframes pulse-focus {
-  0% { 
-    box-shadow: 0 0 20px var(--shadow-color); 
+  0% {
+    box-shadow: 0 0 20px var(--shadow-color);
     border-color: var(--color-success);
   }
-  50% { 
+  50% {
     box-shadow: 0 0 30px var(--color-success), 0 0 20px var(--shadow-color);
     border-color: var(--color-success);
   }
-  100% { 
+  100% {
     box-shadow: 0 0 20px var(--shadow-color);
     border-color: var(--color-success);
   }
