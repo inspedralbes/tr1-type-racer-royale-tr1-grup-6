@@ -43,7 +43,7 @@ jobs:
             echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
             # Las variables VITE_* son cruciales para el build del frontend
             echo "VITE_SOCKET_URL=${{ secrets.FRONTEND_URL }}" >> .env
-            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "JWT_SECResET=${{ secrets.JWT_SECRET }}" >> .env
             echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> .env
             echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> .env
             echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}" >> .env
