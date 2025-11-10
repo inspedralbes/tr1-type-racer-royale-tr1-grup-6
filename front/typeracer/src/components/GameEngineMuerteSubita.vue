@@ -279,104 +279,106 @@ function calculateProgress(completedWords) {
 </script>
 
 <template>
-  <div class="game-header">
-    <h2 class="modo-titulo">
-      Mode de joc:
-      <span :class="['modo-text', props.modo]">
-        {{ props.modo === "muerteSubita" ? "Mort Súbita" : "Normal" }}
-      </span>
-    </h2>
-  </div>
-  <div class="game-layout">
-    <div class="game-main">
-      <TransitionGroup name="fall" tag="div" class="paraules-container">
-        <div
-          v-for="(paraula, index) in estatDelJoc.paraules"
-          :key="paraula.id"
-          class="paraula"
-          :class="{
-            'paraula-activa': index === estatDelJoc.paraules.length - 1,
-            'completada-correcta':
-              paraula.estat === 'completada' && paraula.errors === 0,
-            'completada-incorrecta':
-              paraula.estat === 'completada' && paraula.errors > 0,
-          }"
-        >
-          <template v-if="index === estatDelJoc.paraules.length - 1">
-            <span
-              v-for="(lletra, i) in paraula.text.split('')"
-              :key="i"
-              class="lletra"
-              :class="getClasseLletra(i)"
+  <div>
+    <div class="game-header">
+      <h2 class="modo-titulo">
+        Mode de joc:
+        <span :class="['modo-text', props.modo]">
+          {{ props.modo === "muerteSubita" ? "Mort Súbita" : "Normal" }}
+        </span>
+      </h2>
+    </div>
+    <div class="game-layout">
+      <div class="game-main">
+        <TransitionGroup name="fall" tag="div" class="paraules-container">
+          <div
+            v-for="(paraula, index) in estatDelJoc.paraules"
+            :key="paraula.id"
+            class="paraula"
+            :class="{
+              'paraula-activa': index === estatDelJoc.paraules.length - 1,
+              'completada-correcta':
+                paraula.estat === 'completada' && paraula.errors === 0,
+              'completada-incorrecta':
+                paraula.estat === 'completada' && paraula.errors > 0,
+            }"
+          >
+            <template v-if="index === estatDelJoc.paraules.length - 1">
+              <span
+                v-for="(lletra, i) in paraula.text.split('')"
+                :key="i"
+                class="lletra"
+                :class="getClasseLletra(i)"
+              >
+                {{ lletra }}
+              </span>
+            </template>
+            <template v-else>
+              {{ paraula.text }}
+            </template>
+          </div>
+        </TransitionGroup>
+
+        <input
+          type="text"
+          class="text-input"
+          v-model="estatDelJoc.textEntrat"
+          @input="validarProgres"
+          placeholder="Comença a escriure..."
+          :disabled="JuegoTerminado"
+        />
+
+        <div class="teclat">
+          <div
+            v-for="(fila, fIndex) in filesDelTeclat"
+            :key="fIndex"
+            class="fila"
+          >
+            <div
+              v-for="lletra in fila"
+              :key="lletra"
+              class="tecla"
+              :class="{ 'tecla-premuda': teclaPremuda === lletra }"
             >
               {{ lletra }}
-            </span>
-          </template>
-          <template v-else>
-            {{ paraula.text }}
-          </template>
-        </div>
-      </TransitionGroup>
-
-      <input
-        type="text"
-        class="text-input"
-        v-model="estatDelJoc.textEntrat"
-        @input="validarProgres"
-        placeholder="Comença a escriure..."
-        :disabled="JuegoTerminado"
-      />
-
-      <div class="teclat">
-        <div
-          v-for="(fila, fIndex) in filesDelTeclat"
-          :key="fIndex"
-          class="fila"
-        >
-          <div
-            v-for="lletra in fila"
-            :key="lletra"
-            class="tecla"
-            :class="{ 'tecla-premuda': teclaPremuda === lletra }"
-          >
-            {{ lletra }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <aside class="players-sidebar">
-      <h3>Jugadors</h3>
-      <ul>
-        <li
-          v-for="p in props.players"
-          :key="p.id"
-          class="player-name-inline"
-          :class="{ eliminado: p.eliminated }"
-        >
-          <span class="player-name-text">{{ p.name }}</span>
-          <span
-            v-if="p.eliminated"
-            style="color: #dc3545; font-weight: bold; margin-left: 10px"
+      <aside class="players-sidebar">
+        <h3>Jugadors</h3>
+        <ul>
+          <li
+            v-for="p in props.players"
+            :key="p.id"
+            class="player-name-inline"
+            :class="{ eliminado: p.eliminated }"
           >
-            Eliminat
-          </span>
-          <span class="completed-count">
-            Paraules fetes: {{ p.completedWords || 0 }}
-          </span>
-        </li>
-      </ul>
-    </aside>
+            <span class="player-name-text">{{ p.name }}</span>
+            <span
+              v-if="p.eliminated"
+              style="color: #dc3545; font-weight: bold; margin-left: 10px"
+            >
+              Eliminat
+            </span>
+            <span class="completed-count">
+              Paraules fetes: {{ p.completedWords || 0 }}
+            </span>
+          </li>
+        </ul>
+      </aside>
 
-    <GameResult
-      v-if="JuegoTerminado"
-      :winner="ganador"
-      :loser="perdedor"
-      :message="perdidoMensaje"
-      :players="props.players"
-      @volverInicio="handleVolverInicio"
-      :modo="props.modo"
-    />
+      <GameResult
+        v-if="JuegoTerminado"
+        :winner="ganador"
+        :loser="perdedor"
+        :message="perdidoMensaje"
+        :players="props.players"
+        @volverInicio="handleVolverInicio"
+        :modo="props.modo"
+      />
+    </div>
   </div>
 </template>
 
