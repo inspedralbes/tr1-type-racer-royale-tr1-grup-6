@@ -70,7 +70,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}",
+          "mysql -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} -e 'SELECT 1'",
         ]
       interval: 20s # Aumentamos el intervalo entre verificaciones a 20 segundos.
       timeout: 10s # Aumentamos el tiempo de espera de cada verificación.
