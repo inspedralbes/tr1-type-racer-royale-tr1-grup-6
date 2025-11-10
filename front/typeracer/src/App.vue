@@ -150,17 +150,24 @@ function connectarAlServidor() {
       modoJuego.value = data.modo;
     }
   });
+
+  // LÒGICA MODIFICADA
+  // =================================================================
   communicationManager.onGameStart((payload) => {
-    const ownId = socketId.value;
-    if (ownId && payload.wordsByPlayer && payload.wordsByPlayer[ownId]) {
-      playerWords.value = payload.wordsByPlayer[ownId];
+    // Ara tots reben la mateixa llista "gameWords"
+    if (payload.gameWords) {
+      playerWords.value = payload.gameWords; // <-- AQUÍ
+
+      // La resta de la configuració ve igual
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
       gameMaxStack.value = payload.maxStack || 5;
       modoJuego.value = payload.modo || "normal";
     } else {
+      // Si alguna cosa falla, llista buida
+      console.error("No s'han rebut les paraules del servidor!");
       playerWords.value = [];
-      modoJuego.value = payload.modo || "normal";
     }
+
     sessionStorage.setItem("justStartedGame", "true");
     vistaActual.value = "joc";
   });
