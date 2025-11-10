@@ -31,7 +31,6 @@ function broadcastRoomPlayerList(roomId) {
   if (!room) return;
 
   const players = Array.from(room.players.values());
-  // Include current game mode so clients can show it in the lobby
   io.to(roomId).emit("updatePlayerList", {
     players,
     hostId: room.hostId,
@@ -159,13 +158,13 @@ io.on("connection", (socket) => {
     const room = rooms.get(data.roomId);
     if (room) {
       // No permitir unirse si el juego ya comenzó
-      if (room.gameState?.started) {
+      if (room.gameState.started) {
         console.log(
-          `Player ${socket.id} tried to join room ${data.roomId} but game already started`
+          `Jugador ${socket.id} ha intentat unir-se a la sala ${data.roomId} pero el joc ja ha començat`
         );
         socket.emit("joinedRoom", {
           success: false,
-          error: "No puedes unirte a una partida en curso",
+          error: "El joc ja ha començat",
         });
         return;
       }
@@ -197,7 +196,7 @@ io.on("connection", (socket) => {
       // Broadcast updated player list to room
       broadcastRoomPlayerList(data.roomId);
     } else {
-      socket.emit("joinedRoom", { success: false, error: "Room not found" });
+      socket.emit("joinedRoom", { success: false, error: "Sala no trobada" });
     }
   });
 
@@ -391,7 +390,7 @@ io.on("connection", (socket) => {
 
     if (room.players.size < 2) {
       console.log(
-        `Room ${roomId}: No hay suficientes jugadores para iniciar. Mínimo 2 requeridos.`
+        `Room ${roomId}: No hi ha prou jugadors per iniciar. Mínim 2 requerits.`
       );
       socket.emit("notEnoughPlayers", {
         message: "Se requieren al menos 2 jugadores para iniciar.",
@@ -420,7 +419,6 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameStart", gamePayload);
     console.log(`gameStart emitido para room ${roomId}`);
   });
-
   // Allow the host to change the room mode (normal / muerteSubita) before starting
   socket.on("setRoomMode", (payload) => {
     const roomId = payload?.roomId;
@@ -463,7 +461,7 @@ io.on("connection", (socket) => {
         `Jugador ${player.name} ha sido eliminado por acumulación de palabras.`
       );
       socket.emit("playerEliminated", {
-        message: "Has perdido: demasiadas palabras acumuladas.",
+        message: "Has perdut: massa paraules acumulades.",
       });
 
       // Actualizar la lista de la room
@@ -479,21 +477,21 @@ io.on("connection", (socket) => {
 
         // Enviamos mensaje de victoria al ganador
         io.to(ganador.id).emit("playerWon", {
-          message: "¡Enhorabuena! Has ganado a todos los jugadores.",
+          message: "¡Enhorabona! Has guanyat tots els jugadors.",
         });
 
         // Enviamos mensaje de derrota a los demás
         Array.from(room.players.values()).forEach((j) => {
           if (j.id !== ganador.id) {
             io.to(j.id).emit("playerEliminated", {
-              message: `Has perdido. El ganador es ${ganador.name}.`,
+              message: `Has perdut. El guanyador és ${ganador.name}.`,
             });
           }
         });
         io.to(roomId).emit("gameOver", {
           winnerId: ganador.id,
           winnerName: ganador.name,
-          message: `${ganador.name} ha ganado la partida.`,
+          message: `${ganador.name} ha guanyat la partida.`,
         });
         // Emitimos evento de fin de partida SOLO a la room
       }
@@ -513,13 +511,13 @@ io.on("connection", (socket) => {
 
     // Marcar al jugador como eliminado
     player.eliminated = true;
-    console.log(`Jugador ${player.name} eliminado en muerte súbita por error`);
+    console.log(`Jugador ${player.name} eliminat en mort súbita per error`);
 
     // Notificar al jugador que ha sido eliminado
     socket.emit("playerEliminated", {
       playerId: player.id,
       playerName: player.name,
-      message: "¡Te has equivocado! En muerte súbita, estás eliminado.",
+      message: "¡T'has equivocat! En mort súbita, estàs eliminat.",
     });
 
     // Actualizar la lista de jugadores en la sala
@@ -535,14 +533,14 @@ io.on("connection", (socket) => {
 
       // Notificar al ganador
       io.to(ganador.id).emit("playerWon", {
-        message: "¡Eres el último jugador en pie!",
+        message: "¡Ets l'últim jugador dret!",
       });
 
       // Notificar a los demás jugadores
       Array.from(room.players.values()).forEach((j) => {
         if (j.id !== ganador.id) {
           io.to(j.id).emit("playerEliminated", {
-            message: `Has perdido. El ganador es ${ganador.name}.`,
+            message: `Has perdut. El guanyador és ${ganador.name}.`,
           });
         }
       });
@@ -551,7 +549,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("gameOver", {
         winnerId: ganador.id,
         winnerName: ganador.name,
-        message: `${ganador.name} ha ganado la partida en modo muerte súbita.`,
+        message: `${ganador.name} ha guanyat la partida en mode mort súbita.`,
       });
     }
   });
