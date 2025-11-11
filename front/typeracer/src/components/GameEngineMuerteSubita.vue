@@ -13,7 +13,11 @@ const props = defineProps({
   spectatorTargetId: { type: String, default: null },
 });
 const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
-
+const sortedPlayers = computed(() => {
+  return [...props.players].sort((a, b) => {
+    return (b.completedWords || 0) - (a.completedWords || 0);
+  });
+});
 const perdedor = ref(false);
 const ganador = ref(false);
 const perdidoMensaje = ref('');
@@ -380,8 +384,7 @@ function calculateProgress(completedWords) {
           type="text"
           class="text-input"
           :value="displayedText"
-          @input="validarProgres"
-          :placeholder="
+          @input="validarProgres" :placeholder="
             props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
           "
           :disabled="JuegoTerminado"
@@ -428,7 +431,7 @@ function calculateProgress(completedWords) {
         <h3>Jugadors</h3>
         <ul>
           <li
-            v-for="p in props.players"
+            v-for="p in sortedPlayers"
             :key="p.id"
             class="player-name-inline"
             :class="{ eliminado: p.eliminated }"

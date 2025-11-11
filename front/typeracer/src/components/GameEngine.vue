@@ -43,9 +43,6 @@ const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 
-// ===================================
-// 1. COMPUTEDS CONDICIONALS (CORREGITS)
-// ===================================
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
   const target = props.players.find((p) => p.id === props.spectatorTargetId);
@@ -64,6 +61,12 @@ const wordStack = computed(() => {
   }
 });
 
+const sortedPlayers = computed(() => {
+  return [...props.players].sort(
+    (a, b) => (b.completedWords || 0) - (a.completedWords || 0),
+  );
+});
+
 // LA PARAULA ACTIVA DEPÈN DE LA PILA QUE ES MOSTRA
 const paraulaActiva = computed(() => {
   if (wordStack.value.length === 0) {
@@ -80,7 +83,6 @@ const displayedText = computed(() => {
     return textEntratLocal.value;
   }
 });
-// ===================================
 
 const totalErrors = ref(0);
 
@@ -264,9 +266,6 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
   }
 
-  // ===================================
-  // CORRECCIÓ 1: Afegit !props.isSpectator
-  // ===================================
   if (
     !props.isSpectator &&
     estatDelJoc.value.paraules.length === 0 &&
@@ -292,9 +291,6 @@ onMounted(() => {
     }
   }
 
-  // ===================================
-  // CORRECCIÓ 2: Lògica 'onPlayerEliminated'
-  // ===================================
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
 
@@ -320,9 +316,6 @@ onMounted(() => {
     }
   });
 
-  // ===================================
-  // CORRECCIÓ 3: Lògica 'onPlayerWon'
-  // ===================================
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
@@ -335,16 +328,13 @@ onMounted(() => {
       playSound('gameWin');
     }
 
-    JuegoTerminado.value = true; // Atura el joc per a tothom
+    JuegoTerminado.value = true;
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
 
-  // ===================================
-  // CORRECCIÓ 4: Lògica 'onGameOver'
-  // ===================================
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
     onGameEnd();
@@ -379,17 +369,13 @@ onMounted(() => {
       }
     }
 
-    JuegoTerminado.value = true; // Activa GameResult per a tothom
+    JuegoTerminado.value = true;
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
-  // ===================================
 
-  // ===================================
-  // CORRECCIÓ 5: Afegit !props.isSpectator al Timer
-  // ===================================
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
       if (JuegoTerminado.value) return;
@@ -536,7 +522,7 @@ onUnmounted(() => {
 
         <h3>[REFUGIATS]</h3>
         <ul>
-          <li v-for="p in props.players" :key="p.id" class="player-name-inline">
+          <li v-for="p in sortedPlayers" :key="p.id" class="player-name-inline">
             <span
               class="color-dot"
               :style="{
@@ -585,7 +571,7 @@ onUnmounted(() => {
 .spectator-controls h4 {
   margin: 0 0 8px;
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: 1.5rem;
   text-align: center;
 }
 .spectator-targets {
@@ -596,7 +582,7 @@ onUnmounted(() => {
 }
 .spectator-targets button {
   padding: 4px 8px;
-  font-size: 0.8rem;
+  font-size: 1.2rem;
   background-color: var(--color-background-soft);
   color: var(--color-text);
   border: 1px solid var(--color-border);
@@ -740,7 +726,6 @@ onUnmounted(() => {
   justify-content: flex-end;
   border-radius: 12px;
   box-shadow: inset 0 0 10px var(--shadow-color);
-  overflow-y: auto;
   flex: 1 1 auto;
   min-height: 120px;
 }
