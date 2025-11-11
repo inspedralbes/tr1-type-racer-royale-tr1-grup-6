@@ -638,9 +638,9 @@ function calculateProgress(completedWords) {
   justify-content: flex-end;
   border-radius: 8px;
   box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
-  overflow-y: auto;
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .paraula {
   padding: 8px 12px;

@@ -727,7 +727,8 @@ onUnmounted(() => {
   border-radius: 12px;
   box-shadow: inset 0 0 10px var(--shadow-color);
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .paraula {
   padding: 8px 12px;
