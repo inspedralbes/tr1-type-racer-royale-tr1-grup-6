@@ -55,6 +55,7 @@ const vidasRestantes = ref(3); //  Dos vidas por jugador
 const tiempoRestante = ref(5); // 5 segundos
 let countdownTimer = null;
 const playersLives = ref({});
+const localPlyaerId = ref(null);
 
 // Manejo teclado
 function handleKeyDown(event) {
@@ -123,7 +124,6 @@ function validarProgres() {
       completedWords: palabrasCompletadas.value,
       lives: vidasRestantes.value,
     });
-
     // Limpiar input y reiniciar cronómetro
     estatDelJoc.value.paraules.pop();
     estatDelJoc.value.textEntrat = "";
@@ -168,12 +168,17 @@ function getClasseLletra(indexLletra) {
 
 function reiniciarCronometro() {
   clearInterval(countdownTimer);
-  tiempoRestante.value = 5;
+  tiempoRestante.value = 5; // Siempre se resetea a 5 al completar una palabra
 
   countdownTimer = setInterval(() => {
+    if (JuegoTerminado.value) {
+      clearInterval(countdownTimer);
+      return;
+    }
+
     tiempoRestante.value -= 0.1; // decrementar suave para barra
     if (tiempoRestante.value <= 0) {
-      manejarTiempoAgotado();
+      manejarTiempoAgotado(); // Al acabar el tiempo, se resta la vida
     }
   }, 100);
 }
@@ -182,17 +187,20 @@ function reiniciarCronometro() {
 function manejarTiempoAgotado() {
   if (JuegoTerminado.value) return;
 
-  vidasRestantes.value--;
-  if (vidasRestantes.value <= 0) {
-    perdedor.value = true;
-    perdidoMensaje.value = "Se acabó el tiempo y perdiste todas tus vidas.";
-    communicationManager.reportMuerteSubitaElimination();
-    finalizarJuego();
-  } else {
-    perdidoMensaje.value = `Se acabó el tiempo. Te queda ${vidasRestantes.value} vida${
-      vidasRestantes.value === 1 ? "" : "s"
-    }.`;
-    reiniciarCronometro();
+  if (props.modo === "muerteSubita") {
+    vidasRestantes.value--;
+    // Actualizar localmente el objeto del jugador
+    updateLocalPlayerLives(vidasRestantes.value);
+
+    if (vidasRestantes.value <= 0) {
+      perdedor.value = true;
+      perdidoMensaje.value =
+        "Se acabó el tiempo y perdiste todas tus vidas. ¡Eliminado!";
+      communicationManager.reportMuerteSubitaElimination();
+      finalizarJuego();
+    } else {
+      reiniciarCronometro();
+    }
   }
 }
 
@@ -202,55 +210,74 @@ function manejarError() {
 
   // Solo aplica en modo muerte súbita
   if (props.modo === "muerteSubita") {
-    // Restar vida
     vidasRestantes.value--;
+    updateLocalPlayerLives(vidasRestantes.value);
 
-    // Actualizar localmente el objeto del jugador
-    const playerId = communicationManager.socket?.id;
-    if (playerId) {
-      playersLives.value[playerId] = {
-        ...(playersLives.value[playerId] || {}),
-        lives: vidasRestantes.value,
-      };
+    // Efecto de error visual
+    const input = document.querySelector(".text-input");
+    if (input) {
+      input.style.borderColor = "#ff4d4d";
+      setTimeout(() => (input.style.borderColor = ""), 300);
     }
 
-    // Enviar actualización al servidor
-    communicationManager.updatePlayerProgress({
-      lives: vidasRestantes.value,
-    });
-
-    // Si se quedó sin vidas → derrota inmediata
+    // Si se quedó sin vidas  derrota inmediata
     if (vidasRestantes.value <= 0) {
       perdedor.value = true;
       perdidoMensaje.value = "Has perdido todas tus vidas. ¡Estás eliminado!";
       communicationManager.reportMuerteSubitaElimination();
       finalizarJuego();
-      return;
     }
+  }
+}
+
+// 🚨 Función centralizada para actualizar vidas localmente y en el servidor
+function updateLocalPlayerLives(newLives) {
+  const playerId = localPlayerId.value;
+  if (playerId) {
+    // 1. Actualiza el objeto interno (playersLives) para el rendering
+    playersLives.value[playerId] = {
+      ...(playersLives.value[playerId] || { name: "Tú" }),
+      lives: newLives,
+    };
+
+    // 2. Opcional, pero muy recomendado para forzar la reactividad en el v-for.
+    // Esto asegura que Vue vea que el objeto base ha cambiado.
+    playersLives.value = { ...playersLives.value };
+
+    // 3. Envía la actualización al servidor
+    communicationManager.updatePlayerProgress({
+      lives: newLives,
+    });
   }
 }
 
 // Ciclo vida
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
-  if (props.modo === "muerteSubita") {
-    playersLives.value[communicationManager.socket?.id] = {
-      name: "Tú",
-      lives: vidasRestantes.value,
-    };
-    reiniciarCronometro();
-    // Inicializar vidas de otros jugadores
-    if (props.players && props.players.length > 0) {
-      props.players.forEach((player) => {
-        if (player.id !== communicationManager.socket?.id) {
-          playersLives.value[player.id] = {
-            name: player.name,
-            lives: 3,
-          };
-        }
-      });
+  // 🚨 Usa onConnect para obtener el ID y inicializar las vidas
+  communicationManager.onConnect((id) => {
+    localPlayerId.value = id;
+    if (props.modo === "muerteSubita") {
+      // Inicializar vidas del jugador local usando el ID garantizado
+      playersLives.value[id] = {
+        name: "Tú",
+        lives: vidasRestantes.value, // (3)
+      };
     }
+  });
+
+  // Inicializar vidas de otros jugadores
+  if (props.players && props.players.length > 0) {
+    props.players.forEach((player) => {
+      if (player.id !== communicationManager.socket?.id) {
+        playersLives.value[player.id] = {
+          name: player.name,
+          lives: 3,
+        };
+      }
+    });
   }
+  reiniciarCronometro();
 
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
@@ -333,7 +360,7 @@ function finalizarJuego() {
   <div>
     <div class="game-header">
       <!-- Sidebar + corazones -->
-      
+
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
@@ -371,20 +398,22 @@ function finalizarJuego() {
             </template>
           </div>
         </TransitionGroup>
-      <div class="input-barra-wrapper">
-        <div
-          class="input-tiempo-borde"
-          :style="{ '--progress': (tiempoRestante / 5) * 100 + '%' }"
-        ></div>
-        <input
-          type="text"
-          class="text-input"
-          v-model="estatDelJoc.textEntrat"
-          @input="validarProgres"
-          placeholder="Comença a escriure..."
-          :disabled="JuegoTerminado"
-        />
-      </div>
+        <div class="input-barra-wrapper">
+          <input
+            type="text"
+            class="text-input"
+            v-model="estatDelJoc.textEntrat"
+            @input="validarProgres"
+            placeholder="Comença a escriure..."
+            :disabled="JuegoTerminado"
+          />
+          <div class="barra-tiempo">
+            <div
+              class="progreso-tiempo"
+              :style="{ width: (tiempoRestante / 5) * 100 + '%' }"
+            ></div>
+          </div>
+        </div>
 
         <div class="teclat">
           <div
@@ -426,13 +455,15 @@ function finalizarJuego() {
           </li>
           <li
             v-for="p in props.players"
-            :key="p.id"
-            :class="{ eliminado: p.eliminated }"
+            :key="p.id + 'lives'"
+            :class="{
+              eliminado: p.eliminated || playersLives[p.id]?.lives === 0,
+            }"
           >
             {{ p.name }}
             <div class="vidas-jugador">
               <span
-                v-for="n in (playersLives[p.id]?.lives || 0)"
+                v-for="n in playersLives[p.id]?.lives || 0"
                 :key="n"
                 class="corazon"
                 >❤️</span
@@ -441,7 +472,6 @@ function finalizarJuego() {
           </li>
         </ul>
       </aside>
-    
 
       <GameResult
         v-if="JuegoTerminado"
@@ -514,31 +544,51 @@ function finalizarJuego() {
   color: white;
   transform: scale(0.95);
 }
+
+/*estilo imput con tiempo*/
 .input-barra-wrapper {
-  position: relative;
-  display: inline-block;
-  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  flex-direction: column;
+  align-items: center;
 }
 
-.input-tiempo-borde {
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
+.text-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 12px 16px;
+  font-size: 1.2rem;
+  border: 4px solid;
   border-radius: 12px;
-  border: 3px solid #28a745;
-  pointer-events: none;
-  box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
-  background: conic-gradient(
-    #dc3545 calc(var(--progress) * 1%),
-    #ccc 0
+  outline: none;
+  transition: border-color 0.2s linear;
+  border-image: linear-gradient(
+    to right,
+    #00ff7f calc(var(--progress) * 1%),
+    #333 calc(var(--progress) * 1%)
   );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  padding: 2px;
-  transition: background 0.1s linear;
+  border-image-slice: 1;
+}
+
+.text-input:focus {
+  box-shadow: 0 0 10px rgba(0, 255, 127, 0.4);
+}
+/* Barra de tiempo debajo del input */
+.barra-tiempo {
+  width: 100%;
+  max-width: 400px;
+  height: 8px;
+  background-color: #333;
+  border-radius: 6px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.progreso-tiempo {
+  height: 100%;
+  background-color: #00ff7f;
+  transition: width 0.1s linear;
 }
 
 .game-layout {

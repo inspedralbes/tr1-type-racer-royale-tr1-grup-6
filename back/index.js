@@ -365,14 +365,14 @@ io.on("connection", (socket) => {
         if (typeof payload.totalErrors === "number") {
           player.totalErrors = payload.totalErrors;
         }
-        
+
         // Si el cliente manda playTime (ms), lo guardamos para mostrar WPM
         if (typeof payload.playTime === "number") {
           player.playTime = payload.playTime;
         }
         if (typeof payload.lives === "number") {
           player.lives = payload.lives;
-          // 🔔 Notificar a los demás jugadores
+          //  Notificar a los demás jugadores
           socket.broadcast.to(roomId).emit("playerProgressUpdate", {
             playerId: socket.id,
             lives: payload.lives,
@@ -382,6 +382,11 @@ io.on("connection", (socket) => {
         break; // updated the room containing this player
       }
     }
+  });
+
+  socket.on("playerProgressUpdate", (data) => {
+    data.playerId = socket.id;
+    io.to(roomId).emit("playerProgressUpdate", data);
   });
 
   // Handler por si el host pulsa un botón para iniciar la partida
@@ -524,11 +529,6 @@ io.on("connection", (socket) => {
 
     const player = room.players.get(socket.id);
     if (!player) return;
-
-    if (player.lives === undefined) player.lives = 3; // Tres vidas por jugador
-
-    // Restar una vida
-    player.lives--;
 
     if (player.lives <= 0) {
       player.eliminated = true;
