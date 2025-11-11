@@ -24,6 +24,9 @@ const communicationManager = {
       currentRoom = null;
     });
   },
+  get id() {
+    return socket.id;
+  },
 
   // Obtener la sala actual
   getCurrentRoom() {
@@ -76,7 +79,6 @@ const communicationManager = {
   reportPlayerLost() {
     socket.emit("playerLost");
   },
-
 
   // Enviar progreso del jugador (palabras completadas)
   updatePlayerProgress(progress) {
