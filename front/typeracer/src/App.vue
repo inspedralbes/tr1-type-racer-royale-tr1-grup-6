@@ -164,8 +164,10 @@ function connectarAlServidor() {
   });
 
   communicationManager.onJoinedRoom((data) => {
-    if (data.success) {
+    if (data.success && data.roomId) {
+      currentRoom.value = data.roomId;
       isSpectator.value = false;
+      console.log("Establecida sala actual (jugador):", currentRoom.value);
       onRoomJoined(data.roomId);
     } else if (data.error) {
       alert(data.error);
@@ -215,21 +217,21 @@ watch(modoJuego, (newModo, oldModo) => {
 });
 
 function onRoomJoined(room) {
-  currentRoom.value = {id: room.roomId};
+  currentRoom.value = room;
   vistaActual.value = "lobby";
 }
 
 function kickPlayer(playerId) {
   if (!currentRoom.value) return;
   if (confirm("Estàs segur que vols expulsar aquest jugador?")){
-    communicationManager.kickUser(currentRoom.value.id, playerId);
+    communicationManager.kickUser(currentRoom.value, playerId);
   }
 }
 
 function transferHost(newHostId) {
   if (!currentRoom.value) return;
   if (confirm("Estàs segur que vols transferir el rol de supervisor?")){
-    communicationManager.transferHost(currentRoom.value.id, newHostId);
+    communicationManager.transferHost(currentRoom.value, newHostId);
   }
 }
 
@@ -371,7 +373,7 @@ communicationManager.onkicked(() => {
         </button>
         <button @click="volverInicio">Tornar a l'Inici</button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
-          <h3>Selecciona el modo de juego</h3>
+          <h3>Selecciona el mode de joc</h3>
           <div class="modo-buttons">
             <label class="modo-btn" :class="{ active: modoJuego === 'normal' }">
               <input type="radio" value="normal" v-model="modoJuego" />
@@ -414,6 +416,135 @@ communicationManager.onkicked(() => {
 </template>
 
 <style scoped>
+.modo-btn .tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  transition: opacity 180ms ease, transform 180ms ease,
+    visibility 0s linear 180ms;
+  z-index: 1200; /* definitely above everything */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: none; /* don't block hover */
+  min-width: 180px;
+  text-align: center;
+  z-index: 9999;
+}
+
+.modo-btn:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+  transition-delay: 40ms;
+}
+
+/* little arrow under the tooltip */
+.modo-btn .tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 7px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+  z-index: 1201;
+}
+
+/* special color for Muerte Súbita tooltip to match danger style */
+.modo-btn.muerte .tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+  color: #fff;
+}
+
+.modo-btn.muerte .tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
+
+/* non-host mode help icon + tooltip */
+.mode-help {
+  display: inline-block;
+  position: relative;
+  margin-left: 10px;
+  cursor: pointer;
+}
+.mode-help-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #f0f0f0);
+  color: #222;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.mode-help-tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 1200;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mode-help:hover .mode-help-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mode-help .mode-help-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+}
+.mode-help.muerte .mode-help-tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+}
+.mode-help.muerte .mode-help-tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
 .spectator-list {
   margin-top: 20px;
   border-top: 1px dashed var(--color-border);
@@ -628,7 +759,8 @@ button.btn-host {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  overflow: hidden;
+  overflow: visible;
+  z-index: 1;
 }
 .modo-btn:hover {
   transform: translateY(-3px);
