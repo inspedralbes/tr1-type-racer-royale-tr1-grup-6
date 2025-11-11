@@ -83,6 +83,60 @@ function createGamePayload(room) {
 io.on("connection", (socket) => {
   console.log(`Usuario conectado: ${socket.id}`);
 
+  socket.on("kickUser", ({ roomId, userId }) => {
+    console.log(`Expulsando ${userId} de la sala ${roomId}`);
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Solo el host puede expulsar
+    if (room.hostId !== socket.id) return;
+
+    // Sacar al jugador del array
+    room.players.delete(userId);
+
+    // Avisar al jugador expulsado
+    io.to(userId).emit("kicked", { message: "Has sido expulsado de la sala" });
+
+    // Hacer que el jugador salga de la room de socket.io
+    const targetSocket = io.sockets.sockets.get(userId);
+    if (targetSocket) targetSocket.leave(roomId);
+
+    broadcastRoomPlayerList(roomId);
+
+    console.log(`Jugador ${userId} expulsado de la sala ${roomId}`);
+  });
+
+  // Transferir host
+  socket.on("transferHost", ({ roomId, newHostId }) => {
+    console.log(`Transfiriendo host en ${roomId} a ${newHostId}`);
+
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Solo el host actual puede hacerlo
+    if (room.hostId !== socket.id) return;
+
+    room.hostId = newHostId;
+
+    const newPlayersMap = new Map();
+    if (room.players.has(newHostId)){
+      newPlayersMap.set(newHostId, room.players.get(newHostId));
+    }
+
+    for (const[id, player] of room.players){
+      if (id !== newHostId){
+        newPlayersMap.set(id, player);
+      }
+    }
+    room.players = newPlayersMap;
+
+    io.to(roomId).emit("hostTransferred", { newHostId });
+    broadcastRoomPlayerList(roomId);
+
+    console.log(`Host transferido en ${roomId} a ${newHostId}`);
+  });
+
   // Room management events
   socket.on("listRooms", () => {
     const roomsList = Array.from(rooms.values()).map((room) => ({

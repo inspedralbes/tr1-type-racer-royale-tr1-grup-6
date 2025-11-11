@@ -198,9 +198,40 @@ watch(modoJuego, (newModo, oldModo) => {
 });
 
 function onRoomJoined(room) {
-  currentRoom.value = room;
+  currentRoom.value = {id: room.roomId};
   vistaActual.value = "lobby";
 }
+
+function kickPlayer(playerId) {
+  if (!currentRoom.value) return;
+  if (confirm("Estàs segur que vols expulsar aquest jugador?")){
+    communicationManager.kickUser(currentRoom.value.id, playerId);
+  }
+}
+
+function transferHost(newHostId) {
+  if (!currentRoom.value) return;
+  if (confirm("Estàs segur que vols transferir el rol de supervisor?")){
+    communicationManager.transferHost(currentRoom.value.id, newHostId);
+  }
+}
+
+communicationManager.onHostTransferred(({ newHostId }) => {
+  // Actualizar el host en el payload
+  playersPayload.value.hostId = newHostId;
+
+  if (newHostId === socketId.value) {
+    alert("Ahora eres el nuevo supervisor de la sala");
+  } else {
+    alert("El rol de supervisor ha sido transferido a otro jugador.");
+  }
+});
+
+communicationManager.onkicked(() => {
+  alert("Has sido expulsado de la sala.");
+  volverInicio();
+});
+
 </script>
 
 <template>
@@ -262,14 +293,14 @@ function onRoomJoined(room) {
               {{
                 modoJuego === "muerteSubita"
                   ? "Si comets dos errors quedes eliminat."
-                  : "Completa paraules; acumula 20 per guanyar."
+                  : "Completa paraules; acumula 20 per quedar eliminat."
               }}
             </span>
           </span>
         </div>
       </div>
       <ul>
-        <li v-for="jugador in jugadors" :key="jugador.id">
+        <li v-for="jugador in jugadors" :key="jugador.id" >
           <span
             class="color-dot"
             :style="{
@@ -283,6 +314,14 @@ function onRoomJoined(room) {
           <span v-if="jugador.id === hostId" class="host-status">
             — [Supervisor]
           </span>
+          <template v-if="isHost && jugador.id !== socketId">
+            <button @click="kickPlayer(jugador.id)" class="btn-kick">
+              Elimninar
+            </button>
+            <button @click="transferHost(jugador.id)" class="btn-transfer">
+              Transferir Supervisor
+            </button>
+          </template>
         </li>
       </ul>
       <div class="lobby-actions">
@@ -305,8 +344,7 @@ function onRoomJoined(room) {
               <input type="radio" value="normal" v-model="modoJuego" />
               <span>Normal</span>
               <span class="tooltip"
-                >Guanya si arribes a 20 paraules, però si les acumules, quedaràs
-                eliminat.</span
+                >Quedaràs eliminat si s'acumulen 20 paraules.</span
               >
             </label>
 
@@ -317,7 +355,7 @@ function onRoomJoined(room) {
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
               <span>Muerte Súbita</span>
               <span class="tooltip"
-                >Tens 2 vides — al 3r error quedes eliminat.</span
+                >Tens 2 vides — al 2n error quedes eliminat.</span
               >
             </label>
           </div>
@@ -536,8 +574,7 @@ button {
   cursor: pointer;
   font-family: var(--font-main);
   font-size: 1.5rem;
-  text-shadow: 0 0 5px var(--color-heading);
-
+  text-shadow: 0 0 5px var(--color-heading);  
   width: auto;
 }
 
@@ -606,6 +643,31 @@ button.ready {
 button.btn-host {
   background-color: var(--color-success, #28a745);
 }
+
+.btn-kick {
+  margin-top: 10px;
+  background-color: var(--color-danger, #dc3545);
+  margin-left: 10px;
+  padding: 4px 10px;
+  font-size: 18px;
+  color: white;
+
+} 
+.btn-kick:hover {
+  background-color: #b71c1c;
+}
+
+.btn-transfer {
+  padding: 4px 10px;
+  font-size: 18px;
+  background-color: var(--color-warning, #ffc107);
+  margin-left: 10px;
+  color: black;
+}
+.btn-transfer:hover {
+  background-color: #e0a800;
+}
+
 .host-status {
   color: var(--color-text-muted);
   margin-left: 8px;

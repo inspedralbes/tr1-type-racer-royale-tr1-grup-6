@@ -1,3 +1,4 @@
+//import { on } from "node:events";
 import { io } from "socket.io-client";
 
 const socket = io("http://localhost:3000", {
@@ -193,6 +194,24 @@ const communicationManager = {
 
   onGameOver(callback) {
     socket.on("gameOver", callback);
+  },
+
+  // --- Funciones de host ---
+
+  kickUser(roomId, userId) {
+    socket.emit("kickUser", { roomId, userId });
+  },
+
+  transferHost(roomId, newHostId) {
+    socket.emit("transferHost", { roomId, newHostId });
+  },
+
+  onkicked(callback) {
+    socket.on("kicked", callback);
+  },
+
+  onHostTransferred(callback) {
+    socket.on("hostTransferred", callback);
   },
 
   // Desconectarse del servidor
