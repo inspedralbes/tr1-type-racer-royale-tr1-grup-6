@@ -365,9 +365,18 @@ io.on("connection", (socket) => {
         if (typeof payload.totalErrors === "number") {
           player.totalErrors = payload.totalErrors;
         }
+        
         // Si el cliente manda playTime (ms), lo guardamos para mostrar WPM
         if (typeof payload.playTime === "number") {
           player.playTime = payload.playTime;
+        }
+        if (typeof payload.lives === "number") {
+          player.lives = payload.lives;
+          // 🔔 Notificar a los demás jugadores
+          socket.broadcast.to(roomId).emit("playerProgressUpdate", {
+            playerId: socket.id,
+            lives: payload.lives,
+          });
         }
         broadcastRoomPlayerList(roomId);
         break; // updated the room containing this player

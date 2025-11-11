@@ -54,6 +54,7 @@ const totalErrors = ref(0);
 const vidasRestantes = ref(3); //  Dos vidas por jugador
 const tiempoRestante = ref(5); // 5 segundos
 let countdownTimer = null;
+const playersLives = ref({});
 
 // Manejo teclado
 function handleKeyDown(event) {
@@ -120,6 +121,7 @@ function validarProgres() {
 
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
+      lives: vidasRestantes.value,
     });
 
     // Limpiar input y reiniciar cronómetro
@@ -139,7 +141,6 @@ function validarProgres() {
 
       // Reducir vidas si estamos en modo muerte súbita
       if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
-        vidasRestantes.value--;
         manejarError();
       }
     } else {
@@ -172,7 +173,6 @@ function reiniciarCronometro() {
   countdownTimer = setInterval(() => {
     tiempoRestante.value -= 0.1; // decrementar suave para barra
     if (tiempoRestante.value <= 0) {
-      clearInterval(countdownTimer);
       manejarTiempoAgotado();
     }
   }, 100);
@@ -189,9 +189,9 @@ function manejarTiempoAgotado() {
     communicationManager.reportMuerteSubitaElimination();
     finalizarJuego();
   } else {
-    perdidoMensaje.value = ` Se acabó el tiempo. Te queda ${
-      vidasRestantes.value
-    } vida${vidasRestantes.value === 1 ? "" : "s"}.`;
+    perdidoMensaje.value = `Se acabó el tiempo. Te queda ${vidasRestantes.value} vida${
+      vidasRestantes.value === 1 ? "" : "s"
+    }.`;
     reiniciarCronometro();
   }
 }
@@ -200,16 +200,33 @@ function manejarTiempoAgotado() {
 function manejarError() {
   if (JuegoTerminado.value) return;
 
-  vidasRestantes.value--;
-  if (vidasRestantes.value <= 0) {
-    perdedor.value = true;
-    perdidoMensaje.value = "Has perdido todas tus vidas. ¡Estás eliminado!";
-    communicationManager.reportMuerteSubitaElimination();
-    finalizarJuego();
-  } else {
-    perdidoMensaje.value = ` Error. Te queda ${vidasRestantes.value} vida${
-      vidasRestantes.value === 1 ? "" : "s"
-    }.`;
+  // Solo aplica en modo muerte súbita
+  if (props.modo === "muerteSubita") {
+    // Restar vida
+    vidasRestantes.value--;
+
+    // Actualizar localmente el objeto del jugador
+    const playerId = communicationManager.socket?.id;
+    if (playerId) {
+      playersLives.value[playerId] = {
+        ...(playersLives.value[playerId] || {}),
+        lives: vidasRestantes.value,
+      };
+    }
+
+    // Enviar actualización al servidor
+    communicationManager.updatePlayerProgress({
+      lives: vidasRestantes.value,
+    });
+
+    // Si se quedó sin vidas → derrota inmediata
+    if (vidasRestantes.value <= 0) {
+      perdedor.value = true;
+      perdidoMensaje.value = "Has perdido todas tus vidas. ¡Estás eliminado!";
+      communicationManager.reportMuerteSubitaElimination();
+      finalizarJuego();
+      return;
+    }
   }
 }
 
@@ -217,8 +234,24 @@ function manejarError() {
 onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
   if (props.modo === "muerteSubita") {
-    reiniciarCronometro(); // inicia el primer cronómetro
+    playersLives.value[communicationManager.socket?.id] = {
+      name: "Tú",
+      lives: vidasRestantes.value,
+    };
+    reiniciarCronometro();
+    // Inicializar vidas de otros jugadores
+    if (props.players && props.players.length > 0) {
+      props.players.forEach((player) => {
+        if (player.id !== communicationManager.socket?.id) {
+          playersLives.value[player.id] = {
+            name: player.name,
+            lives: 3,
+          };
+        }
+      });
+    }
   }
+
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
@@ -226,51 +259,29 @@ onMounted(() => {
     JuegoTerminado.value = true;
     perdidoMensaje.value =
       data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
+    if (revealTimer) clearInterval(revealTimer);
+    if (countdownTimer) clearInterval(countdownTimer);
+  });
+
+  communicationManager.onPlayerProgressUpdate((data) => {
+    if (data.playerId && data.lives !== undefined) {
+      playersLives.value[data.playerId] = {
+        ...(playersLives.value[data.playerId] || {}),
+        lives: data.lives,
+      };
     }
   });
 
   communicationManager.onPlayerEliminated((data) => {
-    const player = props.players.find((p) => p.id === data.playerId);
-    if (player) {
-      player.eliminated = true;
-    }
-
-    if (data.playerId === communicationManager.id) {
-      perdedor.value = true;
-      perdidoMensaje.value =
-        data.message || "Te has equivocado, ¡estás eliminado!";
-      window.removeEventListener("keydown", handleKeyDown);
-      estatDelJoc.value.textEntrat = "";
-      if (revealTimer) {
-        clearInterval(revealTimer);
-        revealTimer = null;
+    if (data.playerId) {
+      if (playersLives.value[data.playerId]) {
+        playersLives.value[data.playerId].lives = 0;
       }
     }
   });
 
   communicationManager.onGameOver((data) => {
-    if (JuegoTerminado.value) return;
-
-    if (data.winnerId === communicationManager.id) {
-      ganador.value = true;
-      perdedor.value = false;
-      perdidoMensaje.value =
-        data.message || "¡Has ganado! Todos los demás fueron eliminados.";
-    } else {
-      ganador.value = false;
-      perdedor.value = true;
-      perdidoMensaje.value =
-        data.message || `Has perdido. ${data.winnerName} ha ganado.`;
-    }
-
     JuegoTerminado.value = true;
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
-    }
   });
 
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
@@ -303,18 +314,18 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown);
-  if (revealTimer) {
-    clearInterval(revealTimer);
-    revealTimer = null;
-  }
-  if (countdownTimer) {
-    clearInterval(countdownTimer);
-    countdownTimer = null;
-  }
+  if (revealTimer) clearInterval(revealTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
 });
 
 function calculateProgress(completedWords) {
   return (completedWords / estatDelJoc.value.paraules.length) * 100;
+}
+
+function finalizarJuego() {
+  JuegoTerminado.value = true;
+  if (revealTimer) clearInterval(revealTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
 }
 </script>
 
@@ -322,31 +333,7 @@ function calculateProgress(completedWords) {
   <div>
     <div class="game-header">
       <!-- Sidebar + corazones -->
-      <aside class="players-sidebar">
-        <h3>Jugadores</h3>
-        <ul>
-          <li
-            v-for="p in props.players"
-            :key="p.id"
-            :class="{ eliminado: p.eliminated }"
-          >
-            {{ p.name }}
-          </li>
-        </ul>
-
-        <!-- Corazones retro debajo de la sidebar -->
-        <div class="vidas-retro">
-          <span v-for="n in vidasRestantes" :key="n">❤️</span>
-        </div>
-
-        <!-- Barra de tiempo -->
-        <div class="barra-tiempo-container">
-          <div
-            class="barra-tiempo"
-            :style="{ width: (tiempoRestante / 5) * 100 + '%' }"
-          ></div>
-        </div>
-      </aside>
+      
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
@@ -384,7 +371,11 @@ function calculateProgress(completedWords) {
             </template>
           </div>
         </TransitionGroup>
-
+      <div class="input-barra-wrapper">
+        <div
+          class="input-tiempo-borde"
+          :style="{ '--progress': (tiempoRestante / 5) * 100 + '%' }"
+        ></div>
         <input
           type="text"
           class="text-input"
@@ -393,6 +384,7 @@ function calculateProgress(completedWords) {
           placeholder="Comença a escriure..."
           :disabled="JuegoTerminado"
         />
+      </div>
 
         <div class="teclat">
           <div
@@ -432,8 +424,24 @@ function calculateProgress(completedWords) {
               Paraules fetes: {{ p.completedWords || 0 }}
             </span>
           </li>
+          <li
+            v-for="p in props.players"
+            :key="p.id"
+            :class="{ eliminado: p.eliminated }"
+          >
+            {{ p.name }}
+            <div class="vidas-jugador">
+              <span
+                v-for="n in (playersLives[p.id]?.lives || 0)"
+                :key="n"
+                class="corazon"
+                >❤️</span
+              >
+            </div>
+          </li>
         </ul>
       </aside>
+    
 
       <GameResult
         v-if="JuegoTerminado"
@@ -506,28 +514,33 @@ function calculateProgress(completedWords) {
   color: white;
   transform: scale(0.95);
 }
-/*STILOS RELOJ MUERTE SUBITA */
-.vidas-retro {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-  margin-top: 10px;
-  font-size: 14px; /* corazones pequeños */
+.input-barra-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 100%;
 }
 
-.barra-tiempo-container {
-  height: 6px;
-  background: #333;
-  margin-top: 10px;
-  border-radius: 3px;
-  overflow: hidden;
+.input-tiempo-borde {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 12px;
+  border: 3px solid #28a745;
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
+  background: conic-gradient(
+    #dc3545 calc(var(--progress) * 1%),
+    #ccc 0
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 2px;
+  transition: background 0.1s linear;
 }
 
-.barra-tiempo {
-  height: 100%;
-  background: #dc3545;
-  transition: width 0.1s linear;
-}
 .game-layout {
   display: flex;
   gap: 24px;
