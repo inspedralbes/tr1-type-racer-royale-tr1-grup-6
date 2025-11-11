@@ -1,74 +1,100 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import communicationManager from "../services/communicationManager.js";
-import GameResult from "@/components/GameResult.vue";
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import communicationManager from '../services/communicationManager.js';
+import GameResult from '@/components/GameResult.vue';
 
-// Props
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
-  modo: { type: String, default: "normal" },
+  modo: { type: String, default: 'normal' },
+  isSpectator: { type: Boolean, default: false },
+  spectatorTargetId: { type: String, default: null },
 });
-
-// Estado ganador y perdedor
+const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
+const sortedPlayers = computed(() => {
+  return [...props.players].sort((a, b) => {
+    return (b.completedWords || 0) - (a.completedWords || 0);
+  });
+});
 const perdedor = ref(false);
 const ganador = ref(false);
-const perdidoMensaje = ref("");
+const perdidoMensaje = ref('');
 
-// Estado teclado
 const filesDelTeclat = ref([
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-  ["Z", "X", "C", "V", "B", "N", "M"],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
 ]);
-const teclaPremuda = ref("");
+const teclaPremuda = ref('');
 
-// Estado juego
 const JuegoTerminado = ref(false);
 const estatDelJoc = ref({
   paraules: [],
-  textEntrat: "",
   estadistiques: [],
 });
-const emit = defineEmits(["volverInicio"]);
+const textEntratLocal = ref('');
+
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 function handleVolverInicio() {
-  emit("volverInicio");
+  emit('volverInicio');
 }
-// Computed: palabra activa
+
+const watchedPlayer = computed(() => {
+  if (!props.isSpectator || !props.spectatorTargetId) return null;
+  const target = props.players.find((p) => p.id === props.spectatorTargetId);
+  return target || props.players[0] || null;
+});
+
+const wordStack = computed(() => {
+  if (props.isSpectator) {
+    return watchedPlayer.value?.wordStack || [];
+  } else {
+    return estatDelJoc.value.paraules;
+  }
+});
+
 const paraulaActiva = computed(() => {
-  if (estatDelJoc.value.paraules.length === 0) {
+  if (wordStack.value.length === 0) {
     return null;
   }
-  return estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+  return wordStack.value[wordStack.value.length - 1];
+});
+
+const displayedText = computed(() => {
+  if (props.isSpectator) {
+    return watchedPlayer.value?.currentWordProgress || '';
+  } else {
+    return textEntratLocal.value;
+  }
 });
 
 const totalErrors = ref(0);
 
-// Manejo teclado
 function handleKeyDown(event) {
+  if (JuegoTerminado.value || props.isSpectator) return;
+
   const key = event.key;
 
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     teclaPremuda.value = key.toUpperCase();
     setTimeout(() => {
-      teclaPremuda.value = "";
+      teclaPremuda.value = '';
     }, 100);
   }
 
   if (JuegoTerminado.value) return;
 
-  if (key === "Backspace") {
+  if (key === 'Backspace') {
     event.preventDefault();
-    estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
+    textEntratLocal.value = textEntratLocal.value.slice(0, -1);
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
-    estatDelJoc.value.textEntrat += key;
+    textEntratLocal.value += key;
   } else {
     return;
   }
@@ -76,22 +102,28 @@ function handleKeyDown(event) {
   validarProgres();
 }
 
-// Cronómetro inicio palabra
 function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
 
-// Validar progreso en palabra actual
 function validarProgres() {
-  if (estatDelJoc.value.textEntrat.length === 1 && tempsIniciParaula === 0) {
+  if (JuegoTerminado.value || props.isSpectator) return;
+
+  if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
   }
 
-  const typed = estatDelJoc.value.textEntrat;
-  const paraula = paraulaActiva.value;
+  const typed = textEntratLocal.value;
+  const paraula =
+    estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+
+  communicationManager.updatePlayerProgress({
+    currentWordProgress: typed,
+    wordStack: estatDelJoc.value.paraules,
+  });
 
   if (!paraula) {
-    estatDelJoc.value.textEntrat = "";
+    textEntratLocal.value = '';
     return;
   }
 
@@ -101,26 +133,31 @@ function validarProgres() {
   ) {
     paraula.letterErrors = Array.from(
       { length: paraula.text.length },
-      () => false
+      () => false,
     );
   }
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-    const self = props.players.find((p) => p.id === communicationManager.id);
+    const self = props.players.find(
+      (p) => p.id === communicationManager.getId(),
+    );
     if (self) self.completedWords = (self.completedWords || 0) + 1;
 
-    paraula.estat = "completada";
+    paraula.estat = 'completada';
+
+    estatDelJoc.value.paraules.pop();
+    textEntratLocal.value = '';
+    tempsIniciParaula = 0;
 
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
+      currentWordProgress: '',
+      wordStack: estatDelJoc.value.paraules,
     });
 
-    estatDelJoc.value.paraules.pop();
-    estatDelJoc.value.textEntrat = "";
-    tempsIniciParaula = 0;
-
-    const nextParaula = paraulaActiva.value;
+    const nextParaula =
+      estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
     if (nextParaula) {
       if (
         !Array.isArray(nextParaula.letterErrors) ||
@@ -128,27 +165,28 @@ function validarProgres() {
       ) {
         nextParaula.letterErrors = Array.from(
           { length: nextParaula.text.length },
-          () => false
+          () => false,
         );
         nextParaula.errors = 0;
       }
     }
   }
 
-  // Lógica conteo errores para modo muerte súbita
   for (let i = 0; i < typed.length; i++) {
     if (i >= paraula.text.length) break;
     const isError = typed[i] !== paraula.text[i];
     if (isError && !paraula.letterErrors[i]) {
       totalErrors.value++;
-      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
+      if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
         perdedor.value = true;
-        perdidoMensaje.value = "Te has equivocado, ¡estás eliminado!";
+        perdidoMensaje.value = "T'has equivocat, estàs eliminat!";
         communicationManager.reportMuerteSubitaElimination();
-        // El jugador local ya no puede escribir
-        estatDelJoc.value.textEntrat = "";
-        window.removeEventListener("keydown", handleKeyDown);
-        estatDelJoc.value.textEntrat = "";
+
+        textEntratLocal.value = '';
+        if (!props.isSpectator) {
+          window.removeEventListener('keydown', handleKeyDown);
+        }
+        textEntratLocal.value = '';
         if (revealTimer) {
           clearInterval(revealTimer);
           revealTimer = null;
@@ -162,34 +200,38 @@ function validarProgres() {
   }
 }
 
-// Lógica colores letras
 function getClasseLletra(indexLletra) {
-  if (!paraulaActiva.value) return "";
+  if (!paraulaActiva.value) return '';
 
-  const typed = estatDelJoc.value.textEntrat;
+  const typed = displayedText.value;
   const target = paraulaActiva.value.text;
 
   if (indexLletra >= typed.length) {
     if (paraulaActiva.value.letterErrors[indexLletra]) {
-      return "incorrecte";
+      return 'incorrecte';
     }
-    return "";
+    return '';
   }
 
-  return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
+  return typed[indexLletra] === target[indexLletra] ? 'correcte' : 'incorrecte';
 }
 
-// Ciclo vida
 onMounted(() => {
-  window.addEventListener("keydown", handleKeyDown);
+  if (!props.isSpectator) {
+    window.addEventListener('keydown', handleKeyDown);
+  }
 
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
-    ganador.value = true;
-    perdedor.value = false;
+
+    if (data.winnerId === communicationManager.getId() && !props.isSpectator) {
+      ganador.value = true;
+      perdedor.value = false;
+      perdidoMensaje.value =
+        data?.message || 'Has guanyat! Tots els altres han estat eliminats.';
+    }
+
     JuegoTerminado.value = true;
-    perdidoMensaje.value =
-      data?.message || "¡Has ganado! Todos los demás fueron eliminados.";
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
@@ -202,12 +244,13 @@ onMounted(() => {
       player.eliminated = true;
     }
 
-    if (data.playerId === communicationManager.id) {
+    if (data.playerId === communicationManager.getId() && !props.isSpectator) {
       perdedor.value = true;
-      perdidoMensaje.value =
-        data.message || "Te has equivocado, ¡estás eliminado!";
-      window.removeEventListener("keydown", handleKeyDown);
-      estatDelJoc.value.textEntrat = "";
+      perdidoMensaje.value = data.message || "T'has equivocat, estàs eliminat!";
+      if (!props.isSpectator) {
+        window.removeEventListener('keydown', handleKeyDown);
+      }
+      textEntratLocal.value = '';
       if (revealTimer) {
         clearInterval(revealTimer);
         revealTimer = null;
@@ -218,16 +261,22 @@ onMounted(() => {
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
 
-    if (data.winnerId === communicationManager.id) {
-      ganador.value = true;
-      perdedor.value = false;
-      perdidoMensaje.value =
-        data.message || "¡Has ganado! Todos los demás fueron eliminados.";
-    } else {
+    if (props.isSpectator) {
       ganador.value = false;
-      perdedor.value = true;
-      perdidoMensaje.value =
-        data.message || `Has perdido. ${data.winnerName} ha ganado.`;
+      perdedor.value = false;
+      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
+    } else {
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false;
+        perdidoMensaje.value =
+          data.message || 'Has guanyat! Tots els altres han estat eliminats.';
+      } else {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value =
+          data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      }
     }
 
     JuegoTerminado.value = true;
@@ -237,36 +286,48 @@ onMounted(() => {
     }
   });
 
-  if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
+  if (
+    !props.isSpectator &&
+    Array.isArray(props.initialWords) &&
+    props.initialWords.length > 0
+  ) {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Timer para revelar palabras
-  revealTimer = setInterval(() => {
-    if (JuegoTerminado.value) return;
-    try {
-      if (
-        remainingWords.value.length > 0 &&
-        estatDelJoc.value.paraules.length < props.maxStack
-      ) {
-        const nextText = remainingWords.value.shift();
-        const newParaula = {
-          id: Date.now() + Math.random(),
-          text: nextText,
-          estat: "pendent",
-          errors: 0,
-          letterErrors: Array.from({ length: nextText.length }, () => false),
-        };
-        estatDelJoc.value.paraules.unshift(newParaula);
+  if (!JuegoTerminado.value && !props.isSpectator) {
+    revealTimer = setInterval(() => {
+      if (JuegoTerminado.value) return;
+      try {
+        if (
+          remainingWords.value.length > 0 &&
+          estatDelJoc.value.paraules.length < props.maxStack
+        ) {
+          const nextText = remainingWords.value.shift();
+          const newParaula = {
+            id: Date.now() + Math.random(),
+            text: nextText,
+            estat: 'pendent',
+            errors: 0,
+            letterErrors: Array.from({ length: nextText.length }, () => false),
+          };
+          estatDelJoc.value.paraules.unshift(newParaula);
+
+          // CORRECCIÓ: Envia la pila quan cau una paraula
+          communicationManager.updatePlayerProgress({
+            wordStack: estatDelJoc.value.paraules,
+          });
+        }
+      } catch (e) {
+        console.error('Error en revealTimer:', e);
       }
-    } catch (e) {
-      console.error("Error en revealTimer:", e);
-    }
-  }, props.intervalMs || 3000);
+    }, props.intervalMs || 3000);
+  }
 });
 
 onUnmounted(() => {
-  window.removeEventListener("keydown", handleKeyDown);
+  if (!props.isSpectator) {
+    window.removeEventListener('keydown', handleKeyDown);
+  }
   if (revealTimer) {
     clearInterval(revealTimer);
     revealTimer = null;
@@ -284,7 +345,7 @@ function calculateProgress(completedWords) {
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
-          {{ props.modo === "muerteSubita" ? "Mort Súbita" : "Normal" }}
+          {{ props.modo === 'muerteSubita' ? 'Mort Súbita' : 'Normal' }}
         </span>
       </h2>
     </div>
@@ -292,18 +353,18 @@ function calculateProgress(completedWords) {
       <div class="game-main">
         <TransitionGroup name="fall" tag="div" class="paraules-container">
           <div
-            v-for="(paraula, index) in estatDelJoc.paraules"
+            v-for="(paraula, index) in wordStack"
             :key="paraula.id"
             class="paraula"
             :class="{
-              'paraula-activa': index === estatDelJoc.paraules.length - 1,
+              'paraula-activa': index === wordStack.length - 1,
               'completada-correcta':
                 paraula.estat === 'completada' && paraula.errors === 0,
               'completada-incorrecta':
                 paraula.estat === 'completada' && paraula.errors > 0,
             }"
           >
-            <template v-if="index === estatDelJoc.paraules.length - 1">
+            <template v-if="index === wordStack.length - 1">
               <span
                 v-for="(lletra, i) in paraula.text.split('')"
                 :key="i"
@@ -322,13 +383,15 @@ function calculateProgress(completedWords) {
         <input
           type="text"
           class="text-input"
-          v-model="estatDelJoc.textEntrat"
-          @input="validarProgres"
-          placeholder="Comença a escriure..."
+          :value="displayedText"
+          @input="validarProgres" :placeholder="
+            props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
+          "
           :disabled="JuegoTerminado"
+          :readonly="props.isSpectator"
         />
 
-        <div class="teclat">
+        <div class="teclat" v-if="!props.isSpectator">
           <div
             v-for="(fila, fIndex) in filesDelTeclat"
             :key="fIndex"
@@ -347,10 +410,28 @@ function calculateProgress(completedWords) {
       </div>
 
       <aside class="players-sidebar">
+        <h3 v-if="props.isSpectator" class="spectator-banner">
+          [MODO ESPECTADOR]
+        </h3>
+        <div v-if="props.isSpectator" class="spectator-controls">
+          <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
+          <div class="spectator-targets">
+            <button
+              v-for="p in props.players"
+              :key="p.id"
+              @click="emit('switchSpectatorTarget', p.id)"
+              :class="{ 'target-active': p.id === props.spectatorTargetId }"
+              :title="`Canviar a ${p.name}`"
+            >
+              {{ p.name.substring(0, 3) }}
+            </button>
+          </div>
+        </div>
+
         <h3>Jugadors</h3>
         <ul>
           <li
-            v-for="p in props.players"
+            v-for="p in sortedPlayers"
             :key="p.id"
             class="player-name-inline"
             :class="{ eliminado: p.eliminated }"
@@ -377,12 +458,56 @@ function calculateProgress(completedWords) {
         :players="props.players"
         @volverInicio="handleVolverInicio"
         :modo="props.modo"
+        :isSpectator="props.isSpectator"
       />
     </div>
   </div>
 </template>
 
 <style scoped>
+.spectator-banner {
+  color: var(--color-warning, #ffc107);
+  background: var(--color-background);
+  border: 1px solid var(--color-warning, #ffc107);
+  padding: 5px;
+  text-align: center;
+  border-radius: 4px;
+  margin-bottom: 10px !important;
+}
+.spectator-controls {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--color-border);
+}
+.spectator-controls h4 {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.spectator-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.spectator-targets button {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  background-color: var(--color-background-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.spectator-targets button:hover {
+  background-color: var(--color-border);
+}
+.spectator-targets button.target-active {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  font-weight: bold;
+}
 .correcte {
   color: #28a745;
   font-weight: bold;
@@ -392,9 +517,7 @@ function calculateProgress(completedWords) {
   background-color: #f8d7da;
   border-radius: 3px;
 }
-
 .teclat {
-  /* sticky keyboard so it remains visible while words scroll */
   position: sticky;
   bottom: 0;
   margin-top: 12px;
@@ -440,7 +563,6 @@ function calculateProgress(completedWords) {
   color: white;
   transform: scale(0.95);
 }
-
 .game-layout {
   display: flex;
   gap: 24px;
@@ -457,11 +579,9 @@ function calculateProgress(completedWords) {
   max-width: 720px;
   display: flex;
   flex-direction: column;
-  /* keep the keyboard visible by bounding the game area height */
   min-height: calc(60vh);
   max-height: calc(80vh);
 }
-
 .players-sidebar {
   width: 300px;
   background: var(--color-background-soft, #f8f8f8);
@@ -484,7 +604,6 @@ function calculateProgress(completedWords) {
   opacity: 0.5;
   text-decoration: line-through;
 }
-
 .player-name-inline {
   display: flex;
   justify-content: space-between;
@@ -510,9 +629,7 @@ function calculateProgress(completedWords) {
   border-radius: 4px;
   font-weight: bold;
 }
-
 .paraules-container {
-  /* Make the word stack scroll inside this box instead of growing the page */
   border: 1px solid var(--color-border, #ccc);
   background: var(--color-background, #fff);
   padding: 12px;
@@ -521,12 +638,10 @@ function calculateProgress(completedWords) {
   justify-content: flex-end;
   border-radius: 8px;
   box-shadow: inset 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.05));
-  overflow-y: auto;
-  /* allow this area to grow within .game-main but not push the keyboard */
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 0;
+  overflow-y: auto;
 }
-
 .paraula {
   padding: 8px 12px;
   margin-bottom: 6px;
@@ -540,7 +655,6 @@ function calculateProgress(completedWords) {
   text-align: center;
   font-weight: 500;
 }
-
 .paraula-activa {
   background: var(--color-background, #fff);
   color: var(--color-heading, #333);
@@ -551,14 +665,13 @@ function calculateProgress(completedWords) {
   box-shadow: 0 4px 12px var(--shadow-color, rgba(0, 123, 255, 0.15));
   transform: scale(1.02);
 }
-
 .input-display-area {
   margin-top: 20px;
   padding: 12px 16px;
   border: 1px solid var(--color-border, #ccc);
   border-radius: 8px;
   font-size: 1.5rem;
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   color: var(--color-text, #333);
   min-height: 55px;
   background: var(--color-background, #fff);
@@ -566,7 +679,6 @@ function calculateProgress(completedWords) {
   box-shadow: 0 2px 4px var(--shadow-color, rgba(0, 0, 0, 0.05));
   word-wrap: break-word;
 }
-
 .cursor {
   animation: blink 1s step-end infinite;
   font-weight: bold;
@@ -584,43 +696,35 @@ function calculateProgress(completedWords) {
   margin: 14px 0 6px;
   background: var(--color-background, #fff);
   color: var(--color-text, #333);
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   text-align: center;
   box-shadow: 0 2px 12px rgba(0, 123, 255, 0.08);
   outline: none;
   transition: border-color 0.15s;
 }
-
-/*estilos para el header del modo de juego*/
-
 .game-header {
   width: 100%;
   text-align: center;
   margin-bottom: 12px;
 }
-
 .modo-titulo {
   font-size: 1.4rem;
   font-weight: 700;
   color: var(--color-heading, #333);
 }
-
 .modo-text {
   padding: 4px 10px;
   border-radius: 8px;
   font-weight: bold;
 }
-
 .modo-text.normal {
   background-color: #007bff;
   color: white;
 }
-
 .modo-text.muerteSubita {
   background-color: #dc3545;
   color: white;
 }
-
 .text-input:focus {
   border-color: #28a745;
 }
@@ -629,7 +733,6 @@ function calculateProgress(completedWords) {
   color: #b3b3b3;
   opacity: 0.7;
 }
-
 .fall-enter-active {
   transition: all 0.5s ease-in;
 }
@@ -641,7 +744,6 @@ function calculateProgress(completedWords) {
   opacity: 1;
   transform: translateY(0);
 }
-
 .fall-leave-active {
   transition: all 0.3s ease-out;
   position: absolute;
@@ -654,11 +756,9 @@ function calculateProgress(completedWords) {
   opacity: 0;
   transform: scale(0.8);
 }
-
 .fall-move {
   transition: transform 0.4s ease;
 }
-
 @keyframes blink {
   from,
   to {

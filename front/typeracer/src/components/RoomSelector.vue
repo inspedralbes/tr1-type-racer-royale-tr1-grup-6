@@ -15,6 +15,9 @@
             </div>
             <div class="room-meta">
               <span>Jugadors: {{ r.count || 0 }}</span>
+              <span v-if="r.spectatorCount > 0"
+                >Espectadors: {{ r.spectatorCount }}</span
+              >
               <span class="mode-info"
                 >Mode:
                 {{
@@ -31,6 +34,15 @@
               :title="r.inGame ? 'No puedes unirte a una partida en curso' : ''"
             >
               {{ r.inGame ? "En juego" : "Entrar" }}
+            </button>
+            
+            <button
+              v-if="r.inGame"
+              @click="spectateRoom(r.id)"
+              class="btn-spectate"
+              title="Entrar como espectador"
+            >
+              Espiar
             </button>
           </div>
         </li>
@@ -56,7 +68,6 @@ const newRoomName = ref("");
 let pollTimer = null;
 
 function refreshRooms() {
-  // Ask server for the list of rooms; server should reply with 'roomList'
   communicationManager.listRooms();
 }
 
@@ -71,46 +82,50 @@ function joinRoom(id) {
   communicationManager.joinRoom(id);
 }
 
-// Añadimos el manejador de errores al unirse a una sala
-onMounted(() => {
-  communicationManager.onEvent("joinedRoom", (data) => {
-    if (!data.success && data.error) {
-      alert(data.error);
-    }
-  });
-});
+// ===================================
+// NOVA FUNCIÓ
+// ===================================
+function spectateRoom(id) {
+  communicationManager.spectateRoom(id);
+}
+// ===================================
 
 function onRoomList(payload) {
-  // payload expected: [{ id, name, count }]
   if (Array.isArray(payload)) {
     rooms.value = payload;
   }
 }
 
 function onJoined(payload) {
-  // payload may contain roomId and success
   emit("joined", payload);
 }
 
 onMounted(() => {
   communicationManager.onRoomList(onRoomList);
-  communicationManager.onJoinedRoom(onJoined);
+  // NOTA: 'onJoinedRoom' s'escolta ara a App.vue per gestionar la navegació
+  // communicationManager.onJoinedRoom(onJoined); 
+  
+  // ===================================
+  // NOU LISTENER D'ERROR
+  // ===================================
+  communicationManager.onSpectateError((data) => {
+    alert(data.message || "No s'ha pogut entrar com a espectador");
+  });
+  // ===================================
 
-  // initial fetch and periodic polling as fallback
   refreshRooms();
   pollTimer = setInterval(refreshRooms, 4000);
 });
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);
-  // communicationManager doesn't expose off(), so server side listeners persist only in socket
 });
 </script>
 
 <style scoped>
 .room-selector {
   width: 100%;
-  max-width: 560px;
+  max-width: 660px;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
   padding: 18px;
@@ -133,10 +148,11 @@ onUnmounted(() => {
   border-bottom: 1px dashed var(--color-border);
 }
 .room-name {
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 1.5rem;
 }
 .room-meta {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--color-text);
   opacity: 0.8;
   display: flex;
@@ -190,5 +206,10 @@ button.disabled {
 button.disabled:hover {
   opacity: 0.7;
   transform: none;
+}
+/* NOU ESTIL PER AL BOTÓ ESPIAR (opcional) */
+.btn-spectate {
+  background-color: var(--color-info, #17a2b8);
+  margin-left: 1rem;
 }
 </style>

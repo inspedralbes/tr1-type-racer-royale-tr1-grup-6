@@ -30,6 +30,11 @@ const communicationManager = {
   getCurrentRoom() {
     return currentRoom;
   },
+  
+  // Obtenir el nostre ID de socket
+  getId() {
+    return socket.id;
+  },
 
   // Registrar callback al conectar
   onConnect(callback) {
@@ -75,19 +80,19 @@ const communicationManager = {
 
   // Reportar que un jugador ha perdido
   reportPlayerLost() {
-    socket.emit("playerLost");
+    socket.emit("playerLost", { roomId: currentRoom }); // CORREGIT
   },
 
   reportPlayerEliminated() {
     if (currentRoom) {
-      socket.emit("muerteSubitaEliminacion", { roomId: currentRoom });
+      socket.emit("muerteSubitaElimination", { roomId: currentRoom });
       console.log("Reportando eliminación para sala:", currentRoom);
     } else {
       console.error("No hay roomId actual al reportar eliminación.");
     }
   },
 
-  // Enviar progreso del jugador (palabras completadas)
+  // Enviar progreso del jugador
   updatePlayerProgress(progress) {
     if (typeof progress === "number") {
       socket.emit("updatePlayerProgress", {
@@ -134,6 +139,28 @@ const communicationManager = {
     socket.emit("joinRoom", { roomId });
   },
 
+  // ===================================
+  // NOVES FUNCIONS PER A ESPECTADOR
+  // ===================================
+  spectateRoom(roomId) {
+    socket.emit("spectateRoom", { roomId });
+  },
+
+  onSpectateSuccess(callback) {
+    socket.on("spectateSuccess", (data) => {
+      if (data.success && data.roomId) {
+        currentRoom = data.roomId;
+        console.log("Establecida sala actual (espectador):", currentRoom);
+      }
+      callback(data);
+    });
+  },
+
+  onSpectateError(callback) {
+    socket.on("spectateError", callback);
+  },
+  // ===================================
+
   // Salir de la sala actual
   leaveRoom() {
     if (currentRoom) {
@@ -163,7 +190,7 @@ const communicationManager = {
     socket.on("joinedRoom", (data) => {
       if (data.success && data.roomId) {
         currentRoom = data.roomId;
-        console.log("Establecida sala actual:", currentRoom);
+        console.log("Establecida sala actual (jugador):", currentRoom);
       }
       callback(data);
     });
