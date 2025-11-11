@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineEmits } from "vue";
-import communicationManager from "../services/communicationManager.js";
-import GameResult from "@/components/GameResult.vue";
-import { useSounds } from "@/composables/useSounds";
+import { ref, computed, onMounted, onUnmounted, defineEmits } from 'vue';
+import communicationManager from '../services/communicationManager.js';
+import GameResult from '@/components/GameResult.vue';
+import { useSounds } from '@/composables/useSounds';
 
 const startTime = ref(null);
 const endTime = ref(null);
@@ -12,51 +12,59 @@ const props = defineProps({
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
-  modo: { type: String, default: "normal" },
+  modo: { type: String, default: 'normal' },
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
 });
-const emit = defineEmits(["volverInicio", "switchSpectatorTarget"]);
+const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
 
 const { playSound } = useSounds();
 
 const isShaking = ref(false);
 const perdedor = ref(false);
 const ganador = ref(false);
-const perdidoMensaje = ref("");
+const perdidoMensaje = ref('');
 const filesDelTeclat = ref([
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-  ["Z", "X", "C", "V", "B", "N", "M"],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
 ]);
-const teclaPremuda = ref("");
+const teclaPremuda = ref('');
 const JuegoTerminado = ref(false);
 
 const estatDelJoc = ref({
   paraules: [],
   estadistiques: [],
 });
-const textEntratLocal = ref("");
+const textEntratLocal = ref('');
 
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 
+// ===================================
+// 1. COMPUTEDS CONDICIONALS (CORREGITS)
+// ===================================
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
-  const target = props.players.find(p => p.id === props.spectatorTargetId);
+  const target = props.players.find((p) => p.id === props.spectatorTargetId);
+  // Si no el troba (potser s'ha desconnectat), mira el primer jugador
   return target || props.players[0] || null;
 });
 
+// AQUESTA ÉS LA PILA DE PARAULES QUE ES MOSTRA
 const wordStack = computed(() => {
   if (props.isSpectator) {
+    // Si som espectadors, mirem la pila del jugador observat
     return watchedPlayer.value?.wordStack || [];
   } else {
+    // Si som jugadors, mirem la nostra pila local
     return estatDelJoc.value.paraules;
   }
 });
 
+// LA PARAULA ACTIVA DEPÈN DE LA PILA QUE ES MOSTRA
 const paraulaActiva = computed(() => {
   if (wordStack.value.length === 0) {
     return null;
@@ -64,31 +72,33 @@ const paraulaActiva = computed(() => {
   return wordStack.value[wordStack.value.length - 1];
 });
 
+// EL TEXT D'INPUT DEPÈN DE QUI SOM
 const displayedText = computed(() => {
   if (props.isSpectator) {
-    return watchedPlayer.value?.currentWordProgress || "";
+    return watchedPlayer.value?.currentWordProgress || '';
   } else {
     return textEntratLocal.value;
   }
 });
+// ===================================
 
 const totalErrors = ref(0);
 
 function handleVolverInicio() {
-  emit("volverInicio");
+  emit('volverInicio');
 }
 
 function handleKeyDown(event) {
   if (JuegoTerminado.value || props.isSpectator) return;
-  
+
   const key = event.key;
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     teclaPremuda.value = key.toUpperCase();
     setTimeout(() => {
-      teclaPremuda.value = "";
+      teclaPremuda.value = '';
     }, 100);
   }
-  if (key === "Backspace") {
+  if (key === 'Backspace') {
     event.preventDefault();
     textEntratLocal.value = textEntratLocal.value.slice(0, -1);
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
@@ -104,6 +114,7 @@ function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
 
+// 2. MODIFICAR 'validarProgres'
 function validarProgres() {
   if (JuegoTerminado.value || props.isSpectator) return;
 
@@ -113,33 +124,36 @@ function validarProgres() {
   if (!startTime.value && textEntratLocal.value.length === 1) {
     startTime.value = Date.now();
   }
-  
-  const typed = textEntratLocal.value;
-  const paraula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
 
+  const typed = textEntratLocal.value;
+  // El jugador valida contra la seva pròpia pila local
+  const paraula =
+    estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+
+  // Envia el progrés I la pila
   communicationManager.updatePlayerProgress({
-      currentWordProgress: typed,
-      wordStack: estatDelJoc.value.paraules
+    currentWordProgress: typed,
+    wordStack: estatDelJoc.value.paraules,
   });
 
   if (!paraula) {
-    textEntratLocal.value = "";
+    textEntratLocal.value = '';
     return;
   }
   if (typed.length > 0) {
     const lastCharIndex = typed.length - 1;
     if (lastCharIndex < paraula.text.length) {
       if (typed[lastCharIndex] !== paraula.text[lastCharIndex]) {
-        playSound("keyError");
+        playSound('keyError');
         isShaking.value = true;
         setTimeout(() => {
           isShaking.value = false;
         }, 400);
       } else {
-        playSound("keyPress");
+        playSound('keyPress');
       }
     } else {
-      playSound("keyError");
+      playSound('keyError');
       isShaking.value = true;
       setTimeout(() => {
         isShaking.value = false;
@@ -152,7 +166,7 @@ function validarProgres() {
   ) {
     paraula.letterErrors = Array.from(
       { length: paraula.text.length },
-      () => false
+      () => false,
     );
   }
   let errorCount = 0;
@@ -162,7 +176,7 @@ function validarProgres() {
     if (isError) {
       if (!paraula.letterErrors[i]) {
         totalErrors.value++;
-        if (props.modo === "muerteSubita") {
+        if (props.modo === 'muerteSubita') {
           communicationManager.reportMuerteSubitaElimination();
         }
       }
@@ -178,30 +192,27 @@ function validarProgres() {
     palabrasCompletadas.value++;
 
     estatDelJoc.value.paraules.pop();
-    textEntratLocal.value = "";
+    textEntratLocal.value = '';
     tempsIniciParaula = 0;
+
+    const progressPayload = {
+      completedWords: palabrasCompletadas.value,
+      totalErrors: totalErrors.value,
+      playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+      currentWordProgress: '',
+      wordStack: estatDelJoc.value.paraules,
+    };
 
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
       onGameEnd();
-      communicationManager.updatePlayerProgress({
-        completedWords: palabrasCompletadas.value,
-        totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-        currentWordProgress: "",
-        wordStack: estatDelJoc.value.paraules
-      });
+      communicationManager.updatePlayerProgress(progressPayload);
     } else {
-      communicationManager.updatePlayerProgress({
-        completedWords: palabrasCompletadas.value,
-        totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-        currentWordProgress: "",
-        wordStack: estatDelJoc.value.paraules
-      });
+      communicationManager.updatePlayerProgress(progressPayload);
     }
 
-    const nextParaula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+    const nextParaula =
+      estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
     if (nextParaula) {
       if (
         !Array.isArray(nextParaula.letterErrors) ||
@@ -209,7 +220,7 @@ function validarProgres() {
       ) {
         nextParaula.letterErrors = Array.from(
           { length: nextParaula.text.length },
-          () => false
+          () => false,
         );
         nextParaula.errors = 0;
       }
@@ -222,33 +233,35 @@ function onGameEnd() {
   }
 }
 
+// 3. MODIFICAR 'getClasseLletra'
 function getClasseLletra(indexLletra) {
-  if (!paraulaActiva.value) return "";
+  if (!paraulaActiva.value) return '';
   const typed = displayedText.value;
   const target = paraulaActiva.value.text;
 
   const classes = [];
 
   if (indexLletra === typed.length) {
-    classes.push("caret");
+    classes.push('caret');
   }
 
   if (indexLletra >= typed.length) {
     if (paraulaActiva.value.letterErrors[indexLletra]) {
-      classes.push("incorrecte");
+      classes.push('incorrecte');
     }
   } else {
     classes.push(
-      typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte"
+      typed[indexLletra] === target[indexLletra] ? 'correcte' : 'incorrecte',
     );
   }
 
-  return classes.join(" ");
+  return classes.join(' ');
 }
 
+// 4. MODIFICAR 'onMounted'
 onMounted(() => {
   if (!props.isSpectator) {
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
   }
 
   // ===================================
@@ -263,7 +276,9 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  const ownPlayer = props.players.find((p) => p.id === communicationManager.getId());
+  const ownPlayer = props.players.find(
+    (p) => p.id === communicationManager.getId(),
+  );
   if (ownPlayer) {
     ownPlayer.completedWords = palabrasCompletadas.value;
   }
@@ -292,11 +307,12 @@ onMounted(() => {
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
         totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        playTime:
+          (endTime.value || Date.now()) - (startTime.value || Date.now()),
       });
       perdidoMensaje.value =
-        data?.message || "Has perdut: massa paraules acumulades.";
-      playSound("gameLose");
+        data?.message || 'Has perdut: massa paraules acumulades.';
+      playSound('gameLose');
       if (revealTimer) {
         clearInterval(revealTimer);
         revealTimer = null;
@@ -315,11 +331,11 @@ onMounted(() => {
       ganador.value = true;
       perdedor.value = false;
       perdidoMensaje.value =
-        data?.message || "Has guanyat! Tots els altres han estat eliminats.";
-      playSound("gameWin");
+        data?.message || 'Has guanyat! Tots els altres han estat eliminats.';
+      playSound('gameWin');
     }
-    
-    JuegoTerminado.value = true;
+
+    JuegoTerminado.value = true; // Atura el joc per a tothom
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
@@ -334,38 +350,42 @@ onMounted(() => {
     onGameEnd();
 
     if (props.isSpectator) {
+      // LÒGICA D'ESPECTADOR
       ganador.value = false;
       perdedor.value = false;
       perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
     } else {
+      // LÒGICA DE JUGADOR
       if (!props.isSpectator) {
-          communicationManager.updatePlayerProgress({
-            completedWords: palabrasCompletadas.value,
-            totalErrors: totalErrors.value,
-            playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-          });
+        communicationManager.updatePlayerProgress({
+          completedWords: palabrasCompletadas.value,
+          totalErrors: totalErrors.value,
+          playTime:
+            (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        });
       }
       if (data.winnerId === communicationManager.getId()) {
         ganador.value = true;
         perdedor.value = false;
-        playSound("gameWin");
+        playSound('gameWin');
         perdidoMensaje.value =
-          data.message || "Has guanyat! Tots els altres han estat eliminats.";
+          data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
         perdedor.value = true;
-        playSound("gameLose");
+        playSound('gameLose');
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
       }
     }
-    
-    JuegoTerminado.value = true;
+
+    JuegoTerminado.value = true; // Activa GameResult per a tothom
     if (revealTimer) {
       clearInterval(revealTimer);
       revealTimer = null;
     }
   });
+  // ===================================
 
   // ===================================
   // CORRECCIÓ 5: Afegit !props.isSpectator al Timer
@@ -382,16 +402,16 @@ onMounted(() => {
           const newParaula = {
             id: Date.now() + Math.random(),
             text: nextText,
-            estat: "pendent",
+            estat: 'pendent',
             errors: 0,
             letterErrors: Array.from({ length: nextText.length }, () => false),
           };
           estatDelJoc.value.paraules.unshift(newParaula);
-          playSound("newWord");
+          playSound('newWord');
 
           // CORRECCIÓ 6: El jugador ha d'enviar la pila quan cau una paraula
           communicationManager.updatePlayerProgress({
-            wordStack: estatDelJoc.value.paraules
+            wordStack: estatDelJoc.value.paraules,
           });
         }
 
@@ -403,7 +423,7 @@ onMounted(() => {
           communicationManager.reportPlayerLost();
         }
       } catch (e) {
-        console.error("Error en revealTimer:", e);
+        console.error('Error en revealTimer:', e);
       }
     }, props.intervalMs || 3000);
   }
@@ -411,7 +431,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (!props.isSpectator) {
-    window.removeEventListener("keydown", handleKeyDown);
+    window.removeEventListener('keydown', handleKeyDown);
   }
   if (revealTimer) {
     clearInterval(revealTimer);
@@ -426,7 +446,7 @@ onUnmounted(() => {
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
-          {{ props.modo === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+          {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
         </span>
       </h2>
     </div>
@@ -513,7 +533,7 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        
+
         <h3>[REFUGIATS]</h3>
         <ul>
           <li v-for="p in props.players" :key="p.id" class="player-name-inline">
@@ -533,7 +553,7 @@ onUnmounted(() => {
         </ul>
       </aside>
     </div>
-    
+
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"

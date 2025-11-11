@@ -446,6 +446,7 @@ button {
   flex-grow: 1;
   flex-basis: 200px;
   margin-left: 0;
+  padding: 0.4rem;
 }
 .color-picker-container {
   margin: 20px 0;

@@ -1,48 +1,48 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import communicationManager from "../services/communicationManager.js";
-import GameResult from "@/components/GameResult.vue";
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import communicationManager from '../services/communicationManager.js';
+import GameResult from '@/components/GameResult.vue';
 
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
   intervalMs: { type: Number, default: 1500 },
   maxStack: { type: Number, default: 20 },
   players: { type: Array, default: () => [] },
-  modo: { type: String, default: "normal" },
+  modo: { type: String, default: 'normal' },
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
 });
-const emit = defineEmits(["volverInicio", "switchSpectatorTarget"]);
+const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
 
 const perdedor = ref(false);
 const ganador = ref(false);
-const perdidoMensaje = ref("");
+const perdidoMensaje = ref('');
 
 const filesDelTeclat = ref([
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-  ["Z", "X", "C", "V", "B", "N", "M"],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M'],
 ]);
-const teclaPremuda = ref("");
+const teclaPremuda = ref('');
 
 const JuegoTerminado = ref(false);
 const estatDelJoc = ref({
   paraules: [],
   estadistiques: [],
 });
-const textEntratLocal = ref("");
+const textEntratLocal = ref('');
 
 const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 function handleVolverInicio() {
-  emit("volverInicio");
+  emit('volverInicio');
 }
 
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
-  const target = props.players.find(p => p.id === props.spectatorTargetId);
+  const target = props.players.find((p) => p.id === props.spectatorTargetId);
   return target || props.players[0] || null;
 });
 
@@ -63,7 +63,7 @@ const paraulaActiva = computed(() => {
 
 const displayedText = computed(() => {
   if (props.isSpectator) {
-    return watchedPlayer.value?.currentWordProgress || "";
+    return watchedPlayer.value?.currentWordProgress || '';
   } else {
     return textEntratLocal.value;
   }
@@ -79,13 +79,13 @@ function handleKeyDown(event) {
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     teclaPremuda.value = key.toUpperCase();
     setTimeout(() => {
-      teclaPremuda.value = "";
+      teclaPremuda.value = '';
     }, 100);
   }
 
   if (JuegoTerminado.value) return;
 
-  if (key === "Backspace") {
+  if (key === 'Backspace') {
     event.preventDefault();
     textEntratLocal.value = textEntratLocal.value.slice(0, -1);
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
@@ -110,15 +110,16 @@ function validarProgres() {
   }
 
   const typed = textEntratLocal.value;
-  const paraula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+  const paraula =
+    estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
 
   communicationManager.updatePlayerProgress({
-      currentWordProgress: typed,
-      wordStack: estatDelJoc.value.paraules
+    currentWordProgress: typed,
+    wordStack: estatDelJoc.value.paraules,
   });
 
   if (!paraula) {
-    textEntratLocal.value = "";
+    textEntratLocal.value = '';
     return;
   }
 
@@ -128,28 +129,31 @@ function validarProgres() {
   ) {
     paraula.letterErrors = Array.from(
       { length: paraula.text.length },
-      () => false
+      () => false,
     );
   }
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-    const self = props.players.find((p) => p.id === communicationManager.getId());
+    const self = props.players.find(
+      (p) => p.id === communicationManager.getId(),
+    );
     if (self) self.completedWords = (self.completedWords || 0) + 1;
 
-    paraula.estat = "completada";
+    paraula.estat = 'completada';
 
     estatDelJoc.value.paraules.pop();
-    textEntratLocal.value = "";
+    textEntratLocal.value = '';
     tempsIniciParaula = 0;
 
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
-      currentWordProgress: "",
-      wordStack: estatDelJoc.value.paraules
+      currentWordProgress: '',
+      wordStack: estatDelJoc.value.paraules,
     });
 
-    const nextParaula = estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
+    const nextParaula =
+      estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
     if (nextParaula) {
       if (
         !Array.isArray(nextParaula.letterErrors) ||
@@ -157,7 +161,7 @@ function validarProgres() {
       ) {
         nextParaula.letterErrors = Array.from(
           { length: nextParaula.text.length },
-          () => false
+          () => false,
         );
         nextParaula.errors = 0;
       }
@@ -169,16 +173,16 @@ function validarProgres() {
     const isError = typed[i] !== paraula.text[i];
     if (isError && !paraula.letterErrors[i]) {
       totalErrors.value++;
-      if (props.modo === "muerteSubita" && !perdedor.value && !ganador.value) {
+      if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
         perdedor.value = true;
         perdidoMensaje.value = "T'has equivocat, estàs eliminat!";
         communicationManager.reportMuerteSubitaElimination();
-        
-        textEntratLocal.value = "";
+
+        textEntratLocal.value = '';
         if (!props.isSpectator) {
-            window.removeEventListener("keydown", handleKeyDown);
+          window.removeEventListener('keydown', handleKeyDown);
         }
-        textEntratLocal.value = "";
+        textEntratLocal.value = '';
         if (revealTimer) {
           clearInterval(revealTimer);
           revealTimer = null;
@@ -193,34 +197,34 @@ function validarProgres() {
 }
 
 function getClasseLletra(indexLletra) {
-  if (!paraulaActiva.value) return "";
+  if (!paraulaActiva.value) return '';
 
   const typed = displayedText.value;
   const target = paraulaActiva.value.text;
 
   if (indexLletra >= typed.length) {
     if (paraulaActiva.value.letterErrors[indexLletra]) {
-      return "incorrecte";
+      return 'incorrecte';
     }
-    return "";
+    return '';
   }
 
-  return typed[indexLletra] === target[indexLletra] ? "correcte" : "incorrecte";
+  return typed[indexLletra] === target[indexLletra] ? 'correcte' : 'incorrecte';
 }
 
 onMounted(() => {
   if (!props.isSpectator) {
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
   }
 
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
     if (data.winnerId === communicationManager.getId() && !props.isSpectator) {
-        ganador.value = true;
-        perdedor.value = false;
-        perdidoMensaje.value =
-        data?.message || "Has guanyat! Tots els altres han estat eliminats.";
+      ganador.value = true;
+      perdedor.value = false;
+      perdidoMensaje.value =
+        data?.message || 'Has guanyat! Tots els altres han estat eliminats.';
     }
 
     JuegoTerminado.value = true;
@@ -238,12 +242,11 @@ onMounted(() => {
 
     if (data.playerId === communicationManager.getId() && !props.isSpectator) {
       perdedor.value = true;
-      perdidoMensaje.value =
-        data.message || "T'has equivocat, estàs eliminat!";
+      perdidoMensaje.value = data.message || "T'has equivocat, estàs eliminat!";
       if (!props.isSpectator) {
-          window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener('keydown', handleKeyDown);
       }
-      textEntratLocal.value = "";
+      textEntratLocal.value = '';
       if (revealTimer) {
         clearInterval(revealTimer);
         revealTimer = null;
@@ -255,21 +258,21 @@ onMounted(() => {
     if (JuegoTerminado.value) return;
 
     if (props.isSpectator) {
-        ganador.value = false;
-        perdedor.value = false;
-        perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
+      ganador.value = false;
+      perdedor.value = false;
+      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
     } else {
-        if (data.winnerId === communicationManager.getId()) {
-            ganador.value = true;
-            perdedor.value = false;
-            perdidoMensaje.value =
-                data.message || "Has guanyat! Tots els altres han estat eliminats.";
-        } else {
-            ganador.value = false;
-            perdedor.value = true;
-            perdidoMensaje.value =
-                data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
-        }
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false;
+        perdidoMensaje.value =
+          data.message || 'Has guanyat! Tots els altres han estat eliminats.';
+      } else {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value =
+          data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      }
     }
 
     JuegoTerminado.value = true;
@@ -281,7 +284,7 @@ onMounted(() => {
 
   if (
     !props.isSpectator &&
-    Array.isArray(props.initialWords) && 
+    Array.isArray(props.initialWords) &&
     props.initialWords.length > 0
   ) {
     remainingWords.value = props.initialWords.slice();
@@ -299,19 +302,19 @@ onMounted(() => {
           const newParaula = {
             id: Date.now() + Math.random(),
             text: nextText,
-            estat: "pendent",
+            estat: 'pendent',
             errors: 0,
             letterErrors: Array.from({ length: nextText.length }, () => false),
           };
           estatDelJoc.value.paraules.unshift(newParaula);
-          
+
           // CORRECCIÓ: Envia la pila quan cau una paraula
           communicationManager.updatePlayerProgress({
-            wordStack: estatDelJoc.value.paraules
+            wordStack: estatDelJoc.value.paraules,
           });
         }
       } catch (e) {
-        console.error("Error en revealTimer:", e);
+        console.error('Error en revealTimer:', e);
       }
     }, props.intervalMs || 3000);
   }
@@ -319,7 +322,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (!props.isSpectator) {
-    window.removeEventListener("keydown", handleKeyDown);
+    window.removeEventListener('keydown', handleKeyDown);
   }
   if (revealTimer) {
     clearInterval(revealTimer);
@@ -338,7 +341,7 @@ function calculateProgress(completedWords) {
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
-          {{ props.modo === "muerteSubita" ? "Mort Súbita" : "Normal" }}
+          {{ props.modo === 'muerteSubita' ? 'Mort Súbita' : 'Normal' }}
         </span>
       </h2>
     </div>
@@ -421,7 +424,7 @@ function calculateProgress(completedWords) {
             </button>
           </div>
         </div>
-        
+
         <h3>Jugadors</h3>
         <ul>
           <li
@@ -665,7 +668,7 @@ function calculateProgress(completedWords) {
   border: 1px solid var(--color-border, #ccc);
   border-radius: 8px;
   font-size: 1.5rem;
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   color: var(--color-text, #333);
   min-height: 55px;
   background: var(--color-background, #fff);
@@ -690,7 +693,7 @@ function calculateProgress(completedWords) {
   margin: 14px 0 6px;
   background: var(--color-background, #fff);
   color: var(--color-text, #333);
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   text-align: center;
   box-shadow: 0 2px 12px rgba(0, 123, 255, 0.08);
   outline: none;

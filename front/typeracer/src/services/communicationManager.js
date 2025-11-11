@@ -29,7 +29,7 @@ const communicationManager = {
   getCurrentRoom() {
     return currentRoom;
   },
-
+  
   // Obtenir el nostre ID de socket
   getId() {
     return socket.id;

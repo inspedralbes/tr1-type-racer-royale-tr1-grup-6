@@ -165,7 +165,7 @@ function emitirVolverInicio() {
 }
 
 .result-card {
-  max-width: 520px;
+  max-width: 620px;
   width: 90%;
   padding: 32px;
   border-radius: 10px;
@@ -215,6 +215,7 @@ function emitirVolverInicio() {
   color: var(--color-text);
   cursor: pointer;
   transition: all 0.2s ease;
+  margin: 0.4rem;
 }
 
 .actions button:hover {
