@@ -54,29 +54,30 @@ const communicationManager = {
   // Marcar usuario como ready / no-ready (con sala actual)
   setReady(ready) {
     if (currentRoom) {
-      socket.emit("clientReady", { ready, roomId: currentRoom });
+      socket.emit("clientReady", { ready, roomId: currentRoom }); 
     } else {
       socket.emit("clientReady", { ready });
     }
   },
 
   // Solicitar inicio de partida (modo normal o muerte súbita)
-  requestStart(modo = "normal") {
+  requestStart(modo = "normal", extra = {}) {
     if (currentRoom) {
-      socket.emit("startGame", { roomId: currentRoom, modo });
+      socket.emit("startGame", { roomId: currentRoom, modo, ...extra });
     } else {
-      socket.emit("startGame", { modo });
+      socket.emit("startGame", { modo, ...extra });
     }
   },
 
   // Host can set the room mode before starting
-  setRoomMode(modo) {
+  setRoomMode(modo, extra = {}) {
     if (currentRoom) {
-      socket.emit("setRoomMode", { roomId: currentRoom, modo });
+      socket.emit("setRoomMode", { roomId: currentRoom, modo, ...extra });
     } else {
-      socket.emit("setRoomMode", { modo });
+      socket.emit("setRoomMode", { modo, ...extra });
     }
   },
+
 
   // Reportar que un jugador ha perdido
   reportPlayerLost() {

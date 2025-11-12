@@ -463,33 +463,66 @@ io.on("connection", (socket) => {
       return;
     }
     const modo = payload?.modo || "normal";
-    console.log(`Starting game in mode: ${modo}`);
+    const duration = 30;
+    console.log(`Starting game in mode: ${modo} (duration: ${duration}s)`);
 
     const gamePayload = createGamePayload(room);
     gamePayload.modo = modo;
 
+    if (modo === "contrarellotge") {
+      const DURATION_MS = duration * 1000;
+      room.gameState.deadline = Date.now() + DURATION_MS;
+      room.gameState.duration = duration;
+      gamePayload.duration = duration;
+
+      setTimeout(() => {
+        const playersArray = Array.from(room.players.values());
+        const noEliminats = playersArray.filter(p => !p.eliminated);
+        const winner = noEliminats.sort((a, b) => (b.completedWords || 0) - (a.completedWords || 0))[0];
+        if (winner) {
+          io.to(roomId).emit("gameOver", {
+            winnerId: winner.id,
+            winnerName: winner.name,
+            message: `${winner.name} ha guanyat (mode contrarellotge: + paraules)!`,
+          });
+        } else {
+          io.to(roomId).emit("gameOver", {
+            winnerName: null,
+            message: 'Temps esgotat! Cap guanyador clar.',
+          });
+        }
+      }, DURATION_MS);
+    }
+
     room.gameState.started = true;
     room.gameState.modo = modo;
     room.gameState.gameWords = gamePayload.gameWords;
-
     io.to(roomId).emit("gameStart", gamePayload);
     console.log(`gameStart emitido para room ${roomId}`);
   });
 
+
+
   socket.on("setRoomMode", (payload) => {
     const roomId = payload?.roomId;
     const modo = payload?.modo;
+    const duration = payload?.duration; // nova durada
     if (!roomId || !modo) return;
     const room = rooms.get(roomId);
     if (!room) return;
     if (socket.id !== room.hostId) return;
 
     room.gameState.modo = modo;
-    console.log(`Room ${roomId} mode changed to: ${modo} by host ${socket.id}`);
+    if (modo === "contrarellotge" && duration !== undefined) {
+      room.gameState.duration = duration;
+    }
 
-    io.to(roomId).emit("roomModeUpdated", { modo });
+    console.log(`Room ${roomId} mode changed to: ${modo} (duration: ${duration}s) by host ${socket.id}`);
+
+    io.to(roomId).emit("roomModeUpdated", { modo, duration });
     broadcastRoomPlayerList(roomId);
   });
+
 
   socket.on("completeWord", (word) => {
     for (const [roomId, room] of rooms.entries()) {

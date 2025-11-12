@@ -6,13 +6,15 @@ import DarkModeToggle from "./components/DarkModeToggle.vue";
 import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js";
 import { useSounds } from "@/composables/useSounds";
+import GameEngineContrarellotge from "./components/GameEngineContrarellotge.vue";
+
+// NO HI HA SELECT NI OPCIONS DE TEMPS
+const tempsContrarellotge = ref(30);
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
-// Control de vista
 const vistaActual = ref("salaEspera");
 
-// Estado de conexión
 const nomJugador = ref("");
 const playersPayload = ref({ players: [], hostId: null, spectators: [] });
 const socketId = ref(null);
@@ -68,7 +70,6 @@ function saveStateToLocalStorage() {
     })
   );
 }
-// Al cargar, solo actualiza esas refs locales
 function loadStateFromLocalStorage() {
   const saved = localStorage.getItem("typeRacerUser");
   if (saved) {
@@ -133,7 +134,7 @@ function connectarAlServidor() {
       data.message || "Es requereix almenys 2 jugadors per iniciar la partida."
     );
   });
-  
+
   communicationManager.onUpdatePlayerList((payload) => {
     playersPayload.value = payload;
     if (payload && payload.modo) {
@@ -167,7 +168,6 @@ function connectarAlServidor() {
     if (data.success && data.roomId) {
       currentRoom.value = data.roomId;
       isSpectator.value = false;
-      console.log("Establecida sala actual (jugador):", currentRoom.value);
       onRoomJoined(data.roomId);
     } else if (data.error) {
       alert(data.error);
@@ -177,7 +177,7 @@ function connectarAlServidor() {
   communicationManager.onSpectateSuccess((data) => {
     if (data.success) {
       isSpectator.value = true;
-      
+
       if (data.gameState?.started) {
         playerWords.value = data.gameState.gameWords;
         gameIntervalMs.value = data.gameState.intervalMs;
@@ -206,7 +206,11 @@ function toggleReady() {
   communicationManager.setReady(isReady.value);
 }
 function startGameByHost() {
-  communicationManager.requestStart(modoJuego.value);
+  if (modoJuego.value === 'contrarellotge') {
+    communicationManager.requestStart('contrarellotge', { duration: 30 });
+  } else {
+    communicationManager.requestStart(modoJuego.value);
+  }
 }
 
 watch(modoJuego, (newModo, oldModo) => {
@@ -227,36 +231,29 @@ function kickPlayer(playerId) {
     communicationManager.kickUser(currentRoom.value, playerId);
   }
 }
-
 function transferHost(newHostId) {
   if (!currentRoom.value) return;
   if (confirm("Estàs segur que vols transferir el rol de supervisor?")){
     communicationManager.transferHost(currentRoom.value, newHostId);
   }
 }
-
 communicationManager.onHostTransferred(({ newHostId }) => {
-  // Actualizar el host en el payload
   playersPayload.value.hostId = newHostId;
-
   if (newHostId === socketId.value) {
     alert("Ahora eres el nuevo supervisor de la sala");
   } else {
     alert("El rol de supervisor ha sido transferido a otro jugador.");
   }
 });
-
 communicationManager.onkicked(() => {
   alert("Has sido expulsado de la sala.");
   volverInicio();
 });
-
 </script>
 
 <template>
   <main>
     <DarkModeToggle />
-
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Type Racer Royale</h1>
       <input
@@ -298,21 +295,34 @@ communicationManager.onkicked(() => {
           Mode actual:
           <span
             class="mode-badge"
-            :class="{ 'muerte-subita': modoJuego === 'muerteSubita' }"
+            :class="{
+              'muerte-subita': modoJuego === 'muerteSubita',
+              'contrarellotge': modoJuego === 'contrarellotge'
+            }"
           >
-            {{ modoJuego === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+            {{
+              modoJuego === "muerteSubita"
+                ? "Muerte Súbita"
+                : modoJuego === "contrarellotge"
+                  ? "Contrarellotge (30s)"
+                  : "Normal"
+            }}
           </span>
-          <!-- Info for non-hosts: small help icon that shows the detailed tooltip text -->
           <span
             class="mode-help"
-            :class="{ muerte: modoJuego === 'muerteSubita' }"
+            :class="{
+              muerte: modoJuego === 'muerteSubita',
+              contrarellotge: modoJuego === 'contrarellotge'
+            }"
           >
             <span class="mode-help-icon">i</span>
             <span class="mode-help-tooltip">
               {{
                 modoJuego === "muerteSubita"
                   ? "Si comets dos errors quedes eliminat."
-                  : "Completa paraules; acumula 20 per quedar eliminat."
+                  : modoJuego === "contrarellotge"
+                    ? "Temps límit: 30s per fer màximes paraules."
+                    : "Completa paraules; acumula 20 per quedar eliminat."
               }}
             </span>
           </span>
@@ -358,7 +368,6 @@ communicationManager.onkicked(() => {
         </ul>
       </div>
 
-
       <div class="lobby-actions">
         <button v-if="!isSpectator" @click="toggleReady">
           {{ isReady ? "[CANCEL·LAR]" : "[PREPARAT]" }}
@@ -392,6 +401,16 @@ communicationManager.onkicked(() => {
               <span class="tooltip"
                 >Tens 2 vides — al 2n error quedes eliminat.</span
               >
+            </label>
+            <label
+              class="modo-btn contrarellotge"
+              :class="{ active: modoJuego === 'contrarellotge' }"
+            >
+              <input type="radio" value="contrarellotge" v-model="modoJuego" />
+              <span>Contrarellotge</span>
+              <span class="tooltip">
+                Tens un temps límit per fer tantes paraules com puguis. Guanya qui n'escriu més!
+              </span>
             </label>
           </div>
         </div>
@@ -799,4 +818,29 @@ button.btn-host {
 .modo-btn:active {
   transform: scale(0.98);
 }
+
+.modo-btn.contrarellotge::before {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+}
+
+.modo-btn.contrarellotge.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+.mode-badge.contrarellotge {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+  color: white;
+  font-weight: 700;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff) !important;
+  color: #fff;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip::after {
+  border-color: #7161ff transparent transparent transparent !important;
+}
+
 </style>
