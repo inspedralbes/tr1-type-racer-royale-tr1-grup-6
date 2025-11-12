@@ -90,8 +90,22 @@ function handleVolverInicio() {
   emit('volverInicio');
 }
 
+// --- NOVES FUNCIONS ---
+/**
+ * NOU: Es crida al clicar el botó 'Ver Partida'.
+ * Li diu al communicationManager que iniciï la transició.
+ */
+function convertirEnEspectador() {
+  console.log('Sol·licitant convertir-se en espectador...');
+  communicationManager.requestSpectate();
+  // No cal fer res més aquí. El servidor respondrà,
+  // App.vue ho escoltarà i actualitzarà la prop 'isSpectator'.
+  // Això farà que aquest component reaccioni i mostri la UI d'espectador.
+}
+// --- FI NOVES FUNCIONS ---
+
 function handleKeyDown(event) {
-  if (JuegoTerminado.value || props.isSpectator) return;
+  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return; // Afegit 'perdedor.value'
 
   const key = event.key;
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
@@ -118,7 +132,7 @@ function iniciarCronometreParaula() {
 
 // 2. MODIFICAR 'validarProgres'
 function validarProgres() {
-  if (JuegoTerminado.value || props.isSpectator) return;
+  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return; // Afegit 'perdedor.value'
 
   if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
@@ -296,9 +310,9 @@ onMounted(() => {
 
     // Només s'aplica al jugador eliminat
     if (data.playerId === communicationManager.getId() && !props.isSpectator) {
-      perdedor.value = true;
+      perdedor.value = true; // <-- CANVI CLAU
       ganador.value = false;
-      JuegoTerminado.value = true;
+      // JuegoTerminado.value = true; // <-- AQUESTA LÍNIA S'HA ELIMINAT
       onGameEnd();
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
@@ -362,7 +376,7 @@ onMounted(() => {
           data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
-        perdedor.value = true;
+        perdedor.value = true; // Aquí 'perdedor' és correcte perquè és la fi del joc
         playSound('gameLose');
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
@@ -378,7 +392,7 @@ onMounted(() => {
 
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
-      if (JuegoTerminado.value) return;
+      if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
       try {
         if (
           remainingWords.value.length > 0 &&
@@ -436,6 +450,7 @@ onUnmounted(() => {
         </span>
       </h2>
     </div>
+
     <div class="game-layout">
       <div class="game-main">
         <TransitionGroup
@@ -479,7 +494,7 @@ onUnmounted(() => {
           :placeholder="
             props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
           "
-          :disabled="JuegoTerminado"
+          :disabled="JuegoTerminado || perdedor"
           :readonly="props.isSpectator"
         />
 
@@ -540,6 +555,21 @@ onUnmounted(() => {
       </aside>
     </div>
 
+    <div v-if="perdedor && !JuegoTerminado && !isSpectator" class="overlay-eliminado">
+      <div class="overlay-content">
+        <h2>Has sido eliminado</h2>
+        <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
+        <div class="opciones-perdedor">
+          <button @click="convertirEnEspectador" class="btn btn-espectador">
+            Ver Partida
+          </button>
+          <button @click="handleVolverInicio" class="btn btn-salir">
+            Salir al Lobby
+          </button>
+        </div>
+      </div>
+    </div>
+
     <GameResult
       v-if="JuegoTerminado"
       :winner="ganador"
@@ -554,6 +584,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
+/* ... (copia i enganxa tots els estils que ja tenies) ... */
+
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
@@ -897,5 +930,57 @@ onUnmounted(() => {
 }
 .text-input:focus {
   animation: pulse-focus 1.5s infinite;
+}
+
+/* --- NOU ESTILS AFEGITS --- */
+.overlay-eliminado {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  color: white;
+}
+.overlay-content {
+  text-align: center;
+  background: var(--color-background-soft);
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.overlay-content h2 {
+  color: var(--color-error);
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+.overlay-content p {
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+}
+.opciones-perdedor {
+  display: flex;
+  gap: 20px;
+}
+.opciones-perdedor .btn {
+  padding: 12px 24px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-main);
+}
+.btn-espectador {
+  background-color: var(--color-primary);
+  color: white;
+}
+.btn-salir {
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
 }
 </style>

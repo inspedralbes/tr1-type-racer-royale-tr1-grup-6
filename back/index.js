@@ -247,6 +247,41 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on('requestSpectate', ({ roomId }) => {
+      const room = rooms.get(roomId);
+      if (!room) {
+        console.log(`[requestSpectate] Sala ${roomId} no trobada.`);
+        return;
+      }
+
+      const player = room.players.get(socket.id);
+      if (!player) {
+        console.log(`[requestSpectate] Socket ${socket.id} no és un jugador actiu.`);
+        if (room.spectators.has(socket.id)) {
+           socket.emit('spectateModeActivated', { success: true, roomId });
+        }
+        return;
+      }
+
+      console.log(`[requestSpectate] Movent jugador ${player.name} (id: ${socket.id}) a espectadors en sala ${roomId}`);
+
+      room.players.delete(socket.id);
+
+      const spectator = {
+        id: player.id,
+        name: `${player.name}`,
+        color: player.color,
+      };
+      room.spectators.set(socket.id, spectator);
+
+      socket.emit('spectateModeActivated', {
+        success: true,
+        roomId: roomId,
+      });
+
+      broadcastRoomPlayerList(roomId);
+    });
+
   socket.on("spectateRoom", (data) => {
     const room = rooms.get(data.roomId);
     if (!room) {
