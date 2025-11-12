@@ -1,7 +1,7 @@
 //import { on } from "node:events";
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
-const socket = io("http://localhost:3000", {
+const socket = io('http://localhost:3000', {
   autoConnect: false,
 });
 
@@ -9,28 +9,31 @@ let onConnectCb = null;
 let currentRoom = null;
 
 // Evento de conexión
-socket.on("connect", () => {
-  console.log("Socket connected, id=", socket.id);
-  if (typeof onConnectCb === "function") onConnectCb(socket.id);
+socket.on('connect', () => {
+  console.log('Socket connected, id=', socket.id);
+  if (typeof onConnectCb === 'function') onConnectCb(socket.id);
 });
 
 const communicationManager = {
   // Conectar al servidor y unirse como jugador
   connect(playerData) {
     socket.connect();
-    socket.emit("join", playerData);
+    socket.emit('join', playerData);
 
-    socket.on("disconnect", () => {
-      console.log("Desconnectat del servidor");
+    socket.on('disconnect', () => {
+      console.log('Desconnectat del servidor');
       currentRoom = null;
     });
+  },
+  get id() {
+    return socket.id;
   },
 
   // Obtener la sala actual
   getCurrentRoom() {
     return currentRoom;
   },
-  
+
   // Obtenir el nostre ID de socket
   getId() {
     return socket.id;
@@ -43,64 +46,64 @@ const communicationManager = {
 
   // Escuchar lista de jugadores
   onUpdatePlayerList(callback) {
-    socket.on("updatePlayerList", callback);
+    socket.on('updatePlayerList', callback);
   },
 
   // Escuchar inicio del juego
   onGameStart(callback) {
-    socket.on("gameStart", callback);
+    socket.on('gameStart', callback);
   },
 
   // Marcar usuario como ready / no-ready (con sala actual)
   setReady(ready) {
     if (currentRoom) {
-      socket.emit("clientReady", { ready, roomId: currentRoom });
+      socket.emit('clientReady', { ready, roomId: currentRoom });
     } else {
-      socket.emit("clientReady", { ready });
+      socket.emit('clientReady', { ready });
     }
   },
 
   // Solicitar inicio de partida (modo normal o muerte súbita)
-  requestStart(modo = "normal") {
+  requestStart(modo = 'normal') {
     if (currentRoom) {
-      socket.emit("startGame", { roomId: currentRoom, modo });
+      socket.emit('startGame', { roomId: currentRoom, modo });
     } else {
-      socket.emit("startGame", { modo });
+      socket.emit('startGame', { modo });
     }
   },
 
   // Host can set the room mode before starting
   setRoomMode(modo) {
     if (currentRoom) {
-      socket.emit("setRoomMode", { roomId: currentRoom, modo });
+      socket.emit('setRoomMode', { roomId: currentRoom, modo });
     } else {
-      socket.emit("setRoomMode", { modo });
+      socket.emit('setRoomMode', { modo });
     }
   },
 
   // Reportar que un jugador ha perdido
   reportPlayerLost() {
-    socket.emit("playerLost", { roomId: currentRoom }); // CORREGIT
+    socket.emit('playerLost', { roomId: currentRoom }); // CORREGIT
   },
 
   reportPlayerEliminated() {
     if (currentRoom) {
-      socket.emit("muerteSubitaElimination", { roomId: currentRoom });
-      console.log("Reportando eliminación para sala:", currentRoom);
+      socket.emit('muerteSubitaElimination', { roomId: currentRoom });
+      console.log('Reportando eliminación para sala:', currentRoom);
     } else {
-      console.error("No hay roomId actual al reportar eliminación.");
+      console.error('No hay roomId actual al reportar eliminación.');
     }
   },
 
   // Enviar progreso del jugador
   updatePlayerProgress(progress) {
-    if (typeof progress === "number") {
-      socket.emit("updatePlayerProgress", {
+    if (typeof progress === 'number') {
+      socket.emit('updatePlayerProgress', {
         completedWords: progress,
         roomId: currentRoom,
       });
     } else {
-      socket.emit("updatePlayerProgress", {
+      socket.emit('updatePlayerProgress', {
         ...progress,
         roomId: currentRoom,
       });
@@ -109,7 +112,7 @@ const communicationManager = {
 
   // Escuchar actualizaciones del progreso de jugadores
   onPlayerProgressUpdate(callback) {
-    socket.on("playerProgressUpdate", callback);
+    socket.on('playerProgressUpdate', callback);
   },
 
   // Enviar evento genérico
@@ -126,45 +129,45 @@ const communicationManager = {
 
   // Pedir al servidor la lista de salas
   listRooms() {
-    socket.emit("listRooms");
+    socket.emit('listRooms');
   },
 
   // Crear una nueva sala
   createRoom(name) {
-    socket.emit("createRoom", { name });
+    socket.emit('createRoom', { name });
   },
 
   // Unirse a una sala existente
   joinRoom(roomId) {
-    socket.emit("joinRoom", { roomId });
+    socket.emit('joinRoom', { roomId });
   },
 
   // ===================================
   // NOVES FUNCIONS PER A ESPECTADOR
   // ===================================
   spectateRoom(roomId) {
-    socket.emit("spectateRoom", { roomId });
+    socket.emit('spectateRoom', { roomId });
   },
 
   onSpectateSuccess(callback) {
-    socket.on("spectateSuccess", (data) => {
+    socket.on('spectateSuccess', (data) => {
       if (data.success && data.roomId) {
         currentRoom = data.roomId;
-        console.log("Establecida sala actual (espectador):", currentRoom);
+        console.log('Establecida sala actual (espectador):', currentRoom);
       }
       callback(data);
     });
   },
 
   onSpectateError(callback) {
-    socket.on("spectateError", callback);
+    socket.on('spectateError', callback);
   },
   // ===================================
 
   // Salir de la sala actual
   leaveRoom() {
     if (currentRoom) {
-      socket.emit("leaveRoom");
+      socket.emit('leaveRoom');
       currentRoom = null;
     }
   },
@@ -172,25 +175,25 @@ const communicationManager = {
   // Reportar eliminación en modo muerte súbita
   reportMuerteSubitaElimination() {
     if (currentRoom) {
-      socket.emit("muerteSubitaElimination", { roomId: currentRoom });
-      console.log("Enviando eliminación muerte súbita para sala:", currentRoom);
+      socket.emit('muerteSubitaElimination', { roomId: currentRoom });
+      console.log('Enviando eliminación muerte súbita para sala:', currentRoom);
     } else {
       console.error(
-        "Error: No se encontró roomId actual al reportar eliminación muerte súbita"
+        'Error: No se encontró roomId actual al reportar eliminación muerte súbita',
       );
     }
   },
 
   // --- Listeners relacionados con salas ---
   onRoomList(callback) {
-    socket.on("roomList", callback);
+    socket.on('roomList', callback);
   },
 
   onJoinedRoom(callback) {
-    socket.on("joinedRoom", (data) => {
+    socket.on('joinedRoom', (data) => {
       if (data.success && data.roomId) {
         currentRoom = data.roomId;
-        console.log("Establecida sala actual (jugador):", currentRoom);
+        console.log('Establecida sala actual (jugador):', currentRoom);
       }
       callback(data);
     });
@@ -198,11 +201,11 @@ const communicationManager = {
 
   // Escuchar cambios de modo en la sala
   onRoomModeUpdated(callback) {
-    socket.on("roomModeUpdated", callback);
+    socket.on('roomModeUpdated', callback);
   },
 
   onLeftRoom(callback) {
-    socket.on("leftRoom", (data) => {
+    socket.on('leftRoom', (data) => {
       if (data.success) {
         currentRoom = null;
       }
@@ -212,33 +215,33 @@ const communicationManager = {
 
   // --- Otros eventos del juego ---
   onPlayerEliminated(callback) {
-    socket.on("playerEliminated", callback);
+    socket.on('playerEliminated', callback);
   },
 
   onPlayerWon(callback) {
-    socket.on("playerWon", callback);
+    socket.on('playerWon', callback);
   },
 
   onGameOver(callback) {
-    socket.on("gameOver", callback);
+    socket.on('gameOver', callback);
   },
 
   // --- Funciones de host ---
 
   kickUser(roomId, userId) {
-    socket.emit("kickUser", { roomId, userId });
+    socket.emit('kickUser', { roomId, userId });
   },
 
   transferHost(roomId, newHostId) {
-    socket.emit("transferHost", { roomId, newHostId });
+    socket.emit('transferHost', { roomId, newHostId });
   },
 
   onkicked(callback) {
-    socket.on("kicked", callback);
+    socket.on('kicked', callback);
   },
 
   onHostTransferred(callback) {
-    socket.on("hostTransferred", callback);
+    socket.on('hostTransferred', callback);
   },
 
   // Desconectarse del servidor

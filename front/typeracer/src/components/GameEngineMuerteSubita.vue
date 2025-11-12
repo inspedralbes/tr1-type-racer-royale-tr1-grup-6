@@ -75,6 +75,13 @@ const displayedText = computed(() => {
 
 const totalErrors = ref(0);
 
+//variables corazones
+const vidasRestantes = ref(3); //  Dos vidas por jugador
+const tiempoRestante = ref(5); // 5 segundos
+let countdownTimer = null;
+const playersLives = ref({});
+
+// Manejo teclado
 function handleKeyDown(event) {
   if (JuegoTerminado.value || props.isSpectator) return;
 
@@ -91,15 +98,13 @@ function handleKeyDown(event) {
 
   if (key === 'Backspace') {
     event.preventDefault();
-    textEntratLocal.value = textEntratLocal.value.slice(0, -1);
+    estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
+    validarProgres();
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
-    textEntratLocal.value += key;
-  } else {
-    return;
+    estatDelJoc.value.textEntrat += key;
+    validarProgres();
   }
-
-  validarProgres();
 }
 
 function iniciarCronometreParaula() {
@@ -107,11 +112,7 @@ function iniciarCronometreParaula() {
 }
 
 function validarProgres() {
-  if (JuegoTerminado.value || props.isSpectator) return;
-
-  if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
-    iniciarCronometreParaula();
-  }
+  if (JuegoTerminado.value) return;
 
   const typed = textEntratLocal.value;
   const paraula =
@@ -123,10 +124,12 @@ function validarProgres() {
   });
 
   if (!paraula) {
-    textEntratLocal.value = '';
+    estatDelJoc.value.textEntrat = '';
+    reiniciarCronometro();
     return;
   }
 
+  // Inicializar errores de letras si no existen
   if (
     !Array.isArray(paraula.letterErrors) ||
     paraula.letterErrors.length !== paraula.text.length
@@ -137,6 +140,7 @@ function validarProgres() {
     );
   }
 
+  // Si completó la palabra correctamente
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
     const self = props.players.find(
@@ -144,56 +148,34 @@ function validarProgres() {
     );
     if (self) self.completedWords = (self.completedWords || 0) + 1;
 
+    // Contar errores de la palabra
+    const wordErrors = paraula.letterErrors.filter((e) => e).length;
+    paraula.errors = wordErrors;
     paraula.estat = 'completada';
-
-    estatDelJoc.value.paraules.pop();
-    textEntratLocal.value = '';
-    tempsIniciParaula = 0;
 
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
-      currentWordProgress: '',
-      wordStack: estatDelJoc.value.paraules,
+      lives: vidasRestantes.value,
     });
-
-    const nextParaula =
-      estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
-    if (nextParaula) {
-      if (
-        !Array.isArray(nextParaula.letterErrors) ||
-        nextParaula.letterErrors.length !== nextParaula.text.length
-      ) {
-        nextParaula.letterErrors = Array.from(
-          { length: nextParaula.text.length },
-          () => false,
-        );
-        nextParaula.errors = 0;
-      }
-    }
+    // Limpiar input y reiniciar cronómetro
+    estatDelJoc.value.paraules.pop();
+    estatDelJoc.value.textEntrat = '';
+    reiniciarCronometro();
+    return;
   }
 
+  // Validar cada letra y manejar errores
   for (let i = 0; i < typed.length; i++) {
     if (i >= paraula.text.length) break;
+
     const isError = typed[i] !== paraula.text[i];
     if (isError && !paraula.letterErrors[i]) {
-      totalErrors.value++;
-      if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
-        perdedor.value = true;
-        perdidoMensaje.value = "T'has equivocat, estàs eliminat!";
-        communicationManager.reportMuerteSubitaElimination();
-
-        textEntratLocal.value = '';
-        if (!props.isSpectator) {
-          window.removeEventListener('keydown', handleKeyDown);
-        }
-        textEntratLocal.value = '';
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
-        return;
-      }
       paraula.letterErrors[i] = true;
+
+      // Reducir vidas si estamos en modo muerte súbita
+      if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
+        manejarError();
+      }
     } else {
       paraula.letterErrors[i] = false;
     }
@@ -216,11 +198,114 @@ function getClasseLletra(indexLletra) {
   return typed[indexLletra] === target[indexLletra] ? 'correcte' : 'incorrecte';
 }
 
+function reiniciarCronometro() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+  }
+  tiempoRestante.value = 5; // Siempre se resetea a 5
+
+  // Detener el timer si el juego ya terminó
+  if (JuegoTerminado.value) return;
+
+  countdownTimer = setInterval(() => {
+    if (JuegoTerminado.value) {
+      clearInterval(countdownTimer);
+      return;
+    }
+
+    tiempoRestante.value -= 0.1;
+    if (tiempoRestante.value <= 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      vidasRestantes.value--;
+      updateLocalPlayerLives(vidasRestantes.value);
+      manejarTiempoAgotado();
+      if (vidasRestantes.value <= 0) {
+        perdedor.value = true;
+        perdidoMensaje.value = 'Has perdido todas tus vidas. ¡Estás eliminado!';
+        JuegoTerminado.value = true;
+        communicationManager.reportMuerteSubitaElimination();
+        finalizarJuego();
+      }
+    }
+  }, 100);
+}
+
+// Cuando se acaba el tiempo
+function manejarTiempoAgotado() {
+  if (JuegoTerminado.value) return;
+
+  if (props.modo === 'muerteSubita') {
+    // Simplemente reiniciar el cronómetro sin penalización por tiempo
+    reiniciarCronometro();
+  }
+}
+
+// Manejar error al escribir
+function manejarError() {
+  if (JuegoTerminado.value) return;
+
+  // Solo aplica en modo muerte súbita
+  if (props.modo === 'muerteSubita') {
+    vidasRestantes.value--;
+    updateLocalPlayerLives(vidasRestantes.value);
+
+    // Efecto de error visual
+    const input = document.querySelector('.text-input');
+    if (input) {
+      input.style.borderColor = '#ff4d4d';
+      setTimeout(() => (input.style.borderColor = ''), 300);
+    }
+
+    // Si se quedó sin vidas, entonces derrota inmediata
+    if (vidasRestantes.value <= 0) {
+      perdedor.value = true;
+      perdidoMensaje.value = 'Has perdido todas tus vidas. ¡Estás eliminado!';
+      JuegoTerminado.value = true;
+      communicationManager.reportMuerteSubitaElimination();
+      finalizarJuego();
+    }
+  }
+}
+
+// 🚨 Función centralizada para actualizar vidas localmente y en el servidor
+function updateLocalPlayerLives(newLives) {
+  const playerId = communicationManager.id;
+  if (playerId) {
+    // 1. Actualiza el objeto interno (playersLives) para el rendering
+    playersLives.value[playerId] = {
+      ...(playersLives.value[playerId] || { name: 'Tú' }),
+      lives: newLives,
+    };
+    playersLives.value = { ...playersLives.value };
+    communicationManager.updatePlayerProgress({
+      lives: newLives,
+    });
+  }
+}
+
+// Ciclo vida
 onMounted(() => {
-  if (!props.isSpectator) {
-    window.addEventListener('keydown', handleKeyDown);
+  // Inicializar vidas de todos los jugadores (incluyendo el propio)
+  if (props.players && props.players.length > 0) {
+    props.players.forEach((player) => {
+      playersLives.value[player.id] = {
+        name: player.name,
+        lives: 3,
+      };
+    });
   }
 
+  // Inicializar vidas del jugador actual cuando se conecta
+  communicationManager.onConnect((id) => {
+    if (props.modo === 'muerteSubita') {
+      playersLives.value[id] = {
+        name: 'Tú',
+        lives: vidasRestantes.value,
+      };
+      playersLives.value = { ...playersLives.value };
+    }
+  });
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
@@ -232,116 +317,88 @@ onMounted(() => {
     }
 
     JuegoTerminado.value = true;
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
+    perdidoMensaje.value =
+      data?.message || '¡Has ganado! Todos los demás fueron eliminados.';
+    if (revealTimer) clearInterval(revealTimer);
+    if (countdownTimer) clearInterval(countdownTimer);
+  });
+
+  communicationManager.onPlayerProgressUpdate((data) => {
+    if (data.playerId && data.lives !== undefined) {
+      playersLives.value[data.playerId] = {
+        ...(playersLives.value[data.playerId] || {}),
+        lives: data.lives,
+      };
     }
   });
 
   communicationManager.onPlayerEliminated((data) => {
-    const player = props.players.find((p) => p.id === data.playerId);
-    if (player) {
-      player.eliminated = true;
-    }
-
-    if (data.playerId === communicationManager.getId() && !props.isSpectator) {
-      perdedor.value = true;
-      perdidoMensaje.value = data.message || "T'has equivocat, estàs eliminat!";
-      if (!props.isSpectator) {
-        window.removeEventListener('keydown', handleKeyDown);
-      }
-      textEntratLocal.value = '';
-      if (revealTimer) {
-        clearInterval(revealTimer);
-        revealTimer = null;
+    if (data.playerId) {
+      if (playersLives.value[data.playerId]) {
+        playersLives.value[data.playerId].lives = 0;
       }
     }
   });
 
   communicationManager.onGameOver((data) => {
-    if (JuegoTerminado.value) return;
-
-    if (props.isSpectator) {
-      ganador.value = false;
-      perdedor.value = false;
-      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
-    } else {
-      if (data.winnerId === communicationManager.getId()) {
-        ganador.value = true;
-        perdedor.value = false;
-        perdidoMensaje.value =
-          data.message || 'Has guanyat! Tots els altres han estat eliminats.';
-      } else {
-        ganador.value = false;
-        perdedor.value = true;
-        perdidoMensaje.value =
-          data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
-      }
-    }
-
     JuegoTerminado.value = true;
-    if (revealTimer) {
-      clearInterval(revealTimer);
-      revealTimer = null;
-    }
   });
 
-  if (
-    !props.isSpectator &&
-    Array.isArray(props.initialWords) &&
-    props.initialWords.length > 0
-  ) {
+  // Inicializar palabras restantes
+  if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     remainingWords.value = props.initialWords.slice();
   }
 
-  if (!JuegoTerminado.value && !props.isSpectator) {
-    revealTimer = setInterval(() => {
-      if (JuegoTerminado.value) return;
-      try {
-        if (
-          remainingWords.value.length > 0 &&
-          estatDelJoc.value.paraules.length < props.maxStack
-        ) {
-          const nextText = remainingWords.value.shift();
-          const newParaula = {
-            id: Date.now() + Math.random(),
-            text: nextText,
-            estat: 'pendent',
-            errors: 0,
-            letterErrors: Array.from({ length: nextText.length }, () => false),
-          };
-          estatDelJoc.value.paraules.unshift(newParaula);
+  // Iniciar timer para revelar palabras e iniciar el cronómetro
+  revealTimer = setInterval(() => {
+    if (JuegoTerminado.value) return;
+    try {
+      if (
+        remainingWords.value.length > 0 &&
+        estatDelJoc.value.paraules.length < props.maxStack
+      ) {
+        const nextText = remainingWords.value.shift();
+        const newParaula = {
+          id: Date.now() + Math.random(),
+          text: nextText,
+          estat: 'pendent',
+          errors: 0,
+          letterErrors: Array.from({ length: nextText.length }, () => false),
+        };
+        estatDelJoc.value.paraules.unshift(newParaula);
 
-          // CORRECCIÓ: Envia la pila quan cau una paraula
-          communicationManager.updatePlayerProgress({
-            wordStack: estatDelJoc.value.paraules,
-          });
+        // Si es la primera palabra, iniciar el cronómetro
+        if (estatDelJoc.value.paraules.length === 1) {
+          reiniciarCronometro();
         }
-      } catch (e) {
-        console.error('Error en revealTimer:', e);
       }
-    }, props.intervalMs || 3000);
-  }
+    } catch (e) {
+      console.error('Error en revealTimer:', e);
+    }
+  }, props.intervalMs || 3000);
 });
 
 onUnmounted(() => {
-  if (!props.isSpectator) {
-    window.removeEventListener('keydown', handleKeyDown);
-  }
-  if (revealTimer) {
-    clearInterval(revealTimer);
-    revealTimer = null;
-  }
+  if (revealTimer) clearInterval(revealTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
 });
 
 function calculateProgress(completedWords) {
   return (completedWords / estatDelJoc.value.paraules.length) * 100;
+}
+
+function finalizarJuego() {
+  JuegoTerminado.value = true;
+  if (revealTimer) clearInterval(revealTimer);
+  if (countdownTimer) clearInterval(countdownTimer);
 }
 </script>
 
 <template>
   <div>
     <div class="game-header">
+      <!-- Sidebar + corazones -->
+
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
@@ -379,17 +436,24 @@ function calculateProgress(completedWords) {
             </template>
           </div>
         </TransitionGroup>
-
-        <input
-          type="text"
-          class="text-input"
-          :value="displayedText"
-          @input="validarProgres" :placeholder="
-            props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
-          "
-          :disabled="JuegoTerminado"
-          :readonly="props.isSpectator"
-        />
+        <div class="input-barra-wrapper">
+          <input
+            type="text"
+            class="text-input"
+            v-model="estatDelJoc.textEntrat"
+            @input="validarProgres"
+            @keydown="handleKeyDown"
+            placeholder="Comença a escriure..."
+            :disabled="JuegoTerminado"
+            autocomplete="off"
+          />
+          <div class="barra-tiempo">
+            <div
+              class="progreso-tiempo"
+              :style="{ width: (tiempoRestante / 5) * 100 + '%' }"
+            ></div>
+          </div>
+        </div>
 
         <div class="teclat" v-if="!props.isSpectator">
           <div
@@ -433,19 +497,33 @@ function calculateProgress(completedWords) {
           <li
             v-for="p in sortedPlayers"
             :key="p.id"
-            class="player-name-inline"
-            :class="{ eliminado: p.eliminated }"
+            class="player-item"
+            :class="{
+              eliminado: p.eliminated || playersLives[p.id]?.lives === 0,
+            }"
           >
-            <span class="player-name-text">{{ p.name }}</span>
-            <span
-              v-if="p.eliminated"
-              style="color: #dc3545; font-weight: bold; margin-left: 10px"
-            >
-              Eliminat
-            </span>
-            <span class="completed-count">
-              Paraules fetes: {{ p.completedWords || 0 }}
-            </span>
+            <div class="player-info">
+              <span class="player-name-text">{{ p.name }}</span>
+              <span
+                v-if="p.eliminated"
+                style="color: #dc3545; font-weight: bold; margin-left: 10px"
+              >
+                Eliminat
+              </span>
+            </div>
+            <div class="player-stats">
+              <span class="completed-count">
+                Paraules: {{ p.completedWords || 0 }}
+              </span>
+              <div class="vidas-jugador">
+                <span
+                  v-for="n in playersLives[p.id]?.lives || 0"
+                  :key="n"
+                  class="corazon"
+                  >❤️</span
+                >
+              </div>
+            </div>
           </li>
         </ul>
       </aside>
@@ -563,6 +641,53 @@ function calculateProgress(completedWords) {
   color: white;
   transform: scale(0.95);
 }
+
+/*estilo imput con tiempo*/
+.input-barra-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.text-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 12px 16px;
+  font-size: 1.2rem;
+  border: 4px solid;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.2s linear;
+  border-image: linear-gradient(
+    to right,
+    #00ff7f calc(var(--progress) * 1%),
+    #333 calc(var(--progress) * 1%)
+  );
+  border-image-slice: 1;
+}
+
+.text-input:focus {
+  box-shadow: 0 0 10px rgba(0, 255, 127, 0.4);
+}
+/* Barra de tiempo debajo del input */
+.barra-tiempo {
+  width: 100%;
+  max-width: 400px;
+  height: 8px;
+  background-color: #333;
+  border-radius: 6px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.progreso-tiempo {
+  height: 100%;
+  background-color: #00ff7f;
+  transition: width 0.1s linear;
+}
+
 .game-layout {
   display: flex;
   gap: 24px;
@@ -615,6 +740,45 @@ function calculateProgress(completedWords) {
   border-radius: 6px;
   color: var(--color-text, #333);
   font-weight: 600;
+}
+
+.player-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: var(--color-background, #fff);
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  transition: opacity 0.3s ease;
+}
+
+.player-item.eliminado {
+  opacity: 0.5;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.vidas-jugador {
+  display: flex;
+  gap: 4px;
+}
+
+.corazon {
+  font-size: 1.2rem;
 }
 .player-name-text {
   font-weight: 700;

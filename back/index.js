@@ -123,12 +123,12 @@ io.on("connection", (socket) => {
     room.hostId = newHostId;
 
     const newPlayersMap = new Map();
-    if (room.players.has(newHostId)){
+    if (room.players.has(newHostId)) {
       newPlayersMap.set(newHostId, room.players.get(newHostId));
     }
 
-    for (const[id, player] of room.players){
-      if (id !== newHostId){
+    for (const [id, player] of room.players) {
+      if (id !== newHostId) {
         newPlayersMap.set(id, player);
       }
     }
@@ -262,7 +262,9 @@ io.on("connection", (socket) => {
     room.spectators.set(socket.id, spectatorData);
     socket.join(data.roomId);
 
-    console.log(`Socket ${socket.id} ara és espectador a la sala ${data.roomId}`);
+    console.log(
+      `Socket ${socket.id} ara és espectador a la sala ${data.roomId}`
+    );
 
     const payload = {
       success: true,
@@ -331,7 +333,7 @@ io.on("connection", (socket) => {
         room.spectators.delete(socket.id);
         wasInRoom = true;
       }
-      
+
       if (wasInRoom) {
         socket.leave(roomId);
         if (room.players.size === 0 && room.spectators.size === 0) {
@@ -423,25 +425,42 @@ io.on("connection", (socket) => {
     const room = rooms.get(payload.roomId);
     if (!room || !room.players.has(socket.id)) return;
 
-    const player = room.players.get(socket.id);
-    
-    if (typeof payload.completedWords === "number") {
-      player.completedWords = payload.completedWords;
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.players.has(socket.id)) {
+        const player = room.players.get(socket.id);
+        if (typeof payload.completedWords === "number") {
+          player.completedWords = payload.completedWords;
+        }
+        if (typeof payload.totalErrors === "number") {
+          player.totalErrors = payload.totalErrors;
+        }
+        // Si el cliente manda playTime (ms), lo guardamos para mostrar WPM
+        if (typeof payload.playTime === "number") {
+          player.playTime = payload.playTime;
+        }
+        if (typeof payload.lives === "number") {
+          player.lives = payload.lives;
+          //  Notificar a los demás jugadors
+          socket.broadcast.to(roomId).emit("playerProgressUpdate", {
+            playerId: socket.id,
+            lives: payload.lives,
+          });
+        }
+        if (typeof payload.currentWordProgress === "string") {
+          player.currentWordProgress = payload.currentWordProgress;
+        }
+        if (Array.isArray(payload.wordStack)) {
+          player.wordStack = payload.wordStack;
+        }
+      }
     }
-    if (typeof payload.totalErrors === "number") {
-      player.totalErrors = payload.totalErrors;
-    }
-    if (typeof payload.playTime === "number") {
-      player.playTime = payload.playTime;
-    }
-    if (typeof payload.currentWordProgress === "string") {
-      player.currentWordProgress = payload.currentWordProgress;
-    }
-    if (Array.isArray(payload.wordStack)) {
-      player.wordStack = payload.wordStack;
-    }
+    broadcastRoomPlayerList(payload.roomId);
+  });
 
-    broadcastRoomPlayerList(payload.roomId); 
+  socket.on("playerProgressUpdate", (data) => {
+    data.playerId = socket.id;
+
+    io.to(roomId).emit("playerProgressUpdate", data);
   });
 
   socket.on("startGame", (payload) => {
@@ -516,7 +535,7 @@ io.on("connection", (socket) => {
       `Jugador ${player.name} ha sido eliminado por acumulación de palabras.`
     );
     socket.emit("playerEliminated", {
-      playerId: player.id, 
+      playerId: player.id,
       message: "Has perdut: massa paraules acumulades.",
     });
 
@@ -530,7 +549,7 @@ io.on("connection", (socket) => {
       const ganador = activos[0];
 
       io.to(ganador.id).emit("playerWon", {
-        winnerId: ganador.id, 
+        winnerId: ganador.id,
         message: "¡Enhorabona! Has guanyat tots els jugadors.",
       });
 
@@ -549,7 +568,7 @@ io.on("connection", (socket) => {
       });
     }
   });
-  
+
   socket.on("muerteSubitaElimination", (payload) => {
     const roomId = payload?.roomId;
     if (!roomId) return;
@@ -558,17 +577,29 @@ io.on("connection", (socket) => {
     if (!room || room.gameState.modo !== "muerteSubita") return;
 
     const player = room.players.get(socket.id);
-    if (!player || player.eliminated) return;
+    if (!player) return;
 
-    player.eliminated = true;
-    console.log(`Jugador ${player.name} eliminat en mort súbita per error`);
+    // Marcar al jugador como eliminado
+    if (player.lives <= 0) {
+      player.eliminated = true;
+      console.log(`Jugador ${player.name} eliminado en mort súbita`);
 
-    socket.emit("playerEliminated", {
-      playerId: player.id,
-      playerName: player.name,
-      message: "¡T'has equivocat! En mort súbita, estàs eliminat.",
-    });
+      // Notificar al jugador eliminado
+      socket.emit("playerEliminated", {
+        playerId: player.id,
+        playerName: player.name,
+        message: "Has perdut totes las vides. Quedes eliminat!",
+      });
+    } else {
+      // Notificar al jugador que perdió una vida pero sigue vivo
+      socket.emit("vidasActualizadas", {
+        playerId: player.id,
+        lives: player.lives,
+        message: `¡T'has equivocat! Et queden ${player.lives} vides.`,
+      });
+    }
 
+    // Actualizar lista de jugadores en la sala
     broadcastRoomPlayerList(roomId);
 
     const activos = Array.from(room.players.values()).filter(
@@ -578,24 +609,25 @@ io.on("connection", (socket) => {
     if (activos.length === 1) {
       const ganador = activos[0];
 
+      // Notificar al ganador
       io.to(ganador.id).emit("playerWon", {
-        winnerId: ganador.id, // Envia l'ID del guanyador
-        message: "¡Ets l'últim jugador dret!",
+        message: "¡Ets l'últim jugador en peu!",
       });
 
+      // Notificar a los demás jugadores eliminats
       Array.from(room.players.values()).forEach((j) => {
         if (j.id !== ganador.id) {
           io.to(j.id).emit("playerEliminated", {
-            playerId: j.id,
-            message: `Has perdut. El guanyador és ${ganador.name}.`,
+            message: `Has perdut. El guanyador es ${ganador.name}.`,
           });
         }
       });
 
+      // Notificar el fin del juego a toda la sala
       io.to(roomId).emit("gameOver", {
         winnerId: ganador.id,
         winnerName: ganador.name,
-        message: `${ganador.name} ha guanyat la partida en mode mort súbita.`,
+        message: `${ganador.name} ha ganado la partida en modo muerte súbita.`,
       });
     }
   });
