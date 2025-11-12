@@ -1,8 +1,8 @@
 <script setup>
-import communicationManager from "@/services/communicationManager";
-import DarkModeToggle from "./DarkModeToggle.vue";
-import { ref, computed, defineEmits } from "vue";
-const emit = defineEmits(["volverInicio"]);
+import communicationManager from '@/services/communicationManager';
+import DarkModeToggle from './DarkModeToggle.vue';
+import { ref, computed, defineEmits } from 'vue';
+const emit = defineEmits(['volverInicio']);
 
 const showRanking = ref(false);
 const showStats = ref(false);
@@ -31,39 +31,44 @@ function calcularPrecision(player) {
 const props = defineProps({
   winner: { type: Boolean, default: false },
   loser: { type: Boolean, default: false },
-  message: { type: String, default: "" },
+  message: { type: String, default: '' },
   players: { type: Array, default: () => [] },
-  modo: { type: String, default: "normal" },
+  modo: { type: String, default: 'normal' },
 });
 
 // Texto calculado según props
 const title = computed(() =>
-  props.winner ? "¡Has guanyat!" : props.loser ? "Has perdut" : ""
+  props.winner ? '¡Has guanyat!' : props.loser ? 'Has perdut' : '',
 );
 const displayedMessage = computed(() => {
   if (props.message) return props.message;
 
   if (props.winner) {
-    return props.modo === "muerteSubita"
+    return props.modo === 'muerteSubita'
       ? "Ets l'últim jugador dret!"
-      : "Has completat totes les paraules.";
+      : 'Has completat totes les paraules.';
   }
 
   if (props.loser) {
-    return props.modo === "muerteSubita"
-      ? "Has fallat una paraula. Has estat eliminat."
-      : "Masses errors o paraules acumulades.";
+    return props.modo === 'muerteSubita'
+      ? 'Has fallat una paraula. Has estat eliminat.'
+      : 'Masses errors o paraules acumulades.';
   }
 
-  return "";
+  return '';
 });
 const sortedPlayers = computed(() =>
   [...props.players].sort(
-    (a, b) => (b.completedWords ?? 0) - (a.completedWords ?? 0)
-  )
+    (a, b) => (b.completedWords ?? 0) - (a.completedWords ?? 0),
+  ),
 );
 function emitirVolverInicio() {
-  emit("volverInicio");
+  emit('volverInicio');
+}
+
+function cerrarResultados() {
+  // Cierra el modal sin volver al lobby
+  emit('cerrarResultados');
 }
 </script>
 
@@ -79,10 +84,10 @@ function emitirVolverInicio() {
           Tornar al lobby
         </button>
         <button @click="toggleRanking">
-          {{ showRanking ? "Amagar ranking" : "Veure ranking" }}
+          {{ showRanking ? 'Amagar ranking' : 'Veure ranking' }}
         </button>
         <button @click="toggleStats">
-          {{ showStats ? "Amagar estadístiques" : "Estadístiques" }}
+          {{ showStats ? 'Amagar estadístiques' : 'Estadístiques' }}
         </button>
       </div>
       <div v-if="showRanking" class="ranking-table">

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineEmits } from 'vue';
+import { ref, computed, onMounted, onUnmounted, defineEmits, watch } from 'vue';
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
 import { useSounds } from '@/composables/useSounds';
@@ -31,6 +31,7 @@ const filesDelTeclat = ref([
 ]);
 const teclaPremuda = ref('');
 const JuegoTerminado = ref(false);
+const eliminado = ref(false);
 
 const estatDelJoc = ref({
   paraules: [],
@@ -118,7 +119,7 @@ function iniciarCronometreParaula() {
 
 // 2. MODIFICAR 'validarProgres'
 function validarProgres() {
-  if (JuegoTerminado.value || props.isSpectator) return;
+  if (JuegoTerminado.value || props.isSpectator || eliminado.value) return;
 
   if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
@@ -298,6 +299,7 @@ onMounted(() => {
     if (data.playerId === communicationManager.getId() && !props.isSpectator) {
       perdedor.value = true;
       ganador.value = false;
+      eliminado.value = true;
       JuegoTerminado.value = true;
       onGameEnd();
       communicationManager.updatePlayerProgress({
@@ -522,7 +524,12 @@ onUnmounted(() => {
 
         <h3>[REFUGIATS]</h3>
         <ul>
-          <li v-for="p in sortedPlayers" :key="p.id" class="player-name-inline">
+          <li
+            v-for="p in sortedPlayers"
+            :key="p.id"
+            class="player-name-inline"
+            :class="{ eliminado: p.eliminated }"
+          >
             <span
               class="color-dot"
               :style="{
@@ -532,6 +539,12 @@ onUnmounted(() => {
               aria-hidden="true"
             ></span>
             <span class="player-name-text">{{ p.name }}</span>
+            <span
+              v-if="p.eliminated"
+              style="color: #dc3545; font-weight: bold; margin-left: 10px"
+            >
+              Eliminat
+            </span>
             <span class="completed-count">
               [Paraules: {{ p.completedWords || 0 }}]
             </span>
@@ -690,6 +703,10 @@ onUnmounted(() => {
   color: var(--color-text);
   font-weight: 700;
   font-size: 1.3rem;
+  transition: opacity 0.3s ease;
+}
+.player-name-inline.eliminado {
+  opacity: 0.5;
 }
 .player-name-text {
   font-weight: 700;

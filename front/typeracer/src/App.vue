@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import GameEngine from "./components/GameEngine.vue";
 import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
+import GameCountdown from "./components/GameCountdown.vue";
 import DarkModeToggle from "./components/DarkModeToggle.vue";
 import RoomSelector from "./components/RoomSelector.vue";
 import communicationManager from "./services/communicationManager.js";
@@ -52,7 +53,8 @@ watch(vistaActual, (newVista, oldVista) => {
   } else if (
     newVista === "lobby" ||
     newVista === "rooms" ||
-    newVista === "salaEspera"
+    newVista === "salaEspera" ||
+    newVista === "preparados"
   ) {
     playMenuMusic();
   }
@@ -160,7 +162,7 @@ function connectarAlServidor() {
       playerWords.value = [];
     }
     sessionStorage.setItem("justStartedGame", "true");
-    vistaActual.value = "joc";
+    vistaActual.value = "preparados";
   });
 
   communicationManager.onJoinedRoom((data) => {
@@ -207,6 +209,10 @@ function toggleReady() {
 }
 function startGameByHost() {
   communicationManager.requestStart(modoJuego.value);
+}
+
+function onCountdownComplete() {
+  vistaActual.value = "joc";
 }
 
 watch(modoJuego, (newModo, oldModo) => {
@@ -396,6 +402,13 @@ communicationManager.onkicked(() => {
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-else-if="vistaActual === 'preparados'" class="vista-container-preparados">
+      <GameCountdown 
+        :modo="modoJuego"
+        @countdownComplete="onCountdownComplete"
+      />
     </div>
 
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
@@ -590,6 +603,12 @@ communicationManager.onkicked(() => {
   margin: 20px auto;
   padding: 0;
   border: none;
+}
+.vista-container-preparados {
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
 }
 h1 {
   font-size: 3.5rem;
