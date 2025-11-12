@@ -611,6 +611,7 @@ io.on("connection", (socket) => {
 
       // Notificar al ganador
       io.to(ganador.id).emit("playerWon", {
+        winnerId: ganador.id,
         message: "¡Ets l'últim jugador en peu!",
       });
 

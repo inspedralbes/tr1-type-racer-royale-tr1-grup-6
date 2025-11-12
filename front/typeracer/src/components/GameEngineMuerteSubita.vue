@@ -98,11 +98,11 @@ function handleKeyDown(event) {
 
   if (key === 'Backspace') {
     event.preventDefault();
-    estatDelJoc.value.textEntrat = estatDelJoc.value.textEntrat.slice(0, -1);
+    textEntratLocal.value = textEntratLocal.value.slice(0, -1);
     validarProgres();
   } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
     event.preventDefault();
-    estatDelJoc.value.textEntrat += key;
+    textEntratLocal.value += key;
     validarProgres();
   }
 }
@@ -124,7 +124,7 @@ function validarProgres() {
   });
 
   if (!paraula) {
-    estatDelJoc.value.textEntrat = '';
+    textEntratLocal.value = '';
     reiniciarCronometro();
     return;
   }
@@ -159,7 +159,7 @@ function validarProgres() {
     });
     // Limpiar input y reiniciar cronómetro
     estatDelJoc.value.paraules.pop();
-    estatDelJoc.value.textEntrat = '';
+    textEntratLocal.value = '';
     reiniciarCronometro();
     return;
   }
@@ -222,7 +222,8 @@ function reiniciarCronometro() {
       manejarTiempoAgotado();
       if (vidasRestantes.value <= 0) {
         perdedor.value = true;
-        perdidoMensaje.value = 'Has perdido todas tus vidas. ¡Estás eliminado!';
+        perdidoMensaje.value =
+          'Has perdut totes les teves vides. ¡Estàs eliminat!';
         JuegoTerminado.value = true;
         communicationManager.reportMuerteSubitaElimination();
         finalizarJuego();
@@ -260,7 +261,8 @@ function manejarError() {
     // Si se quedó sin vidas, entonces derrota inmediata
     if (vidasRestantes.value <= 0) {
       perdedor.value = true;
-      perdidoMensaje.value = 'Has perdido todas tus vidas. ¡Estás eliminado!';
+      perdidoMensaje.value =
+        'Has perdut totes les teves vides. ¡Estàs eliminat!';
       JuegoTerminado.value = true;
       communicationManager.reportMuerteSubitaElimination();
       finalizarJuego();
@@ -309,16 +311,16 @@ onMounted(() => {
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
-    if (data.winnerId === communicationManager.getId() && !props.isSpectator) {
+    if (data.winnerId == communicationManager.getId() && !props.isSpectator) {
       ganador.value = true;
       perdedor.value = false;
-      perdidoMensaje.value =
-        data?.message || 'Has guanyat! Tots els altres han estat eliminats.';
+    } else if (!props.isSpectator) {
+      perdedor.value = true;
+      ganador.value = false;
     }
 
     JuegoTerminado.value = true;
-    perdidoMensaje.value =
-      data?.message || '¡Has ganado! Todos los demás fueron eliminados.';
+    perdidoMensaje.value = data?.message || ''; // Pass server message or empty
     if (revealTimer) clearInterval(revealTimer);
     if (countdownTimer) clearInterval(countdownTimer);
   });
@@ -440,8 +442,7 @@ function finalizarJuego() {
           <input
             type="text"
             class="text-input"
-            v-model="estatDelJoc.textEntrat"
-            @input="validarProgres"
+            v-model="textEntratLocal"
             @keydown="handleKeyDown"
             placeholder="Comença a escriure..."
             :disabled="JuegoTerminado"
