@@ -74,6 +74,7 @@ const displayedText = computed(() => {
 });
 
 const totalErrors = ref(0);
+let gameStartTime = 0;
 
 //variables corazones
 const vidasRestantes = ref(3); //  Dos vidas por jugador
@@ -248,6 +249,7 @@ function manejarError() {
 
   // Solo aplica en modo muerte súbita
   if (props.modo === 'muerteSubita') {
+    totalErrors.value++;
     vidasRestantes.value--;
     updateLocalPlayerLives(vidasRestantes.value);
 
@@ -319,10 +321,8 @@ onMounted(() => {
       ganador.value = false;
     }
 
-    JuegoTerminado.value = true;
     perdidoMensaje.value = data?.message || ''; // Pass server message or empty
-    if (revealTimer) clearInterval(revealTimer);
-    if (countdownTimer) clearInterval(countdownTimer);
+    finalizarJuego();
   });
 
   communicationManager.onPlayerProgressUpdate((data) => {
@@ -369,8 +369,9 @@ onMounted(() => {
         };
         estatDelJoc.value.paraules.unshift(newParaula);
 
-        // Si es la primera palabra, iniciar el cronómetro
+        // Si es la primera palabra, iniciar el cronómetro y el tiempo de juego
         if (estatDelJoc.value.paraules.length === 1) {
+          gameStartTime = Date.now();
           reiniciarCronometro();
         }
       }
@@ -389,7 +390,18 @@ function calculateProgress(completedWords) {
   return (completedWords / estatDelJoc.value.paraules.length) * 100;
 }
 
+function enviarEstadisticasFinales() {
+  if (!gameStartTime) return;
+  const playTime = Date.now() - gameStartTime;
+  communicationManager.updatePlayerProgress({
+    playTime: playTime,
+    totalErrors: totalErrors.value,
+  });
+}
+
 function finalizarJuego() {
+  if (JuegoTerminado.value) return;
+  enviarEstadisticasFinales();
   JuegoTerminado.value = true;
   if (revealTimer) clearInterval(revealTimer);
   if (countdownTimer) clearInterval(countdownTimer);
