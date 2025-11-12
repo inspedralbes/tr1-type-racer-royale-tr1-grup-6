@@ -34,22 +34,20 @@ onMounted(() => {
 <template>
   <div class="countdown-container">
     <div class="countdown-content">
-      <h1 class="preparados-titulo">¿Preparados?</h1>
+      <h1 class="preparados-titulo">Preparats?</h1>
 
       <div class="modo-info">
         <p class="modo-badge" :class="modo">
-          Mode: {{ modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+          Mode: {{ modo === 'muerteSubita' ? 'Mort subita' : 'Normal' }}
         </p>
       </div>
 
       <div class="countdown-circle" :class="{ animate: isAnimating }">
-        <span class="countdown-number">{{ countdown || '¡YA!' }}</span>
+        <span class="countdown-number">{{ countdown || 'JA!' }}</span>
       </div>
 
       <p class="countdown-text">
-        {{
-          countdown > 0 ? 'El juego empieza en...' : '¡Que empiece la carrera!'
-        }}
+        {{ countdown > 0 ? 'El joc comença en...' : 'Que comenci la cursa!' }}
       </p>
     </div>
   </div>

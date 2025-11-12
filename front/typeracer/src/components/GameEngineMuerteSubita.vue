@@ -89,6 +89,9 @@ function handleKeyDown(event) {
   const key = event.key;
 
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
+    if (!gameStartTime) {
+      gameStartTime = Date.now();
+    }
     teclaPremuda.value = key.toUpperCase();
     setTimeout(() => {
       teclaPremuda.value = '';
@@ -154,9 +157,12 @@ function validarProgres() {
     paraula.errors = wordErrors;
     paraula.estat = 'completada';
 
+    const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
       lives: vidasRestantes.value,
+      totalErrors: totalErrors.value,
+      playTime: playTime,
     });
     // Limpiar input y reiniciar cronómetro
     estatDelJoc.value.paraules.pop();
@@ -371,7 +377,6 @@ onMounted(() => {
 
         // Si es la primera palabra, iniciar el cronómetro y el tiempo de juego
         if (estatDelJoc.value.paraules.length === 1) {
-          gameStartTime = Date.now();
           reiniciarCronometro();
         }
       }
@@ -390,18 +395,26 @@ function calculateProgress(completedWords) {
   return (completedWords / estatDelJoc.value.paraules.length) * 100;
 }
 
-function enviarEstadisticasFinales() {
-  if (!gameStartTime) return;
-  const playTime = Date.now() - gameStartTime;
-  communicationManager.updatePlayerProgress({
-    playTime: playTime,
-    totalErrors: totalErrors.value,
-  });
-}
-
 function finalizarJuego() {
   if (JuegoTerminado.value) return;
-  enviarEstadisticasFinales();
+  const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
+  const finalStats = {
+    playTime: playTime,
+    totalErrors: totalErrors.value,
+    completedWords: palabrasCompletadas.value,
+    lives: vidasRestantes.value,
+  };
+  communicationManager.updatePlayerProgress(finalStats);
+
+  const localPlayer = props.players.find(
+    (p) => p.id === communicationManager.getId(),
+  );
+  if (localPlayer) {
+    localPlayer.playTime = finalStats.playTime;
+    localPlayer.totalErrors = finalStats.totalErrors;
+    localPlayer.completedWords = finalStats.completedWords;
+  }
+
   JuegoTerminado.value = true;
   if (revealTimer) clearInterval(revealTimer);
   if (countdownTimer) clearInterval(countdownTimer);
