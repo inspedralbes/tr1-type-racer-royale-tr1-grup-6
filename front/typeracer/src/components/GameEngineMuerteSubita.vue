@@ -116,7 +116,7 @@ function validarProgres() {
     if (self) self.completedWords = (self.completedWords || 0) + 1;
 
     // Contar errores de la palabra
-    const wordErrors = paraula.letterErrors.filter(e => e).length;
+    const wordErrors = paraula.letterErrors.filter((e) => e).length;
     paraula.errors = wordErrors;
     paraula.estat = "completada";
 
@@ -185,7 +185,16 @@ function reiniciarCronometro() {
     if (tiempoRestante.value <= 0) {
       clearInterval(countdownTimer);
       countdownTimer = null;
+      vidasRestantes.value--;
+      updateLocalPlayerLives(vidasRestantes.value);
       manejarTiempoAgotado();
+      if (vidasRestantes.value <= 0) {
+        perdedor.value = true;
+        perdidoMensaje.value = "Has perdido todas tus vidas. ¡Estás eliminado!";
+        JuegoTerminado.value = true;
+        communicationManager.reportMuerteSubitaElimination();
+        finalizarJuego();
+      }
     }
   }, 100);
 }
@@ -227,7 +236,7 @@ function manejarError() {
   }
 }
 
-  // 🚨 Función centralizada para actualizar vidas localmente y en el servidor
+// 🚨 Función centralizada para actualizar vidas localmente y en el servidor
 function updateLocalPlayerLives(newLives) {
   const playerId = communicationManager.id;
   if (playerId) {
@@ -254,7 +263,7 @@ onMounted(() => {
       };
     });
   }
-  
+
   // Inicializar vidas del jugador actual cuando se conecta
   communicationManager.onConnect((id) => {
     if (props.modo === "muerteSubita") {
@@ -264,7 +273,8 @@ onMounted(() => {
       };
       playersLives.value = { ...playersLives.value };
     }
-  });  communicationManager.onPlayerWon((data) => {
+  });
+  communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
     ganador.value = true;
     perdedor.value = false;
@@ -318,7 +328,7 @@ onMounted(() => {
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
         estatDelJoc.value.paraules.unshift(newParaula);
-        
+
         // Si es la primera palabra, iniciar el cronómetro
         if (estatDelJoc.value.paraules.length === 1) {
           reiniciarCronometro();
@@ -432,7 +442,9 @@ function finalizarJuego() {
             v-for="p in props.players"
             :key="p.id"
             class="player-item"
-            :class="{ eliminado: p.eliminated || playersLives[p.id]?.lives === 0 }"
+            :class="{
+              eliminado: p.eliminated || playersLives[p.id]?.lives === 0,
+            }"
           >
             <div class="player-info">
               <span class="player-name-text">{{ p.name }}</span>
@@ -449,7 +461,7 @@ function finalizarJuego() {
               </span>
               <div class="vidas-jugador">
                 <span
-                  v-for="n in (playersLives[p.id]?.lives || 0)"
+                  v-for="n in playersLives[p.id]?.lives || 0"
                   :key="n"
                   class="corazon"
                   >❤️</span
