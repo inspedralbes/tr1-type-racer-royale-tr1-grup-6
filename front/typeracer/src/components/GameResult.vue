@@ -38,21 +38,21 @@ const props = defineProps({
 
 // Texto calculado según props
 const title = computed(() =>
-  props.winner ? "¡Has ganado!" : props.loser ? "Has perdido" : ""
+  props.winner ? "¡Has guanyat!" : props.loser ? "Has perdut" : ""
 );
 const displayedMessage = computed(() => {
   if (props.message) return props.message;
 
   if (props.winner) {
     return props.modo === "muerteSubita"
-      ? "¡Eres el último jugador en pie!"
-      : "Completaste todas las palabras.";
+      ? "Ets l'últim jugador dret!"
+      : "Has completat totes les paraules.";
   }
 
   if (props.loser) {
     return props.modo === "muerteSubita"
-      ? "Fallaste una palabra. Has sido eliminado."
-      : "Demasiados errores o palabras acumuladas.";
+      ? "Has fallat una paraula. Has estat eliminat."
+      : "Masses errors o paraules acumulades.";
   }
 
   return "";
@@ -76,13 +76,13 @@ function emitirVolverInicio() {
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="emitirVolverInicio" style="margin-left: 8px">
-          Volver al lobby
+          Tornar al lobby
         </button>
         <button @click="toggleRanking">
-          {{ showRanking ? "Ocultar ranking" : "Ver ranking" }}
+          {{ showRanking ? "Amagar ranking" : "Veure ranking" }}
         </button>
         <button @click="toggleStats">
-          {{ showStats ? "Ocultar estadísticas" : "Estadísticas" }}
+          {{ showStats ? "Amagar estadístiques" : "Estadístiques" }}
         </button>
       </div>
       <div v-if="showRanking" class="ranking-table">
@@ -91,8 +91,8 @@ function emitirVolverInicio() {
             <tr>
               <th>Posició</th>
               <th>Jugador</th>
-              <th>Palabras</th>
-              <th>Errores</th>
+              <th>Paraules</th>
+              <th>Errors</th>
             </tr>
           </thead>
           <tbody>
@@ -111,8 +111,8 @@ function emitirVolverInicio() {
             <tr>
               <th>Posició</th>
               <th>Jugador</th>
-              <th>Velocidad (WPM)</th>
-              <th>Precisión (%)</th>
+              <th>Velocitat (WPM)</th>
+              <th>Precisió (%)</th>
             </tr>
           </thead>
           <tbody>
@@ -165,7 +165,7 @@ function emitirVolverInicio() {
 }
 
 .result-card {
-  max-width: 520px;
+  max-width: 620px;
   width: 90%;
   padding: 32px;
   border-radius: 10px;
@@ -215,6 +215,7 @@ function emitirVolverInicio() {
   color: var(--color-text);
   cursor: pointer;
   transition: all 0.2s ease;
+  margin: 0.4rem;
 }
 
 .actions button:hover {

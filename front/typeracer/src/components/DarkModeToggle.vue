@@ -3,7 +3,7 @@
     class="dark-toggle"
     :aria-pressed="isDark.toString()"
     @click="toggle"
-    title="Toggle dark mode"
+    title="Canvia el mode a fosc"
   >
     <span v-if="isDark">🌙</span>
     <span v-else>☀️</span>
