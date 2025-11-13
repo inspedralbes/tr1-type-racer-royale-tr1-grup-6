@@ -1,4 +1,5 @@
 <script setup>
+// 1. IMPORTAR WATCH
 import { ref, computed, onMounted, onUnmounted, defineEmits, watch } from 'vue';
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
@@ -44,31 +45,53 @@ const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
 
+// 2. CREAR LISTA LOCAL DE JUGADORES
+const localPlayers = ref([]);
+
+// 3. AÑADIR WATCH PARA SINCRONIZAR LISTAS (SIN ELIMINAR)
+watch(
+  () => props.players,
+  (propPlayers) => {
+    propPlayers.forEach((propP) => {
+      let localP = localPlayers.value.find((p) => p.id === propP.id);
+      if (localP) {
+        // Si el jugador existe, actualiza sus datos (palabras, estado, etc.)
+        Object.assign(localP, propP);
+      } else {
+        // Si el jugador no existe, añádelo (esto maneja la inicialización)
+        localPlayers.value.push(JSON.parse(JSON.stringify(propP)));
+      }
+    });
+    // **Importante:** No se elimina a nadie, así que si un jugador
+    // desaparece de 'props.players' (al espiar), permanece en 'localPlayers'.
+  },
+  { deep: true, immediate: true },
+);
+
+// 4. CAMBIAR COMPUTEDS PARA USAR 'localPlayers'
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
-  const target = props.players.find((p) => p.id === props.spectatorTargetId);
-  // Si no el troba (potser s'ha desconnectat), mira el primer jugador
-  return target || props.players[0] || null;
+  const target = localPlayers.value.find((p) => p.id === props.spectatorTargetId);
+  return target || localPlayers.value[0] || null;
 });
 
-// AQUESTA ÉS LA PILA DE PARAULES QUE ES MOSTRA
 const wordStack = computed(() => {
   if (props.isSpectator) {
-    // Si som espectadors, mirem la pila del jugador observat
     return watchedPlayer.value?.wordStack || [];
   } else {
-    // Si som jugadors, mirem la nostra pila local
     return estatDelJoc.value.paraules;
   }
 });
 
 const sortedPlayers = computed(() => {
-  return [...props.players].sort(
+  // Ordena la lista local
+  return [...localPlayers.value].sort(
     (a, b) => (b.completedWords || 0) - (a.completedWords || 0),
   );
 });
 
-// LA PARAULA ACTIVA DEPÈN DE LA PILA QUE ES MOSTRA
+// ... (El resto de computed properties no cambian) ...
+
 const paraulaActiva = computed(() => {
   if (wordStack.value.length === 0) {
     return null;
@@ -76,7 +99,6 @@ const paraulaActiva = computed(() => {
   return wordStack.value[wordStack.value.length - 1];
 });
 
-// EL TEXT D'INPUT DEPÈN DE QUI SOM
 const displayedText = computed(() => {
   if (props.isSpectator) {
     return watchedPlayer.value?.currentWordProgress || '';
@@ -91,22 +113,15 @@ function handleVolverInicio() {
   emit('volverInicio');
 }
 
-// --- NOVES FUNCIONS ---
-/**
- * NOU: Es crida al clicar el botó 'Ver Partida'.
- * Li diu al communicationManager que iniciï la transició.
- */
 function convertirEnEspectador() {
   console.log('Sol·licitant convertir-se en espectador...');
   communicationManager.requestSpectate();
-  // No cal fer res més aquí. El servidor respondrà,
-  // App.vue ho escoltarà i actualitzarà la prop 'isSpectator'.
-  // Això farà que aquest component reaccioni i mostri la UI d'espectador.
 }
-// --- FI NOVES FUNCIONS ---
+
+// ... (handleKeyDown, iniciarCronometreParaula, validarProgres, onGameEnd y getClasseLletra no cambian) ...
 
 function handleKeyDown(event) {
-  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return; // Afegit 'perdedor.value'
+  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return;
 
   const key = event.key;
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
@@ -131,7 +146,6 @@ function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
 
-// 2. MODIFICAR 'validarProgres'
 function validarProgres() {
   if (JuegoTerminado.value || props.isSpectator || perdedor.value) return;
 
@@ -143,11 +157,9 @@ function validarProgres() {
   }
 
   const typed = textEntratLocal.value;
-  // El jugador valida contra la seva pròpia pila local
   const paraula =
     estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
 
-  // Envia el progrés I la pila
   communicationManager.updatePlayerProgress({
     currentWordProgress: typed,
     wordStack: estatDelJoc.value.paraules,
@@ -244,7 +256,6 @@ function onGameEnd() {
   }
 }
 
-// 3. MODIFICAR 'getClasseLletra'
 function getClasseLletra(indexLletra) {
   if (!paraulaActiva.value) return '';
   const typed = displayedText.value;
@@ -269,7 +280,6 @@ function getClasseLletra(indexLletra) {
   return classes.join(' ');
 }
 
-// 4. MODIFICAR 'onMounted'
 onMounted(() => {
   if (!props.isSpectator) {
     window.addEventListener('keydown', handleKeyDown);
@@ -284,7 +294,8 @@ onMounted(() => {
     remainingWords.value = props.initialWords.slice();
   }
 
-  const ownPlayer = props.players.find(
+  // 5. ACTUALIZAR onMounted para usar 'localPlayers'
+  const ownPlayer = localPlayers.value.find(
     (p) => p.id === communicationManager.getId(),
   );
   if (ownPlayer) {
@@ -300,22 +311,39 @@ onMounted(() => {
     }
   }
 
+  // 6. ACTUALIZAR 'onPlayerEliminated' para guardar datos en 'localPlayers'
   communicationManager.onPlayerEliminated((data) => {
     if (JuegoTerminado.value) return;
 
-    // Només s'aplica al jugador eliminat
     if (data.playerId === communicationManager.getId() && !props.isSpectator) {
-      perdedor.value = true; // <-- CANVI CLAU
+      perdedor.value = true;
       ganador.value = false;
       eliminado.value = true;
 
       onGameEnd();
+
+      // Captura las estadísticas finales
+      const finalPlayTime = (endTime.value || Date.now()) - (startTime.value || Date.now());
+      const finalCompletedWords = palabrasCompletadas.value;
+      const finalTotalErrors = totalErrors.value;
+
+      // Envía el progreso final al servidor
       communicationManager.updatePlayerProgress({
-        completedWords: palabrasCompletadas.value,
-        totalErrors: totalErrors.value,
-        playTime:
-          (endTime.value || Date.now()) - (startTime.value || Date.now()),
+        completedWords: finalCompletedWords,
+        totalErrors: finalTotalErrors,
+        playTime: finalPlayTime,
+        eliminated: true, // Informa al servidor
       });
+
+      // **CAMBIO CLAVE**: Actualiza la lista local INMEDIATAMENTE
+      const self = localPlayers.value.find(p => p.id === data.playerId);
+      if (self) {
+        self.completedWords = finalCompletedWords;
+        self.totalErrors = finalTotalErrors;
+        self.playTime = finalPlayTime;
+        self.eliminated = true;
+      }
+
       perdidoMensaje.value =
         data?.message || 'Has perdut: massa paraules acumulades.';
       playSound('gameLose');
@@ -329,7 +357,6 @@ onMounted(() => {
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
-    // Només el jugador real pot guanyar
     if (data.winnerId === communicationManager.getId() && !props.isSpectator) {
       ganador.value = true;
       perdedor.value = false;
@@ -345,27 +372,39 @@ onMounted(() => {
     }
   });
 
+  // 7. ACTUALIZAR 'onGameOver' para guardar datos en 'localPlayers'
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
     onGameEnd();
 
     if (props.isSpectator) {
-      // LÒGICA D'ESPECTADOR
-      // Si el jugador ja havia perdut, mantenim l'estat de perdedor
-      // per mostrar la pantalla de resultats correcta.
       ganador.value = false;
       perdidoMensaje.value =
         data.message || `La partida ha acabat. Guanyador: ${data.winnerName}.`;
     } else {
-      // LÒGICA DE JUGADOR
+      // Lógica de jugador
       if (!props.isSpectator) {
+        // Captura las estadísticas finales
+        const finalPlayTime = (endTime.value || Date.now()) - (startTime.value || Date.now());
+        const finalCompletedWords = palabrasCompletadas.value;
+        const finalTotalErrors = totalErrors.value;
+
+        // Envía el progreso final
         communicationManager.updatePlayerProgress({
-          completedWords: palabrasCompletadas.value,
-          totalErrors: totalErrors.value,
-          playTime:
-            (endTime.value || Date.now()) - (startTime.value || Date.now()),
+          completedWords: finalCompletedWords,
+          totalErrors: finalTotalErrors,
+          playTime: finalPlayTime,
         });
+
+        // **CAMBIO CLAVE**: Actualiza también la lista local
+        const self = localPlayers.value.find(p => p.id === communicationManager.getId());
+        if (self && !self.eliminated) { // No sobrescribas si ya estabas eliminado
+          self.completedWords = finalCompletedWords;
+          self.totalErrors = finalTotalErrors;
+          self.playTime = finalPlayTime;
+        }
       }
+      
       if (data.winnerId === communicationManager.getId()) {
         ganador.value = true;
         perdedor.value = false;
@@ -374,7 +413,7 @@ onMounted(() => {
           data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
-        perdedor.value = true; // Aquí 'perdedor' és correcte perquè és la fi del joc
+        perdedor.value = true;
         playSound('gameLose');
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
@@ -390,7 +429,7 @@ onMounted(() => {
 
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
-      if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
+      if (JuegoTerminado.value || perdedor.value) return;
       try {
         if (
           remainingWords.value.length > 0 &&
@@ -407,7 +446,6 @@ onMounted(() => {
           estatDelJoc.value.paraules.unshift(newParaula);
           playSound('newWord');
 
-          // CORRECCIÓ 6: El jugador ha d'enviar la pila quan cau una paraula
           communicationManager.updatePlayerProgress({
             wordStack: estatDelJoc.value.paraules,
           });
@@ -522,7 +560,7 @@ onUnmounted(() => {
           <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
           <div class="spectator-targets">
             <button
-              v-for="p in props.players"
+              v-for="p in localPlayers"
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
@@ -590,7 +628,7 @@ onUnmounted(() => {
       :winner="ganador"
       :loser="perdedor"
       :message="perdidoMensaje"
-      :players="props.players"
+      :players="localPlayers"
       @volverInicio="handleVolverInicio"
       :modo="props.modo"
       :isSpectator="props.isSpectator"

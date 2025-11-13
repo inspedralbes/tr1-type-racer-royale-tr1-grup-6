@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineEmits } from 'vue'; // Afegit defineEmits
+// 1. IMPORTAR WATCH
+import { ref, computed, onMounted, onUnmounted, defineEmits, watch } from 'vue';
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
 
@@ -12,12 +13,50 @@ const props = defineProps({
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
 });
-const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']); // Ja estava
+const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
+
+// 2. CREAR LISTA LOCAL DE JUGADORES
+const localPlayers = ref([]);
+
+// 3. AÑADIR WATCH PARA SINCRONIZAR LISTAS (SIN ELIMINAR)
+watch(
+  () => props.players,
+  (propPlayers) => {
+    propPlayers.forEach((propP) => {
+      let localP = localPlayers.value.find((p) => p.id === propP.id);
+      if (localP) {
+        // Actualiza datos existentes
+        Object.assign(localP, propP);
+      } else {
+        // Añade nuevo jugador con 3 vidas por defecto (para este modo)
+        localPlayers.value.push({
+          ...JSON.parse(JSON.stringify(propP)),
+          lives: 3, 
+        });
+      }
+    });
+  },
+  { deep: true, immediate: true },
+);
+
+// 4. CAMBIAR COMPUTEDS PARA USAR 'localPlayers'
 const sortedPlayers = computed(() => {
-  return [...props.players].sort((a, b) => {
+  return [...localPlayers.value].sort((a, b) => {
+    // Ordena primero por vidas, luego por palabras
+    if ((b.lives || 0) !== (a.lives || 0)) {
+      return (b.lives || 0) - (a.lives || 0);
+    }
     return (b.completedWords || 0) - (a.completedWords || 0);
   });
 });
+
+const watchedPlayer = computed(() => {
+  if (!props.isSpectator || !props.spectatorTargetId) return null;
+  const target = localPlayers.value.find((p) => p.id === props.spectatorTargetId);
+  return target || localPlayers.value[0] || null;
+});
+
+// ... (El resto de refs y computed no cambian) ...
 const perdedor = ref(false);
 const ganador = ref(false);
 const perdidoMensaje = ref('');
@@ -40,22 +79,6 @@ const palabrasCompletadas = ref(0);
 const remainingWords = ref([]);
 let revealTimer = null;
 let tempsIniciParaula = 0;
-function handleVolverInicio() {
-  emit('volverInicio');
-}
-
-// --- NOU: Funció per sol·licitar ser espectador ---
-function convertirEnEspectador() {
-  console.log('Sol·licitant convertir-se en espectador...');
-  communicationManager.requestSpectate();
-}
-// --- FI NOU ---
-
-const watchedPlayer = computed(() => {
-  if (!props.isSpectator || !props.spectatorTargetId) return null;
-  const target = props.players.find((p) => p.id === props.spectatorTargetId);
-  return target || props.players[0] || null;
-});
 
 const wordStack = computed(() => {
   if (props.isSpectator) {
@@ -83,15 +106,22 @@ const displayedText = computed(() => {
 const totalErrors = ref(0);
 let gameStartTime = 0;
 
-//variables corazones
-const vidasRestantes = ref(3); //  Dos vidas por jugador
-const tiempoRestante = ref(5); // 5 segundos
+const vidasRestantes = ref(3);
+const tiempoRestante = ref(5);
 let countdownTimer = null;
-const playersLives = ref({});
+const playersLives = ref({}); // Mantenemos este para la UI de corazones si es necesario
 
-// Manejo teclado
+function handleVolverInicio() {
+  emit('volverInicio');
+}
+
+function convertirEnEspectador() {
+  console.log('Sol·licitant convertir-se en espectador...');
+  communicationManager.requestSpectate();
+}
+
+// ... (handleKeyDown, iniciarCronometreParaula no cambian) ...
 function handleKeyDown(event) {
-  // CANVI: Afegit 'perdedor.value'
   if (JuegoTerminado.value || props.isSpectator || perdedor.value) return;
 
   const key = event.key;
@@ -123,8 +153,9 @@ function iniciarCronometreParaula() {
   tempsIniciParaula = Date.now();
 }
 
+// 5. MODIFICAR 'validarProgres' para usar 'localPlayers'
 function validarProgres() {
-  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
+  if (JuegoTerminado.value || perdedor.value) return;
 
   const typed = textEntratLocal.value;
   const paraula =
@@ -141,7 +172,6 @@ function validarProgres() {
     return;
   }
 
-  // Inicializar errores de letras si no existen
   if (
     !Array.isArray(paraula.letterErrors) ||
     paraula.letterErrors.length !== paraula.text.length
@@ -152,15 +182,15 @@ function validarProgres() {
     );
   }
 
-  // Si completó la palabra correctamente
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-    const self = props.players.find(
+    
+    // Actualiza la lista local
+    const self = localPlayers.value.find(
       (p) => p.id === communicationManager.getId(),
     );
     if (self) self.completedWords = (self.completedWords || 0) + 1;
 
-    // Contar errores de la palabra
     const wordErrors = paraula.letterErrors.filter((e) => e).length;
     paraula.errors = wordErrors;
     paraula.estat = 'completada';
@@ -172,14 +202,13 @@ function validarProgres() {
       totalErrors: totalErrors.value,
       playTime: playTime,
     });
-    // Limpiar input y reiniciar cronómetro
+    
     estatDelJoc.value.paraules.pop();
     textEntratLocal.value = '';
     reiniciarCronometro();
     return;
   }
 
-  // Validar cada letra y manejar errores
   for (let i = 0; i < typed.length; i++) {
     if (i >= paraula.text.length) break;
 
@@ -187,7 +216,6 @@ function validarProgres() {
     if (isError && !paraula.letterErrors[i]) {
       paraula.letterErrors[i] = true;
 
-      // Reducir vidas si estamos en modo muerte súbita
       if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
         manejarError();
       }
@@ -213,17 +241,40 @@ function getClasseLletra(indexLletra) {
   return typed[indexLletra] === target[indexLletra] ? 'correcte' : 'incorrecte';
 }
 
+// 6. CREAR FUNCIÓN PARA GUARDAR STATS AL SER ELIMINADO
+function saveEliminationStats() {
+  if (perdedor.value) return; // Ya se ha procesado
+  
+  const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
+  const finalStats = {
+    playTime,
+    totalErrors: totalErrors.value,
+    completedWords: palabrasCompletadas.value,
+    lives: 0,
+    eliminated: true,
+  };
+
+  // Enviar al servidor
+  communicationManager.updatePlayerProgress(finalStats);
+
+  // Guardar en localPlayers
+  const self = localPlayers.value.find(p => p.id === communicationManager.getId());
+  if (self) {
+    Object.assign(self, finalStats);
+  }
+}
+
+// 7. MODIFICAR 'reiniciarCronometro' y 'manejarError' para llamar a saveEliminationStats
 function reiniciarCronometro() {
   if (countdownTimer) {
     clearInterval(countdownTimer);
   }
-  tiempoRestante.value = 5; // Siempre se resetea a 5
+  tiempoRestante.value = 5;
 
-  // Detener el timer si el juego ya terminó o hem perdut
   if (JuegoTerminado.value || perdedor.value) return;
 
   countdownTimer = setInterval(() => {
-    if (JuegoTerminado.value || perdedor.value) { // Afegit 'perdedor.value'
+    if (JuegoTerminado.value || perdedor.value) {
       clearInterval(countdownTimer);
       return;
     }
@@ -234,86 +285,91 @@ function reiniciarCronometro() {
       countdownTimer = null;
       vidasRestantes.value--;
       updateLocalPlayerLives(vidasRestantes.value);
-      manejarTiempoAgotado(); // Aquesta funció ara només reinicia
+      manejarTiempoAgotado();
       if (vidasRestantes.value <= 0) {
         perdedor.value = true;
         perdidoMensaje.value =
           'Has perdut totes les teves vides. ¡Estàs eliminat!';
-        // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
+        saveEliminationStats(); // <-- CAMBIO CLAVE
         communicationManager.reportMuerteSubitaElimination();
-        // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
       }
     }
   }, 100);
 }
 
-// Cuando se acaba el tiempo
 function manejarTiempoAgotado() {
-  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
+  if (JuegoTerminado.value || perdedor.value) return;
 
   if (props.modo === 'muerteSubita') {
-    // Simplemente reiniciar el cronómetro
     reiniciarCronometro();
   }
 }
 
-// Manejar error al escribir
 function manejarError() {
-  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
+  if (JuegoTerminado.value || perdedor.value) return;
 
-  // Solo aplica en modo muerte súbita
   if (props.modo === 'muerteSubita') {
     totalErrors.value++;
     vidasRestantes.value--;
     updateLocalPlayerLives(vidasRestantes.value);
 
-    // Efecto de error visual
     const input = document.querySelector('.text-input');
     if (input) {
       input.style.borderColor = '#ff4d4d';
       setTimeout(() => (input.style.borderColor = ''), 300);
     }
 
-    // Si se quedó sin vidas, entonces derrota
     if (vidasRestantes.value <= 0) {
       perdedor.value = true;
       perdidoMensaje.value =
         'Has perdut totes les teves vides. ¡Estàs eliminat!';
-      // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
+      saveEliminationStats(); // <-- CAMBIO CLAVE
       communicationManager.reportMuerteSubitaElimination();
-      // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
     }
   }
 }
 
-// 🚨 Función centralizada para actualizar vidas localmente y en el servidor
+// 8. MODIFICAR 'updateLocalPlayerLives' para actualizar 'localPlayers'
 function updateLocalPlayerLives(newLives) {
   const playerId = communicationManager.id;
   if (playerId) {
-    // 1. Actualiza el objeto interno (playersLives) para el rendering
+    // Actualiza 'playersLives' (UI de corazones antigua)
     playersLives.value[playerId] = {
       ...(playersLives.value[playerId] || { name: 'Tú' }),
       lives: newLives,
     };
     playersLives.value = { ...playersLives.value };
+    
+    // **CAMBIO CLAVE**: Actualiza 'localPlayers'
+    const localP = localPlayers.value.find(p => p.id === playerId);
+    if (localP) {
+      localP.lives = newLives;
+    }
+    
     communicationManager.updatePlayerProgress({
       lives: newLives,
     });
   }
 }
 
-// Ciclo vida
+// 9. MODIFICAR 'onMounted' para actualizar 'localPlayers'
 onMounted(() => {
-  // ... (tota la inicialització de 'playersLives' es queda igual)
-  if (props.players && props.players.length > 0) {
-    props.players.forEach((player) => {
-      playersLives.value[player.id] = {
-        name: player.name,
-        lives: 3,
-      };
-    });
+  // El watch 'immediate: true' ya ha poblado 'localPlayers'.
+  // Ahora sincronizamos 'playersLives' (si aún se usa) y 'vidasRestantes' local.
+  
+  // Sincroniza 'playersLives' con 'localPlayers'
+  localPlayers.value.forEach((player) => {
+    playersLives.value[player.id] = {
+      name: player.name,
+      lives: player.lives ?? 3, // Asume 3 si no está definido
+    };
+  });
+  
+  const self = localPlayers.value.find(p => p.id === communicationManager.getId());
+  if (self) {
+    vidasRestantes.value = self.lives ?? 3;
   }
-
+  
   communicationManager.onConnect((id) => {
     if (props.modo === 'muerteSubita') {
       playersLives.value[id] = {
@@ -321,16 +377,18 @@ onMounted(() => {
         lives: vidasRestantes.value,
       };
       playersLives.value = { ...playersLives.value };
+      
+      const localP = localPlayers.value.find(p => p.id === id);
+      if (localP) {
+        localP.lives = vidasRestantes.value;
+      }
     }
   });
-  
-  // Aquests listeners (onPlayerWon, onGameOver) són correctes,
-  // ja que marquen el final de la partida per a TOTHOM.
+
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
     if (props.isSpectator) {
-      // Si el jugador ja havia perdut, mantenim l'estat de perdedor.
       ganador.value = false;
       perdidoMensaje.value =
         data?.message || `Partida acabada. Guanyador: ${data.winnerName}`;
@@ -348,59 +406,66 @@ onMounted(() => {
     finalizarJuego();
   });
 
+  // **CAMBIO CLAVE**: Actualiza ambas listas
   communicationManager.onPlayerProgressUpdate((data) => {
     if (data.playerId && data.lives !== undefined) {
       playersLives.value[data.playerId] = {
         ...(playersLives.value[data.playerId] || {}),
         lives: data.lives,
       };
+      
+      const localP = localPlayers.value.find(p => p.id === data.playerId);
+      if (localP) {
+        localP.lives = data.lives;
+      }
     }
   });
 
+  // **CAMBIO CLAVE**: Actualiza ambas listas
   communicationManager.onPlayerEliminated((data) => {
     if (data.playerId) {
       if (playersLives.value[data.playerId]) {
         playersLives.value[data.playerId].lives = 0;
       }
+      
+      const localP = localPlayers.value.find(p => p.id === data.playerId);
+      if (localP) {
+        localP.lives = 0;
+        localP.eliminated = true; // Marca como eliminado en la lista local
+      }
     }
   });
 
   communicationManager.onGameOver((data) => {
-    // Aquest és el listener que marca el final DEFINITIU de la partida
-    if (JuegoTerminado.value) return; // Evitar execució múltiple
+    if (JuegoTerminado.value) return;
     
     if (props.isSpectator) {
-      // Si som espectadors, només mostrem el missatge final
       ganador.value = false;
       perdidoMensaje.value =
         data.message || `La partida ha acabat. Guanyador: ${data.winnerName}.`;
     } else {
-      // Si som jugadors, comprovem si hem guanyat o perdut
       if (data.winnerId === communicationManager.getId()) {
         ganador.value = true;
-        perdedor.value = false; // Assegurem que no és perdedor
+        perdedor.value = false;
         perdidoMensaje.value =
           data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
-        // Si no som guanyadors, som perdedors (ja sigui per eliminació prèvia o per ser l'últim a perdre)
         perdedor.value = true; 
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
       }
     }
 
-    finalizarJuego(); // Crida a la funció que atura tot
+    finalizarJuego();
   });
 
-  // Inicializar palabras restantes
   if (Array.isArray(props.initialWords) && props.initialWords.length > 0) {
     remainingWords.value = props.initialWords.slice();
   }
 
-  // Iniciar timer para revelar palabras e iniciar el cronómetro
   revealTimer = setInterval(() => {
-    if (JuegoTerminado.value || perdedor.value) return; // CANVI: Afegit 'perdedor.value'
+    if (JuegoTerminado.value || perdedor.value) return;
     try {
       if (
         remainingWords.value.length > 0 &&
@@ -416,7 +481,6 @@ onMounted(() => {
         };
         estatDelJoc.value.paraules.unshift(newParaula);
 
-        // Si es la primera palabra, iniciar el cronómetro y el tiempo de juego
         if (estatDelJoc.value.paraules.length === 1) {
           reiniciarCronometro();
         }
@@ -436,11 +500,10 @@ function calculateProgress(completedWords) {
   return (completedWords / estatDelJoc.value.paraules.length) * 100;
 }
 
+// 10. MODIFICAR 'finalizarJuego' para usar 'localPlayers'
 function finalizarJuego() {
-  // Aquesta funció ara només s'ha de cridar quan el joc ACABA DE VERITAT
-  if (JuegoTerminado.value) return; // Evita que es cridi múltiples cops
-  
-  JuegoTerminado.value = true; // Marca el joc com a acabat
+  if (JuegoTerminado.value) return;
+  JuegoTerminado.value = true;
 
   const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
   const finalStats = {
@@ -450,21 +513,22 @@ function finalizarJuego() {
     lives: vidasRestantes.value,
   };
   
-  // Només enviem progrés si no som espectadors
   if (!props.isSpectator) {
     communicationManager.updatePlayerProgress(finalStats);
 
-    const localPlayer = props.players.find(
+    // **CAMBIO CLAVE**: Actualiza 'localPlayers'
+    const localPlayer = localPlayers.value.find(
       (p) => p.id === communicationManager.getId(),
     );
-    if (localPlayer) {
+    // No sobrescribas si ya estabas eliminado (tus stats finales ya se guardaron)
+    if (localPlayer && !localPlayer.eliminated) { 
       localPlayer.playTime = finalStats.playTime;
       localPlayer.totalErrors = finalStats.totalErrors;
       localPlayer.completedWords = finalStats.completedWords;
+      localPlayer.lives = finalStats.lives;
     }
   }
 
-  // Atura tots els timers
   if (revealTimer) clearInterval(revealTimer);
   if (countdownTimer) clearInterval(countdownTimer);
 }
@@ -559,7 +623,7 @@ function finalizarJuego() {
           <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
           <div class="spectator-targets">
             <button
-              v-for="p in props.players"
+              v-for="p in localPlayers" 
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
@@ -581,13 +645,13 @@ function finalizarJuego() {
             :key="p.id"
             class="player-item"
             :class="{
-              eliminado: p.eliminated || playersLives[p.id]?.lives === 0,
+              eliminado: p.eliminated || p.lives === 0,
             }"
           >
             <div class="player-info">
               <span class="player-name-text">{{ p.name }}</span>
               <span
-                v-if="p.eliminated"
+                v-if="p.eliminated || p.lives === 0"
                 style="color: #dc3545; font-weight: bold; margin-left: 10px"
               >
                 Eliminat
@@ -598,8 +662,8 @@ function finalizarJuego() {
                 Paraules: {{ p.completedWords || 0 }}
               </span>
               <div class="vidas-jugador">
-                <span
-                  v-for="n in playersLives[p.id]?.lives || 0"
+                 <span
+                  v-for="n in p.lives || 0"
                   :key="n"
                   class="corazon"
                   >❤️</span
@@ -630,7 +694,7 @@ function finalizarJuego() {
         :winner="ganador"
         :loser="perdedor"
         :message="perdidoMensaje"
-        :players="props.players"
+        :players="localPlayers"
         @volverInicio="handleVolverInicio"
         :modo="props.modo"
         :isSpectator="props.isSpectator"
@@ -640,6 +704,9 @@ function finalizarJuego() {
 </template>
 
 <style scoped>
+/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
+/* ... (copia i enganxa tots els estils que ja tenies) ... */
+
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
