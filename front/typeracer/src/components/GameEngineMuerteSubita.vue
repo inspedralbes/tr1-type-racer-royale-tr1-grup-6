@@ -605,9 +605,6 @@ function finalizarJuego() {
 </template>
 
 <style scoped>
-/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
-/* ... (copia i enganxa tots els estils que ja tenies) ... */
-
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
@@ -668,11 +665,6 @@ function finalizarJuego() {
   display: block;
   max-width: 100%;
   padding: 10px 0 16px;
-  background: linear-gradient(
-    to top,
-    var(--color-background-soft),
-    transparent
-  );
   z-index: 30;
 }
 .fila {
