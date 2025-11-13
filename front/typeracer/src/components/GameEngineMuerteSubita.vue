@@ -329,15 +329,22 @@ onMounted(() => {
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
-    if (data.winnerId == communicationManager.getId() && !props.isSpectator) {
-      ganador.value = true;
-      perdedor.value = false;
-    } else if (!props.isSpectator) {
-      perdedor.value = true; // Correcte, perquè el joc ha acabat
+    if (props.isSpectator) {
+      // Si el jugador ja havia perdut, mantenim l'estat de perdedor.
       ganador.value = false;
+      perdidoMensaje.value =
+        data?.message || `Partida acabada. Guanyador: ${data.winnerName}`;
+    } else {
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false;
+      } else {
+        perdedor.value = true;
+        ganador.value = false;
+      }
+      perdidoMensaje.value = data?.message || '';
     }
 
-    perdidoMensaje.value = data?.message || '';
     finalizarJuego();
   });
 
@@ -477,10 +484,14 @@ function finalizarJuego() {
           <input
             type="text"
             class="text-input"
-            v-model="textEntratLocal"
+            :value="displayedText"
+            @input="textEntratLocal = $event.target.value"
             @keydown="handleKeyDown"
-            placeholder="Comença a escriure..."
+            :placeholder="
+              props.isSpectator ? 'MODO ESPECTADOR' : 'Comença a escriure...'
+            "
             :disabled="JuegoTerminado || perdedor"
+            :readonly="props.isSpectator"
             autocomplete="off"
           />
           <div class="barra-tiempo">

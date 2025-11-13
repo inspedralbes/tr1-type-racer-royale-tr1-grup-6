@@ -222,8 +222,12 @@ function validarProgres() {
 
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
-      onGameEnd();
-      communicationManager.updatePlayerProgress(progressPayload);
+      const finalStats = {
+        completedWords: palabrasCompletadas.value,
+        totalErrors: totalErrors.value,
+        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
+      };
+      communicationManager.updatePlayerProgress(finalStats);
     } else {
       communicationManager.updatePlayerProgress(progressPayload);
     }
@@ -315,7 +319,6 @@ onMounted(() => {
       ganador.value = false;
       eliminado.value = true;
 
-      JuegoTerminado.value = true;
       onGameEnd();
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
@@ -358,9 +361,11 @@ onMounted(() => {
 
     if (props.isSpectator) {
       // LÒGICA D'ESPECTADOR
+      // Si el jugador ja havia perdut, mantenim l'estat de perdedor
+      // per mostrar la pantalla de resultats correcta.
       ganador.value = false;
-      perdedor.value = false;
-      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
+      perdidoMensaje.value =
+        data.message || `La partida ha acabat. Guanyador: ${data.winnerName}.`;
     } else {
       // LÒGICA DE JUGADOR
       if (!props.isSpectator) {
