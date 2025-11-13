@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import GameEngine from './components/GameEngine.vue';
 import GameEngineMuerteSubita from './components/GameEngineMuerteSubita.vue';
 import DarkModeToggle from './components/DarkModeToggle.vue';
+import GameCountdown from './components/GameCountdown.vue';
 import RoomSelector from './components/RoomSelector.vue';
 import communicationManager from './services/communicationManager.js';
 import { useSounds } from '@/composables/useSounds';
@@ -201,20 +202,6 @@ function connectarAlServidor() {
     }
   });
 
-  // --- CANVI AFEGIT AQUÍ ---
-  /**
-   * NOU: ESCOLTA L'EVENT QUAN UN JUGADOR ÉS ELIMINAT
-   * I PASSA A SER ESPECTADOR DES DE DINS DE LA PARTIDA.
-   */
-  communicationManager.onSpectateModeActivated((data) => {
-    if (data.success) {
-      console.log('App.vue: Transició a espectador confirmada.');
-      isSpectator.value = true; // <-- AQUEST ÉS EL CANVI D'ESTAT CLAU
-      isReady.value = false; // Assegurem que no estem 'ready'
-    }
-  });
-  // --- FI DEL CANVI ---
-
   communicationManager.connect({
     name: nomJugador.value,
     color: colorJugador.value,
@@ -234,10 +221,6 @@ function startGameByHost() {
   } else {
     communicationManager.requestStart(modoJuego.value);
   }
-}
-
-function onCountdownComplete() {
-  vistaActual.value = 'joc';
 }
 
 function onCountdownComplete() {
@@ -331,7 +314,13 @@ communicationManager.onkicked(() => {
               contrarellotge: modoJuego === 'contrarellotge',
             }"
           >
-            {{ modoJuego === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+            {{
+              modoJuego === 'muerteSubita'
+                ? 'Muerte Súbita'
+                : modoJuego === 'contrarellotge'
+                ? 'Contrarellotge'
+                : 'Normal'
+            }}
           </span>
           <span
             class="mode-help"

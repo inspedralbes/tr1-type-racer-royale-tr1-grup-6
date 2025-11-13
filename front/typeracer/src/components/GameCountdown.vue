@@ -38,7 +38,11 @@ onMounted(() => {
 
       <div class="modo-info">
         <p class="modo-badge" :class="modo">
-          Mode: {{ modo === 'muerteSubita' ? 'Mort subita' : 'Normal' }}
+          Mode:
+          {{
+            (modo === 'muerteSubita' ? 'Mort subita' : 'Normal',
+            'Contrarellotge')
+          }}
         </p>
       </div>
 
