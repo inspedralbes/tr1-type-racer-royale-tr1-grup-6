@@ -294,7 +294,7 @@ onMounted(() => {
         onGameEnd();
         clearInterval(gameTimer);
       }
-    }, 33); // ~30 FPS
+    }, 16); // ~60 FPS
   }
 
 
@@ -368,6 +368,14 @@ onMounted(() => {
   });
 
   communicationManager.onGameOver((data) => {
+    // En modo contrarellotge evitamos terminar la partida por un gameOver
+    // enviado por el servidor hasta que nuestro temporizador local llegue a 0.
+    if (props.modo === 'contrarellotge' && contrarellotgeTimeLeft.value > 0) {
+      // Ignorar gameOver temprano; el servidor puede enviar gameOver por seguridad,
+      // pero el cliente debe esperar a 0s para mostrar el final.
+      console.log('Ignorando gameOver del servidor hasta timeLeft 0 (contrarellotge).', contrarellotgeTimeLeft.value);
+      return;
+    }
     if (JuegoTerminado.value) return;
     onGameEnd();
 
