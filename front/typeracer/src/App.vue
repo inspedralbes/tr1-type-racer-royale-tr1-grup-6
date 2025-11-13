@@ -2,11 +2,11 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import GameEngine from './components/GameEngine.vue';
 import GameEngineMuerteSubita from './components/GameEngineMuerteSubita.vue';
-import GameCountdown from './components/GameCountdown.vue';
 import DarkModeToggle from './components/DarkModeToggle.vue';
 import RoomSelector from './components/RoomSelector.vue';
 import communicationManager from './services/communicationManager.js';
 import { useSounds } from '@/composables/useSounds';
+import GameEngineContrarellotge from './components/GameEngineContrarellotge.vue';
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
@@ -14,6 +14,8 @@ const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
 const vistaActual = ref('salaEspera');
 
 // Estado de conexión
+const tempsContrarellotge = ref(30);
+const timeLeftGlobal = ref(30000); // 30s per defecte
 const nomJugador = ref('');
 const playersPayload = ref({ players: [], hostId: null, spectators: [] });
 const socketId = ref(null);
@@ -70,7 +72,6 @@ function saveStateToLocalStorage() {
     }),
   );
 }
-// Al cargar, solo actualiza esas refs locales
 function loadStateFromLocalStorage() {
   const saved = localStorage.getItem('typeRacerUser');
   if (saved) {
@@ -126,6 +127,12 @@ function connectarAlServidor() {
   }
   setVolume(0.5);
   playMenuMusic();
+
+  communicationManager.onEvent('timeLeftUpdate', (data) => {
+    if (data && typeof data.timeLeft === 'number') {
+      timeLeftGlobal.value = data.timeLeft;
+    }
+  });
 
   communicationManager.onConnect((id) => {
     socketId.value = id;
@@ -222,7 +229,15 @@ function toggleReady() {
   communicationManager.setReady(isReady.value);
 }
 function startGameByHost() {
-  communicationManager.requestStart(modoJuego.value);
+  if (modoJuego.value === 'contrarellotge') {
+    communicationManager.requestStart('contrarellotge', { duration: 30 });
+  } else {
+    communicationManager.requestStart(modoJuego.value);
+  }
+}
+
+function onCountdownComplete() {
+  vistaActual.value = 'joc';
 }
 
 function onCountdownComplete() {
@@ -247,25 +262,20 @@ function kickPlayer(playerId) {
     communicationManager.kickUser(currentRoom.value, playerId);
   }
 }
-
 function transferHost(newHostId) {
   if (!currentRoom.value) return;
   if (confirm('Estàs segur que vols transferir el rol de supervisor?')) {
     communicationManager.transferHost(currentRoom.value, newHostId);
   }
 }
-
 communicationManager.onHostTransferred(({ newHostId }) => {
-  // Actualizar el host en el payload
   playersPayload.value.hostId = newHostId;
-
   if (newHostId === socketId.value) {
     alert('Ahora eres el nuevo supervisor de la sala');
   } else {
     alert('El rol de supervisor ha sido transferido a otro jugador.');
   }
 });
-
 communicationManager.onkicked(() => {
   alert('Has sido expulsado de la sala.');
   volverInicio();
@@ -275,7 +285,6 @@ communicationManager.onkicked(() => {
 <template>
   <main>
     <DarkModeToggle />
-
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Atomic Syntax</h1>
       <input
@@ -317,13 +326,19 @@ communicationManager.onkicked(() => {
           Mode actual:
           <span
             class="mode-badge"
-            :class="{ 'muerte-subita': modoJuego === 'muerteSubita' }"
+            :class="{
+              'muerte-subita': modoJuego === 'muerteSubita',
+              contrarellotge: modoJuego === 'contrarellotge',
+            }"
           >
             {{ modoJuego === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
           </span>
           <span
             class="mode-help"
-            :class="{ muerte: modoJuego === 'muerteSubita' }"
+            :class="{
+              muerte: modoJuego === 'muerteSubita',
+              contrarellotge: modoJuego === 'contrarellotge',
+            }"
           >
             <span class="mode-help-icon">i</span>
             <span class="mode-help-tooltip">
@@ -410,6 +425,17 @@ communicationManager.onkicked(() => {
                 >Tens 2 vides — al 2n error quedes eliminat.</span
               >
             </label>
+            <label
+              class="modo-btn contrarellotge"
+              :class="{ active: modoJuego === 'contrarellotge' }"
+            >
+              <input type="radio" value="contrarellotge" v-model="modoJuego" />
+              <span>Contrarellotge</span>
+              <span class="tooltip">
+                Tens un temps límit per fer tantes paraules com puguis. Guanya
+                qui n'escriu més!
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -427,7 +453,13 @@ communicationManager.onkicked(() => {
 
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <component
-        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
+        :is="
+          modoJuego === 'muerteSubita'
+            ? GameEngineMuerteSubita
+            : modoJuego === 'contrarellotge'
+            ? GameEngineContrarellotge
+            : GameEngine
+        "
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"
@@ -437,6 +469,7 @@ communicationManager.onkicked(() => {
         :isSpectator="isSpectator"
         :spectatorTargetId="spectatorTargetId"
         @switch-spectator-target="spectatorTargetId = $event"
+        :timeLeft="modoJuego === 'contrarellotge' ? timeLeftGlobal : undefined"
       />
     </div>
   </main>
@@ -831,5 +864,29 @@ button.btn-host {
 }
 .modo-btn:active {
   transform: scale(0.98);
+}
+
+.modo-btn.contrarellotge::before {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+}
+
+.modo-btn.contrarellotge.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+.mode-badge.contrarellotge {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+  color: white;
+  font-weight: 700;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff) !important;
+  color: #fff;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip::after {
+  border-color: #7161ff transparent transparent transparent !important;
 }
 </style>
