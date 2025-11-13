@@ -477,6 +477,14 @@ onMounted(() => {
           }}
         </span>
       </h2>
+      <button
+        v-if="props.isSpectator"
+        class="spectator-back-btn"
+        @click="handleVolverInicio"
+        title="Volver al lobby"
+      >
+        Volver al lobby
+      </button>
       <div v-if="props.modo === 'contrarellotge'" class="timer-bar-wrapper">
         <div class="timer-label">
           Temps restant: {{ Math.ceil(contrarellotgeTimeLeft / 1000) }} s
@@ -830,6 +838,28 @@ onMounted(() => {
   border: 2px solid var(--color-primary);
   box-shadow: 0 0 12px var(--shadow-color);
   transform: scale(1.02);
+}
+.game-header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 12px;
+  position: relative; /* permite posicionar el botón de espectador */
+}
+
+/* Estilo del botón "Volver al lobby" cuando eres espectador */
+.spectator-back-btn {
+  position: absolute;
+  top: 8px;
+  right: 70px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.spectator-back-btn:hover {
+  transform: translateY(-1px);
 }
 .text-input {
   width: 100%;

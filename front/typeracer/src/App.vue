@@ -84,18 +84,21 @@ function loadStateFromLocalStorage() {
 }
 
 function volverInicio() {
-  localStorage.removeItem('typeRacerUser');
-  communicationManager.disconnect();
-  nomJugador.value = '';
   isReady.value = false;
-  isSpectator.value = false; // <-- Esto ya estaba correcto, ¡bien!
+  isSpectator.value = false;
   spectatorTargetId.value = null;
-  vistaActual.value = 'salaEspera';
+  // Navegar al selector de salas
+  vistaActual.value = 'rooms';
+  // Reset estado de jugadores locales y palabras de la partida
   playersPayload.value = { players: [], hostId: null, spectators: [] };
-  socketId.value = null;
   playerWords.value = [];
   gameIntervalMs.value = 3000;
-  gameMaxStack.value = 20; // También actualizado aquí
+  gameMaxStack.value = 20; 
+  try {
+    communicationManager.setReady(false);
+  } catch (e) {
+
+  }
   stopAllMusic();
 }
 

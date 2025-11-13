@@ -543,6 +543,15 @@ function finalizarJuego() {
           {{ props.modo === 'muerteSubita' ? 'Mort Súbita' : 'Normal' }}
         </span>
       </h2>
+      <!-- Botón para volver al lobby cuando estamos en modo espectador -->
+      <button
+        v-if="props.isSpectator"
+        class="spectator-back-btn"
+        @click="handleVolverInicio"
+        title="Volver al lobby"
+      >
+        Volver al lobby
+      </button>
     </div>
     <div class="game-layout">
       <div class="game-main">
@@ -704,8 +713,7 @@ function finalizarJuego() {
 </template>
 
 <style scoped>
-/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
-/* ... (copia i enganxa tots els estils que ja tenies) ... */
+
 
 .spectator-banner {
   color: var(--color-warning, #ffc107);
@@ -1029,6 +1037,7 @@ function finalizarJuego() {
   width: 100%;
   text-align: center;
   margin-bottom: 12px;
+  position: relative; /* permite posicionar el botón de espectador */
 }
 .modo-titulo {
   font-size: 1.4rem;
@@ -1047,6 +1056,22 @@ function finalizarJuego() {
 .modo-text.muerteSubita {
   background-color: #dc3545;
   color: white;
+}
+
+/* Estilo del botón "Volver al lobby" cuando eres espectador */
+.spectator-back-btn {
+  position: absolute;
+  top: 8px;
+  right: 70px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.spectator-back-btn:hover {
+  transform: translateY(-1px);
 }
 .text-input:focus {
   border-color: #28a745;

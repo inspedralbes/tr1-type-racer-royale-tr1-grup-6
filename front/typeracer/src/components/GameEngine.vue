@@ -485,6 +485,14 @@ onUnmounted(() => {
           {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
         </span>
       </h2>
+      <button
+        v-if="props.isSpectator"
+        class="spectator-back-btn"
+        @click="handleVolverInicio"
+        title="Volver al lobby"
+      >
+        Volver al lobby
+      </button>
     </div>
 
     <div class="game-layout">
@@ -875,6 +883,28 @@ onUnmounted(() => {
   box-shadow: 0 0 20px var(--shadow-color);
   outline: none;
   transition: border-color 0.15s;
+}
+.game-header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 12px;
+  position: relative; /* permite posicionar el botón de espectador */
+}
+
+/* Estilo del botón "Volver al lobby" cuando eres espectador */
+.spectator-back-btn {
+  position: absolute;
+  top: 8px;
+  right: 70px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.spectator-back-btn:hover {
+  transform: translateY(-1px);
 }
 .text-input:focus {
   border-color: var(--color-success);
