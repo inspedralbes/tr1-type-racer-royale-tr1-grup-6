@@ -37,12 +37,23 @@ onMounted(() => {
       <h1 class="preparados-titulo">Preparats?</h1>
 
       <div class="modo-info">
-        <p class="modo-badge" :class="modo">
+        <p class="modo-badge" :class="props.modo">
           Mode:
-          {{
-            (modo === 'muerteSubita' ? 'Mort subita' : 'Normal',
-            'Contrarellotge')
-          }}
+          <span
+            class="mode-badge"
+            :class="{
+              'muerte-subita': props.modo === 'muerteSubita',
+              contrarellotge: props.modo === 'contrarellotge',
+            }"
+          >
+            {{
+              props.modo === 'muerteSubita'
+                ? 'Muerte Súbita'
+                : props.modo === 'contrarellotge'
+                ? 'Contrarellotge'
+                : 'Normal'
+            }}
+          </span>
         </p>
       </div>
 
