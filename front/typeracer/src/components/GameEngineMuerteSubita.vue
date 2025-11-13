@@ -239,9 +239,9 @@ function reiniciarCronometro() {
         perdedor.value = true;
         perdidoMensaje.value =
           'Has perdut totes les teves vides. ¡Estàs eliminat!';
-        // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA
+        // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
         communicationManager.reportMuerteSubitaElimination();
-        // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA
+        // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
       }
     }
   }, 100);
@@ -279,9 +279,9 @@ function manejarError() {
       perdedor.value = true;
       perdidoMensaje.value =
         'Has perdut totes les teves vides. ¡Estàs eliminat!';
-      // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA
+      // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
       communicationManager.reportMuerteSubitaElimination();
-      // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA
+      // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA (Correcte!)
     }
   }
 }
@@ -366,8 +366,31 @@ onMounted(() => {
   });
 
   communicationManager.onGameOver((data) => {
-    JuegoTerminado.value = true;
-    finalizarJuego(); // Assegurem que tot s'atura
+    // Aquest és el listener que marca el final DEFINITIU de la partida
+    if (JuegoTerminado.value) return; // Evitar execució múltiple
+    
+    if (props.isSpectator) {
+      // Si som espectadors, només mostrem el missatge final
+      ganador.value = false;
+      perdidoMensaje.value =
+        data.message || `La partida ha acabat. Guanyador: ${data.winnerName}.`;
+    } else {
+      // Si som jugadors, comprovem si hem guanyat o perdut
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false; // Assegurem que no és perdedor
+        perdidoMensaje.value =
+          data.message || 'Has guanyat! Tots els altres han estat eliminats.';
+      } else {
+        ganador.value = false;
+        // Si no som guanyadors, som perdedors (ja sigui per eliminació prèvia o per ser l'últim a perdre)
+        perdedor.value = true; 
+        perdidoMensaje.value =
+          data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
+      }
+    }
+
+    finalizarJuego(); // Crida a la funció que atura tot
   });
 
   // Inicializar palabras restantes
@@ -415,7 +438,10 @@ function calculateProgress(completedWords) {
 
 function finalizarJuego() {
   // Aquesta funció ara només s'ha de cridar quan el joc ACABA DE VERITAT
-  if (JuegoTerminado.value) return;
+  if (JuegoTerminado.value) return; // Evita que es cridi múltiples cops
+  
+  JuegoTerminado.value = true; // Marca el joc com a acabat
+
   const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
   const finalStats = {
     playTime: playTime,
@@ -423,18 +449,22 @@ function finalizarJuego() {
     completedWords: palabrasCompletadas.value,
     lives: vidasRestantes.value,
   };
-  communicationManager.updatePlayerProgress(finalStats);
+  
+  // Només enviem progrés si no som espectadors
+  if (!props.isSpectator) {
+    communicationManager.updatePlayerProgress(finalStats);
 
-  const localPlayer = props.players.find(
-    (p) => p.id === communicationManager.getId(),
-  );
-  if (localPlayer) {
-    localPlayer.playTime = finalStats.playTime;
-    localPlayer.totalErrors = finalStats.totalErrors;
-    localPlayer.completedWords = finalStats.completedWords;
+    const localPlayer = props.players.find(
+      (p) => p.id === communicationManager.getId(),
+    );
+    if (localPlayer) {
+      localPlayer.playTime = finalStats.playTime;
+      localPlayer.totalErrors = finalStats.totalErrors;
+      localPlayer.completedWords = finalStats.completedWords;
+    }
   }
 
-  JuegoTerminado.value = true;
+  // Atura tots els timers
   if (revealTimer) clearInterval(revealTimer);
   if (countdownTimer) clearInterval(countdownTimer);
 }
@@ -524,7 +554,8 @@ function finalizarJuego() {
         <h3 v-if="props.isSpectator" class="spectator-banner">
           [MODO ESPECTADOR]
         </h3>
-        <div v-if="props.isSpectator" class="spectator-controls">
+        
+        <div v-if="props.isSpectator && !JuegoTerminado" class="spectator-controls">
           <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
           <div class="spectator-targets">
             <button
@@ -537,6 +568,10 @@ function finalizarJuego() {
               {{ p.name.substring(0, 3) }}
             </button>
           </div>
+          
+          <button @click="handleVolverInicio" class="spectator-exit-btn">
+            Sortir al Lobby
+          </button>
         </div>
 
         <h3>Jugadors</h3>
@@ -990,7 +1025,7 @@ function finalizarJuego() {
   }
 }
 
-/* --- NOU ESTILS AFEGITS --- */
+/* --- NOU ESTILS AFEGITS (Overlay) --- */
 .overlay-eliminado {
   position: absolute;
   top: 0;
@@ -1040,5 +1075,24 @@ function finalizarJuego() {
 .btn-salir {
   background-color: var(--color-background-mute);
   color: var(--color-text);
+}
+
+/* --- **** ESTILS NOUS PER AL BOTÓ D'ESPECTADOR **** --- */
+.spectator-exit-btn {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px 12px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-main);
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
+  transition: background-color 0.2s;
+}
+.spectator-exit-btn:hover {
+  background-color: var(--color-border);
 }
 </style>

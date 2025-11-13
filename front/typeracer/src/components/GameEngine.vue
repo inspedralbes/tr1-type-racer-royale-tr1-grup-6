@@ -220,7 +220,7 @@ function validarProgres() {
       wordStack: estatDelJoc.value.paraules,
     };
 
-      communicationManager.updatePlayerProgress(progressPayload);
+    communicationManager.updatePlayerProgress(progressPayload);
 
     const nextParaula =
       estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
@@ -531,6 +531,9 @@ onUnmounted(() => {
               {{ p.name.substring(0, 3) }}
             </button>
           </div>
+          <button @click="handleVolverInicio" class="spectator-exit-btn">
+            Sortir al Lobby
+          </button>
         </div>
 
         <h3>[REFUGIATS]</h3>
@@ -641,6 +644,23 @@ onUnmounted(() => {
   color: white;
   border-color: var(--color-primary);
   font-weight: bold;
+}
+.spectator-exit-btn {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px 12px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-main);
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
+  transition: background-color 0.2s;
+}
+.spectator-exit-btn:hover {
+  background-color: var(--color-border);
 }
 .correcte {
   color: var(--color-success);
