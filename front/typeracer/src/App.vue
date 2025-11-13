@@ -86,7 +86,7 @@ function volverInicio() {
   communicationManager.disconnect();
   nomJugador.value = "";
   isReady.value = false;
-  isSpectator.value = false;
+  isSpectator.value = false; // <-- Esto ya estaba correcto, ¡bien!
   spectatorTargetId.value = null;
   vistaActual.value = "salaEspera";
   playersPayload.value = { players: [], hostId: null, spectators: [] };
@@ -194,6 +194,20 @@ function connectarAlServidor() {
     }
   });
 
+  // --- CANVI AFEGIT AQUÍ ---
+  /**
+   * NOU: ESCOLTA L'EVENT QUAN UN JUGADOR ÉS ELIMINAT
+   * I PASSA A SER ESPECTADOR DES DE DINS DE LA PARTIDA.
+   */
+  communicationManager.onSpectateModeActivated((data) => {
+    if (data.success) {
+      console.log('App.vue: Transició a espectador confirmada.');
+      isSpectator.value = true; // <-- AQUEST ÉS EL CANVI D'ESTAT CLAU
+      isReady.value = false; // Assegurem que no estem 'ready'
+    }
+  });
+  // --- FI DEL CANVI ---
+
   communicationManager.connect({
     name: nomJugador.value,
     color: colorJugador.value,
@@ -256,7 +270,6 @@ communicationManager.onkicked(() => {
   alert("Has sido expulsado de la sala.");
   volverInicio();
 });
-
 </script>
 
 <template>
@@ -308,7 +321,6 @@ communicationManager.onkicked(() => {
           >
             {{ modoJuego === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
           </span>
-          <!-- Info for non-hosts: small help icon that shows the detailed tooltip text -->
           <span
             class="mode-help"
             :class="{ muerte: modoJuego === 'muerteSubita' }"
@@ -429,6 +441,7 @@ communicationManager.onkicked(() => {
 </template>
 
 <style scoped>
+/* ... (TOTS ELS TEUS ESTILS ES QUEDEN EXACTAMENT IGUAL) ... */
 .modo-btn .tooltip {
   position: absolute;
   bottom: 125%;
