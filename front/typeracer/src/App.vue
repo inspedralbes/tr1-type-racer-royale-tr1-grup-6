@@ -1,19 +1,23 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import GameEngine from "./components/GameEngine.vue";
-import GameEngineMuerteSubita from "./components/GameEngineMuerteSubita.vue";
-import DarkModeToggle from "./components/DarkModeToggle.vue";
-import RoomSelector from "./components/RoomSelector.vue";
-import communicationManager from "./services/communicationManager.js";
-import { useSounds } from "@/composables/useSounds";
+import { ref, computed, onMounted, watch } from 'vue';
+import GameEngine from './components/GameEngine.vue';
+import GameEngineMuerteSubita from './components/GameEngineMuerteSubita.vue';
+import DarkModeToggle from './components/DarkModeToggle.vue';
+import GameCountdown from './components/GameCountdown.vue';
+import RoomSelector from './components/RoomSelector.vue';
+import communicationManager from './services/communicationManager.js';
+import { useSounds } from '@/composables/useSounds';
+import GameEngineContrarellotge from './components/GameEngineContrarellotge.vue';
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
 // Control de vista
-const vistaActual = ref("salaEspera");
+const vistaActual = ref('salaEspera');
 
 // Estado de conexión
-const nomJugador = ref("");
+const tempsContrarellotge = ref(30);
+const timeLeftGlobal = ref(30000); // 30s per defecte
+const nomJugador = ref('');
 const playersPayload = ref({ players: [], hostId: null, spectators: [] });
 const socketId = ref(null);
 const isReady = ref(false);
@@ -22,24 +26,24 @@ const spectatorTargetId = ref(null);
 const playerWords = ref([]);
 const gameIntervalMs = ref(3000);
 const gameMaxStack = ref(5);
-const modoJuego = ref("normal");
+const modoJuego = ref('normal');
 const currentRoom = ref(null);
 const colorsDisponibles = ref([
-  "#20ff20",
-  "#a0ffa0",
-  "#F0A000",
-  "#E53935",
-  "#1E88E5",
-  "#D81B60",
-  "#8E24AA",
-  "#FB8C00",
+  '#20ff20',
+  '#a0ffa0',
+  '#F0A000',
+  '#E53935',
+  '#1E88E5',
+  '#D81B60',
+  '#8E24AA',
+  '#FB8C00',
 ]);
 const colorJugador = ref(colorsDisponibles.value[0]);
 const jugadors = computed(() => playersPayload.value.players || []);
 const espectadors = computed(() => playersPayload.value.spectators || []);
 const hostId = computed(() => playersPayload.value.hostId || null);
 const isHost = computed(
-  () => socketId.value && hostId.value === socketId.value
+  () => socketId.value && hostId.value === socketId.value,
 );
 const allReady = computed(() => {
   const p = playersPayload.value.players || [];
@@ -47,12 +51,13 @@ const allReady = computed(() => {
 });
 
 watch(vistaActual, (newVista, oldVista) => {
-  if (newVista === "joc") {
+  if (newVista === 'joc') {
     playGameMusic();
   } else if (
-    newVista === "lobby" ||
-    newVista === "rooms" ||
-    newVista === "salaEspera"
+    newVista === 'lobby' ||
+    newVista === 'rooms' ||
+    newVista === 'salaEspera' ||
+    newVista === 'preparados'
   ) {
     playMenuMusic();
   }
@@ -60,33 +65,32 @@ watch(vistaActual, (newVista, oldVista) => {
 
 function saveStateToLocalStorage() {
   localStorage.setItem(
-    "typeRacerUser",
+    'typeRacerUser',
     JSON.stringify({
       nomJugador: nomJugador.value,
       vistaActual: vistaActual.value,
       isReady: isReady.value,
-    })
+    }),
   );
 }
-// Al cargar, solo actualiza esas refs locales
 function loadStateFromLocalStorage() {
-  const saved = localStorage.getItem("typeRacerUser");
+  const saved = localStorage.getItem('typeRacerUser');
   if (saved) {
     const data = JSON.parse(saved);
     if (data.nomJugador) nomJugador.value = data.nomJugador;
     if (data.vistaActual) vistaActual.value = data.vistaActual;
-    if (typeof data.isReady === "boolean") isReady.value = data.isReady;
+    if (typeof data.isReady === 'boolean') isReady.value = data.isReady;
   }
 }
 
 function volverInicio() {
-  localStorage.removeItem("typeRacerUser");
+  localStorage.removeItem('typeRacerUser');
   communicationManager.disconnect();
-  nomJugador.value = "";
+  nomJugador.value = '';
   isReady.value = false;
-  isSpectator.value = false;
+  isSpectator.value = false; // <-- Esto ya estaba correcto, ¡bien!
   spectatorTargetId.value = null;
-  vistaActual.value = "salaEspera";
+  vistaActual.value = 'salaEspera';
   playersPayload.value = { players: [], hostId: null, spectators: [] };
   socketId.value = null;
   playerWords.value = [];
@@ -97,13 +101,13 @@ function volverInicio() {
 
 onMounted(() => {
   loadStateFromLocalStorage();
-  const entries = performance.getEntriesByType("navigation");
-  const justStarted = sessionStorage.getItem("justStartedGame") === "true";
+  const entries = performance.getEntriesByType('navigation');
+  const justStarted = sessionStorage.getItem('justStartedGame') === 'true';
 
   if (
     entries.length > 0 &&
-    entries[0].type === "reload" &&
-    vistaActual.value === "joc" &&
+    entries[0].type === 'reload' &&
+    vistaActual.value === 'joc' &&
     !justStarted
   ) {
     volverInicio();
@@ -113,27 +117,33 @@ onMounted(() => {
   }
 
   if (justStarted) {
-    sessionStorage.removeItem("justStartedGame");
+    sessionStorage.removeItem('justStartedGame');
   }
 });
 
 function connectarAlServidor() {
-  if (nomJugador.value.trim() === "") {
-    alert("Si us plau, introdueix un nom vàlid.");
+  if (nomJugador.value.trim() === '') {
+    alert('Si us plau, introdueix un nom vàlid.');
     return;
   }
   setVolume(0.5);
   playMenuMusic();
 
+  communicationManager.onEvent('timeLeftUpdate', (data) => {
+    if (data && typeof data.timeLeft === 'number') {
+      timeLeftGlobal.value = data.timeLeft;
+    }
+  });
+
   communicationManager.onConnect((id) => {
     socketId.value = id;
   });
-  communicationManager.onEvent("notEnoughPlayers", (data) => {
+  communicationManager.onEvent('notEnoughPlayers', (data) => {
     alert(
-      data.message || "Es requereix almenys 2 jugadors per iniciar la partida."
+      data.message || 'Es requereix almenys 2 jugadors per iniciar la partida.',
     );
   });
-  
+
   communicationManager.onUpdatePlayerList((payload) => {
     playersPayload.value = payload;
     if (payload && payload.modo) {
@@ -154,20 +164,20 @@ function connectarAlServidor() {
       playerWords.value = payload.gameWords;
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
       gameMaxStack.value = payload.maxStack || 5;
-      modoJuego.value = payload.modo || "normal";
+      modoJuego.value = payload.modo || 'normal';
     } else {
       console.error("No s'han rebut les paraules del servidor!");
       playerWords.value = [];
     }
-    sessionStorage.setItem("justStartedGame", "true");
-    vistaActual.value = "joc";
+    sessionStorage.setItem('justStartedGame', 'true');
+    vistaActual.value = 'preparados';
   });
 
   communicationManager.onJoinedRoom((data) => {
     if (data.success && data.roomId) {
       currentRoom.value = data.roomId;
       isSpectator.value = false;
-      console.log("Establecida sala actual (jugador):", currentRoom.value);
+      console.log('Establecida sala actual (jugador):', currentRoom.value);
       onRoomJoined(data.roomId);
     } else if (data.error) {
       alert(data.error);
@@ -177,7 +187,7 @@ function connectarAlServidor() {
   communicationManager.onSpectateSuccess((data) => {
     if (data.success) {
       isSpectator.value = true;
-      
+
       if (data.gameState?.started) {
         playerWords.value = data.gameState.gameWords;
         gameIntervalMs.value = data.gameState.intervalMs;
@@ -196,8 +206,8 @@ function connectarAlServidor() {
     name: nomJugador.value,
     color: colorJugador.value,
   });
-  if (vistaActual.value === "salaEspera") {
-    vistaActual.value = "rooms";
+  if (vistaActual.value === 'salaEspera') {
+    vistaActual.value = 'rooms';
   }
 }
 
@@ -206,7 +216,15 @@ function toggleReady() {
   communicationManager.setReady(isReady.value);
 }
 function startGameByHost() {
-  communicationManager.requestStart(modoJuego.value);
+  if (modoJuego.value === 'contrarellotge') {
+    communicationManager.requestStart('contrarellotge', { duration: 30 });
+  } else {
+    communicationManager.requestStart(modoJuego.value);
+  }
+}
+
+function onCountdownComplete() {
+  vistaActual.value = 'joc';
 }
 
 watch(modoJuego, (newModo, oldModo) => {
@@ -218,47 +236,40 @@ watch(modoJuego, (newModo, oldModo) => {
 
 function onRoomJoined(room) {
   currentRoom.value = room;
-  vistaActual.value = "lobby";
+  vistaActual.value = 'lobby';
 }
 
 function kickPlayer(playerId) {
   if (!currentRoom.value) return;
-  if (confirm("Estàs segur que vols expulsar aquest jugador?")){
+  if (confirm('Estàs segur que vols expulsar aquest jugador?')) {
     communicationManager.kickUser(currentRoom.value, playerId);
   }
 }
-
 function transferHost(newHostId) {
   if (!currentRoom.value) return;
-  if (confirm("Estàs segur que vols transferir el rol de supervisor?")){
+  if (confirm('Estàs segur que vols transferir el rol de supervisor?')) {
     communicationManager.transferHost(currentRoom.value, newHostId);
   }
 }
-
 communicationManager.onHostTransferred(({ newHostId }) => {
-  // Actualizar el host en el payload
   playersPayload.value.hostId = newHostId;
-
   if (newHostId === socketId.value) {
-    alert("Ahora eres el nuevo supervisor de la sala");
+    alert('Ahora eres el nuevo supervisor de la sala');
   } else {
-    alert("El rol de supervisor ha sido transferido a otro jugador.");
+    alert('El rol de supervisor ha sido transferido a otro jugador.');
   }
 });
-
 communicationManager.onkicked(() => {
-  alert("Has sido expulsado de la sala.");
+  alert('Has sido expulsado de la sala.');
   volverInicio();
 });
-
 </script>
 
 <template>
   <main>
     <DarkModeToggle />
-
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
-      <h1>Type Racer Royale</h1>
+      <h1>Atomic Syntax</h1>
       <input
         type="text"
         v-model="nomJugador"
@@ -298,28 +309,39 @@ communicationManager.onkicked(() => {
           Mode actual:
           <span
             class="mode-badge"
-            :class="{ 'muerte-subita': modoJuego === 'muerteSubita' }"
+            :class="{
+              'muerte-subita': modoJuego === 'muerteSubita',
+              contrarellotge: modoJuego === 'contrarellotge',
+            }"
           >
-            {{ modoJuego === "muerteSubita" ? "Muerte Súbita" : "Normal" }}
+            {{
+              modoJuego === 'muerteSubita'
+                ? 'Muerte Súbita'
+                : modoJuego === 'contrarellotge'
+                ? 'Contrarellotge'
+                : 'Normal'
+            }}
           </span>
-          <!-- Info for non-hosts: small help icon that shows the detailed tooltip text -->
           <span
             class="mode-help"
-            :class="{ muerte: modoJuego === 'muerteSubita' }"
+            :class="{
+              muerte: modoJuego === 'muerteSubita',
+              contrarellotge: modoJuego === 'contrarellotge',
+            }"
           >
             <span class="mode-help-icon">i</span>
             <span class="mode-help-tooltip">
               {{
-                modoJuego === "muerteSubita"
-                  ? "Si comets dos errors quedes eliminat."
-                  : "Completa paraules; acumula 20 per quedar eliminat."
+                modoJuego === 'muerteSubita'
+                  ? 'Si comets dos errors quedes eliminat.'
+                  : 'Completa paraules; acumula 20 per quedar eliminat.'
               }}
             </span>
           </span>
         </div>
       </div>
       <ul>
-        <li v-for="jugador in jugadors" :key="jugador.id" >
+        <li v-for="jugador in jugadors" :key="jugador.id">
           <span
             class="color-dot"
             :style="{
@@ -358,10 +380,9 @@ communicationManager.onkicked(() => {
         </ul>
       </div>
 
-
       <div class="lobby-actions">
         <button v-if="!isSpectator" @click="toggleReady">
-          {{ isReady ? "[CANCEL·LAR]" : "[PREPARAT]" }}
+          {{ isReady ? '[CANCEL·LAR]' : '[PREPARAT]' }}
         </button>
         <button
           v-if="isHost"
@@ -393,14 +414,41 @@ communicationManager.onkicked(() => {
                 >Tens 2 vides — al 2n error quedes eliminat.</span
               >
             </label>
+            <label
+              class="modo-btn contrarellotge"
+              :class="{ active: modoJuego === 'contrarellotge' }"
+            >
+              <input type="radio" value="contrarellotge" v-model="modoJuego" />
+              <span>Contrarellotge</span>
+              <span class="tooltip">
+                Tens un temps límit per fer tantes paraules com puguis. Guanya
+                qui n'escriu més!
+              </span>
+            </label>
           </div>
         </div>
       </div>
     </div>
 
+    <div
+      v-else-if="vistaActual === 'preparados'"
+      class="vista-container-preparados"
+    >
+      <GameCountdown
+        :modo="modoJuego"
+        @countdownComplete="onCountdownComplete"
+      />
+    </div>
+
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <component
-        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
+        :is="
+          modoJuego === 'muerteSubita'
+            ? GameEngineMuerteSubita
+            : modoJuego === 'contrarellotge'
+            ? GameEngineContrarellotge
+            : GameEngine
+        "
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"
@@ -410,12 +458,14 @@ communicationManager.onkicked(() => {
         :isSpectator="isSpectator"
         :spectatorTargetId="spectatorTargetId"
         @switch-spectator-target="spectatorTargetId = $event"
+        :timeLeft="modoJuego === 'contrarellotge' ? timeLeftGlobal : undefined"
       />
     </div>
   </main>
 </template>
 
 <style scoped>
+/* ... (TOTS ELS TEUS ESTILS ES QUEDEN EXACTAMENT IGUAL) ... */
 .modo-btn .tooltip {
   position: absolute;
   bottom: 125%;
@@ -452,7 +502,7 @@ communicationManager.onkicked(() => {
 
 /* little arrow under the tooltip */
 .modo-btn .tooltip::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 100%;
   left: 50%;
@@ -526,7 +576,7 @@ communicationManager.onkicked(() => {
   transform: translateX(-50%) translateY(0) scale(1);
 }
 .mode-help .mode-help-tooltip::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 100%;
   left: 50%;
@@ -562,8 +612,8 @@ communicationManager.onkicked(() => {
   max-width: 1200px;
   margin: 20px auto;
   padding: 18px;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial;
 }
 .vista-container {
   max-width: 600px;
@@ -591,6 +641,12 @@ communicationManager.onkicked(() => {
   padding: 0;
   border: none;
 }
+.vista-container-preparados {
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+}
 h1 {
   font-size: 3.5rem;
   margin-bottom: 24px;
@@ -601,7 +657,7 @@ h2 {
   padding-bottom: 10px;
   margin-bottom: 20px;
 }
-input[type="text"] {
+input[type='text'] {
   width: 100%;
   padding: 12px;
   margin-bottom: 16px;
@@ -692,8 +748,7 @@ button.btn-host {
   padding: 4px 10px;
   font-size: 18px;
   color: white;
-
-} 
+}
 .btn-kick:hover {
   background-color: #b71c1c;
 }
@@ -774,7 +829,7 @@ button.btn-host {
   z-index: 2;
 }
 .modo-btn::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(120deg, #007bff, #00d4ff);
@@ -798,5 +853,29 @@ button.btn-host {
 }
 .modo-btn:active {
   transform: scale(0.98);
+}
+
+.modo-btn.contrarellotge::before {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+}
+
+.modo-btn.contrarellotge.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+.mode-badge.contrarellotge {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+  color: white;
+  font-weight: 700;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff) !important;
+  color: #fff;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip::after {
+  border-color: #7161ff transparent transparent transparent !important;
 }
 </style>

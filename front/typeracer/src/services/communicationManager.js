@@ -77,7 +77,7 @@ const communicationManager = {
   },
 
   // Host can set the room mode before starting
-  setRoomMode(modo) {
+  setRoomMode(modo, extra = {}) {
     if (currentRoom) {
       socket.emit('setRoomMode', { roomId: currentRoom, modo });
     } else {
@@ -146,9 +146,6 @@ const communicationManager = {
     socket.emit('joinRoom', { roomId });
   },
 
-  // ===================================
-  // NOVES FUNCIONS PER A ESPECTADOR
-  // ===================================
   spectateRoom(roomId) {
     socket.emit('spectateRoom', { roomId });
   },
@@ -163,12 +160,25 @@ const communicationManager = {
     });
   },
 
+  requestSpectate() {
+    if (currentRoom) {
+      console.log('Emetent requestSpectate per a la sala:', currentRoom);
+      socket.emit('requestSpectate', { roomId: currentRoom });
+    } else {
+      console.error(
+        'No es pot sol·licitar ser espectador, no hi ha sala actual',
+      );
+    }
+  },
+
+  onSpectateModeActivated(callback) {
+    socket.on('spectateModeActivated', callback);
+  },
+
   onSpectateError(callback) {
     socket.on('spectateError', callback);
   },
-  // ===================================
 
-  // Salir de la sala actual
   leaveRoom() {
     if (currentRoom) {
       socket.emit('leaveRoom');
@@ -229,8 +239,6 @@ const communicationManager = {
   onGameOver(callback) {
     socket.on('gameOver', callback);
   },
-
-  // --- Funciones de host ---
 
   kickUser(roomId, userId) {
     socket.emit('kickUser', { roomId, userId });

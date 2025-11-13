@@ -263,6 +263,41 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on('requestSpectate', ({ roomId }) => {
+      const room = rooms.get(roomId);
+      if (!room) {
+        console.log(`[requestSpectate] Sala ${roomId} no trobada.`);
+        return;
+      }
+
+      const player = room.players.get(socket.id);
+      if (!player) {
+        console.log(`[requestSpectate] Socket ${socket.id} no és un jugador actiu.`);
+        if (room.spectators.has(socket.id)) {
+           socket.emit('spectateModeActivated', { success: true, roomId });
+        }
+        return;
+      }
+
+      console.log(`[requestSpectate] Movent jugador ${player.name} (id: ${socket.id}) a espectadors en sala ${roomId}`);
+
+      room.players.delete(socket.id);
+
+      const spectator = {
+        id: player.id,
+        name: `${player.name}`,
+        color: player.color,
+      };
+      room.spectators.set(socket.id, spectator);
+
+      socket.emit('spectateModeActivated', {
+        success: true,
+        roomId: roomId,
+      });
+
+      broadcastRoomPlayerList(roomId);
+    });
+
   socket.on("spectateRoom", (data) => {
     const room = rooms.get(data.roomId);
     if (!room) {
@@ -498,33 +533,81 @@ io.on("connection", (socket) => {
       return;
     }
     const modo = payload?.modo || "normal";
-    console.log(`Starting game in mode: ${modo}`);
+    const duration = 30;
+    console.log(`Starting game in mode: ${modo} (duration: ${duration}s)`);
 
     const gamePayload = createGamePayload(room);
     gamePayload.modo = modo;
 
+    if (modo === "contrarellotge") {
+      const DURATION_MS = duration * 1000;
+      room.gameState.deadline = Date.now() + DURATION_MS;
+      room.gameState.duration = duration;
+      gamePayload.duration = duration;
+
+      setTimeout(() => {
+        const playersArray = Array.from(room.players.values());
+        const noEliminats = playersArray.filter(p => !p.eliminated);
+        const winner = noEliminats.sort((a, b) => {
+          const diffWords = (b.completedWords || 0) - (a.completedWords || 0);
+          if (diffWords !== 0) return diffWords;
+          return (a.totalErrors || 0) - (b.totalErrors || 0);
+        })[0];
+        if (winner) {
+          io.to(roomId).emit("gameOver", {
+            winnerId: winner.id,
+            winnerName: winner.name,
+            message: `${winner.name} ha guanyat (mode contrarellotge: + paraules)!`,
+          });
+        } else {
+          io.to(roomId).emit("gameOver", {
+            winnerName: null,
+            message: 'Temps esgotat! Cap guanyador clar.',
+          });
+        }
+      }, DURATION_MS);
+
+  // Barra sincronitzada per a tothom cada 0,5 s
+  const intervalTimer = setInterval(() => {
+    const now = Date.now();
+    const timeLeft = room.gameState.deadline - now;
+    if (timeLeft <= 0) {
+      clearInterval(intervalTimer);
+    }
+    io.to(roomId).emit("timeLeftUpdate", { timeLeft: Math.max(timeLeft, 0) });
+  }, 500);
+}
+
+
     room.gameState.started = true;
     room.gameState.modo = modo;
     room.gameState.gameWords = gamePayload.gameWords;
-
     io.to(roomId).emit("gameStart", gamePayload);
     console.log(`gameStart emitido para room ${roomId}`);
   });
 
+
+
   socket.on("setRoomMode", (payload) => {
     const roomId = payload?.roomId;
     const modo = payload?.modo;
+    const duration = payload?.duration; // nova durada
     if (!roomId || !modo) return;
     const room = rooms.get(roomId);
     if (!room) return;
     if (socket.id !== room.hostId) return;
 
     room.gameState.modo = modo;
-    console.log(`Room ${roomId} mode changed to: ${modo} by host ${socket.id}`);
+    if (modo === "contrarellotge" && duration !== undefined) {
+      room.gameState.duration = duration;
+    }
 
-    io.to(roomId).emit("roomModeUpdated", { modo });
+    console.log(`Room ${roomId} mode changed to: ${modo} (duration: ${duration}s) by host ${socket.id}`);
+
+    io.to(roomId).emit("roomModeUpdated", { modo, duration });
     broadcastRoomPlayerList(roomId);
   });
+
 
   socket.on("completeWord", (word) => {
     for (const [roomId, room] of rooms.entries()) {

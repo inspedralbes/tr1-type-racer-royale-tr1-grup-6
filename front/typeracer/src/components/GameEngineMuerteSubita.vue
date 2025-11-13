@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, defineEmits } from 'vue'; // Afegit defineEmits
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
 
@@ -12,7 +12,7 @@ const props = defineProps({
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
 });
-const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
+const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']); // Ja estava
 const sortedPlayers = computed(() => {
   return [...props.players].sort((a, b) => {
     return (b.completedWords || 0) - (a.completedWords || 0);
@@ -44,6 +44,13 @@ function handleVolverInicio() {
   emit('volverInicio');
 }
 
+// --- NOU: Funció per sol·licitar ser espectador ---
+function convertirEnEspectador() {
+  console.log('Sol·licitant convertir-se en espectador...');
+  communicationManager.requestSpectate();
+}
+// --- FI NOU ---
+
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
   const target = props.players.find((p) => p.id === props.spectatorTargetId);
@@ -74,6 +81,7 @@ const displayedText = computed(() => {
 });
 
 const totalErrors = ref(0);
+let gameStartTime = 0;
 
 //variables corazones
 const vidasRestantes = ref(3); //  Dos vidas por jugador
@@ -83,11 +91,15 @@ const playersLives = ref({});
 
 // Manejo teclado
 function handleKeyDown(event) {
-  if (JuegoTerminado.value || props.isSpectator) return;
+  // CANVI: Afegit 'perdedor.value'
+  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return;
 
   const key = event.key;
 
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
+    if (!gameStartTime) {
+      gameStartTime = Date.now();
+    }
     teclaPremuda.value = key.toUpperCase();
     setTimeout(() => {
       teclaPremuda.value = '';
@@ -112,7 +124,7 @@ function iniciarCronometreParaula() {
 }
 
 function validarProgres() {
-  if (JuegoTerminado.value) return;
+  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
 
   const typed = textEntratLocal.value;
   const paraula =
@@ -153,9 +165,12 @@ function validarProgres() {
     paraula.errors = wordErrors;
     paraula.estat = 'completada';
 
+    const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
     communicationManager.updatePlayerProgress({
       completedWords: palabrasCompletadas.value,
       lives: vidasRestantes.value,
+      totalErrors: totalErrors.value,
+      playTime: playTime,
     });
     // Limpiar input y reiniciar cronómetro
     estatDelJoc.value.paraules.pop();
@@ -204,11 +219,11 @@ function reiniciarCronometro() {
   }
   tiempoRestante.value = 5; // Siempre se resetea a 5
 
-  // Detener el timer si el juego ya terminó
-  if (JuegoTerminado.value) return;
+  // Detener el timer si el juego ya terminó o hem perdut
+  if (JuegoTerminado.value || perdedor.value) return;
 
   countdownTimer = setInterval(() => {
-    if (JuegoTerminado.value) {
+    if (JuegoTerminado.value || perdedor.value) { // Afegit 'perdedor.value'
       clearInterval(countdownTimer);
       return;
     }
@@ -219,14 +234,14 @@ function reiniciarCronometro() {
       countdownTimer = null;
       vidasRestantes.value--;
       updateLocalPlayerLives(vidasRestantes.value);
-      manejarTiempoAgotado();
+      manejarTiempoAgotado(); // Aquesta funció ara només reinicia
       if (vidasRestantes.value <= 0) {
         perdedor.value = true;
         perdidoMensaje.value =
           'Has perdut totes les teves vides. ¡Estàs eliminat!';
-        JuegoTerminado.value = true;
+        // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA
         communicationManager.reportMuerteSubitaElimination();
-        finalizarJuego();
+        // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA
       }
     }
   }, 100);
@@ -234,20 +249,21 @@ function reiniciarCronometro() {
 
 // Cuando se acaba el tiempo
 function manejarTiempoAgotado() {
-  if (JuegoTerminado.value) return;
+  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
 
   if (props.modo === 'muerteSubita') {
-    // Simplemente reiniciar el cronómetro sin penalización por tiempo
+    // Simplemente reiniciar el cronómetro
     reiniciarCronometro();
   }
 }
 
 // Manejar error al escribir
 function manejarError() {
-  if (JuegoTerminado.value) return;
+  if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
 
   // Solo aplica en modo muerte súbita
   if (props.modo === 'muerteSubita') {
+    totalErrors.value++;
     vidasRestantes.value--;
     updateLocalPlayerLives(vidasRestantes.value);
 
@@ -258,14 +274,14 @@ function manejarError() {
       setTimeout(() => (input.style.borderColor = ''), 300);
     }
 
-    // Si se quedó sin vidas, entonces derrota inmediata
+    // Si se quedó sin vidas, entonces derrota
     if (vidasRestantes.value <= 0) {
       perdedor.value = true;
       perdidoMensaje.value =
         'Has perdut totes les teves vides. ¡Estàs eliminat!';
-      JuegoTerminado.value = true;
+      // JuegoTerminado.value = true; // <-- CANVI: LÍNIA ELIMINADA
       communicationManager.reportMuerteSubitaElimination();
-      finalizarJuego();
+      // finalizarJuego(); // <-- CANVI: LÍNIA ELIMINADA
     }
   }
 }
@@ -288,7 +304,7 @@ function updateLocalPlayerLives(newLives) {
 
 // Ciclo vida
 onMounted(() => {
-  // Inicializar vidas de todos los jugadores (incluyendo el propio)
+  // ... (tota la inicialització de 'playersLives' es queda igual)
   if (props.players && props.players.length > 0) {
     props.players.forEach((player) => {
       playersLives.value[player.id] = {
@@ -298,7 +314,6 @@ onMounted(() => {
     });
   }
 
-  // Inicializar vidas del jugador actual cuando se conecta
   communicationManager.onConnect((id) => {
     if (props.modo === 'muerteSubita') {
       playersLives.value[id] = {
@@ -308,21 +323,29 @@ onMounted(() => {
       playersLives.value = { ...playersLives.value };
     }
   });
+  
+  // Aquests listeners (onPlayerWon, onGameOver) són correctes,
+  // ja que marquen el final de la partida per a TOTHOM.
   communicationManager.onPlayerWon((data) => {
     if (JuegoTerminado.value) return;
 
-    if (data.winnerId == communicationManager.getId() && !props.isSpectator) {
-      ganador.value = true;
-      perdedor.value = false;
-    } else if (!props.isSpectator) {
-      perdedor.value = true;
+    if (props.isSpectator) {
+      // Si el jugador ja havia perdut, mantenim l'estat de perdedor.
       ganador.value = false;
+      perdidoMensaje.value =
+        data?.message || `Partida acabada. Guanyador: ${data.winnerName}`;
+    } else {
+      if (data.winnerId === communicationManager.getId()) {
+        ganador.value = true;
+        perdedor.value = false;
+      } else {
+        perdedor.value = true;
+        ganador.value = false;
+      }
+      perdidoMensaje.value = data?.message || '';
     }
 
-    JuegoTerminado.value = true;
-    perdidoMensaje.value = data?.message || ''; // Pass server message or empty
-    if (revealTimer) clearInterval(revealTimer);
-    if (countdownTimer) clearInterval(countdownTimer);
+    finalizarJuego();
   });
 
   communicationManager.onPlayerProgressUpdate((data) => {
@@ -344,6 +367,7 @@ onMounted(() => {
 
   communicationManager.onGameOver((data) => {
     JuegoTerminado.value = true;
+    finalizarJuego(); // Assegurem que tot s'atura
   });
 
   // Inicializar palabras restantes
@@ -353,7 +377,7 @@ onMounted(() => {
 
   // Iniciar timer para revelar palabras e iniciar el cronómetro
   revealTimer = setInterval(() => {
-    if (JuegoTerminado.value) return;
+    if (JuegoTerminado.value || perdedor.value) return; // CANVI: Afegit 'perdedor.value'
     try {
       if (
         remainingWords.value.length > 0 &&
@@ -369,7 +393,7 @@ onMounted(() => {
         };
         estatDelJoc.value.paraules.unshift(newParaula);
 
-        // Si es la primera palabra, iniciar el cronómetro
+        // Si es la primera palabra, iniciar el cronómetro y el tiempo de juego
         if (estatDelJoc.value.paraules.length === 1) {
           reiniciarCronometro();
         }
@@ -390,6 +414,26 @@ function calculateProgress(completedWords) {
 }
 
 function finalizarJuego() {
+  // Aquesta funció ara només s'ha de cridar quan el joc ACABA DE VERITAT
+  if (JuegoTerminado.value) return;
+  const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
+  const finalStats = {
+    playTime: playTime,
+    totalErrors: totalErrors.value,
+    completedWords: palabrasCompletadas.value,
+    lives: vidasRestantes.value,
+  };
+  communicationManager.updatePlayerProgress(finalStats);
+
+  const localPlayer = props.players.find(
+    (p) => p.id === communicationManager.getId(),
+  );
+  if (localPlayer) {
+    localPlayer.playTime = finalStats.playTime;
+    localPlayer.totalErrors = finalStats.totalErrors;
+    localPlayer.completedWords = finalStats.completedWords;
+  }
+
   JuegoTerminado.value = true;
   if (revealTimer) clearInterval(revealTimer);
   if (countdownTimer) clearInterval(countdownTimer);
@@ -399,8 +443,6 @@ function finalizarJuego() {
 <template>
   <div>
     <div class="game-header">
-      <!-- Sidebar + corazones -->
-
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
@@ -442,10 +484,14 @@ function finalizarJuego() {
           <input
             type="text"
             class="text-input"
-            v-model="textEntratLocal"
+            :value="displayedText"
+            @input="textEntratLocal = $event.target.value"
             @keydown="handleKeyDown"
-            placeholder="Comença a escriure..."
-            :disabled="JuegoTerminado"
+            :placeholder="
+              props.isSpectator ? 'MODO ESPECTADOR' : 'Comença a escriure...'
+            "
+            :disabled="JuegoTerminado || perdedor"
+            :readonly="props.isSpectator"
             autocomplete="off"
           />
           <div class="barra-tiempo">
@@ -529,6 +575,21 @@ function finalizarJuego() {
         </ul>
       </aside>
 
+      <div v-if="perdedor && !JuegoTerminado && !isSpectator" class="overlay-eliminado">
+        <div class="overlay-content">
+          <h2>Has sido eliminado</h2>
+          <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
+          <div class="opciones-perdedor">
+            <button @click="convertirEnEspectador" class="btn btn-espectador">
+              Ver Partida
+            </button>
+            <button @click="handleVolverInicio" class="btn btn-salir">
+              Salir al Lobby
+            </button>
+          </div>
+        </div>
+      </div>
+
       <GameResult
         v-if="JuegoTerminado"
         :winner="ganador"
@@ -544,6 +605,9 @@ function finalizarJuego() {
 </template>
 
 <style scoped>
+/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
+/* ... (copia i enganxa tots els estils que ja tenies) ... */
+
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
@@ -932,5 +996,57 @@ function finalizarJuego() {
   50% {
     opacity: 0;
   }
+}
+
+/* --- NOU ESTILS AFEGITS --- */
+.overlay-eliminado {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  color: white;
+}
+.overlay-content {
+  text-align: center;
+  background: var(--color-background-soft);
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.overlay-content h2 {
+  color: var(--color-error);
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+.overlay-content p {
+  font-size: 1.2rem;
+  margin-bottom: 30px;
+}
+.opciones-perdedor {
+  display: flex;
+  gap: 20px;
+}
+.opciones-perdedor .btn {
+  padding: 12px 24px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-main);
+}
+.btn-espectador {
+  background-color: var(--color-primary);
+  color: white;
+}
+.btn-salir {
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
 }
 </style>

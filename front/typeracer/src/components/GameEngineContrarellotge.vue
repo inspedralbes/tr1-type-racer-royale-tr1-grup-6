@@ -1,9 +1,21 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineEmits, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, defineEmits } from 'vue';
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
 import { useSounds } from '@/composables/useSounds';
 
+
+const actualTime = ref(Date.now());
+const contrarellotgeStartTime = ref(null);
+
+const contrarellotgeTimeLeft = computed(() => {
+  if (!contrarellotgeStartTime.value) return 30000;
+  const elapsed = actualTime.value - contrarellotgeStartTime.value;
+  return Math.max(30000 - elapsed, 0);
+});
+
+const timeLeft = ref(30000); // 30 segons en ms
+let gameTimer = null;
 const startTime = ref(null);
 const endTime = ref(null);
 
@@ -15,6 +27,7 @@ const props = defineProps({
   modo: { type: String, default: 'normal' },
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
+  timeLeft: { type: Number, default: undefined } // <-- AFEGEIX AIXÒ
 });
 const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
 
@@ -31,7 +44,6 @@ const filesDelTeclat = ref([
 ]);
 const teclaPremuda = ref('');
 const JuegoTerminado = ref(false);
-const eliminado = ref(false);
 
 const estatDelJoc = ref({
   paraules: [],
@@ -91,22 +103,8 @@ function handleVolverInicio() {
   emit('volverInicio');
 }
 
-// --- NOVES FUNCIONS ---
-/**
- * NOU: Es crida al clicar el botó 'Ver Partida'.
- * Li diu al communicationManager que iniciï la transició.
- */
-function convertirEnEspectador() {
-  console.log('Sol·licitant convertir-se en espectador...');
-  communicationManager.requestSpectate();
-  // No cal fer res més aquí. El servidor respondrà,
-  // App.vue ho escoltarà i actualitzarà la prop 'isSpectator'.
-  // Això farà que aquest component reaccioni i mostri la UI d'espectador.
-}
-// --- FI NOVES FUNCIONS ---
-
 function handleKeyDown(event) {
-  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return; // Afegit 'perdedor.value'
+  if (JuegoTerminado.value || props.isSpectator) return;
 
   const key = event.key;
   if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
@@ -133,7 +131,7 @@ function iniciarCronometreParaula() {
 
 // 2. MODIFICAR 'validarProgres'
 function validarProgres() {
-  if (JuegoTerminado.value || props.isSpectator || perdedor.value) return;
+  if (JuegoTerminado.value || props.isSpectator) return;
 
   if (textEntratLocal.value.length === 1 && tempsIniciParaula === 0) {
     iniciarCronometreParaula();
@@ -222,12 +220,8 @@ function validarProgres() {
 
     if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
       JuegoTerminado.value = true;
-      const finalStats = {
-        completedWords: palabrasCompletadas.value,
-        totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-      };
-      communicationManager.updatePlayerProgress(finalStats);
+      onGameEnd();
+      communicationManager.updatePlayerProgress(progressPayload);
     } else {
       communicationManager.updatePlayerProgress(progressPayload);
     }
@@ -279,11 +273,30 @@ function getClasseLletra(indexLletra) {
   return classes.join(' ');
 }
 
+onUnmounted(() => {
+  if (gameTimer) {
+    clearInterval(gameTimer);
+    gameTimer = null;
+  }
+});
+
 // 4. MODIFICAR 'onMounted'
 onMounted(() => {
   if (!props.isSpectator) {
     window.addEventListener('keydown', handleKeyDown);
   }
+  if (props.modo === 'contrarellotge') {
+    contrarellotgeStartTime.value = Date.now();
+    gameTimer = setInterval(() => {
+      actualTime.value = Date.now();
+      if (contrarellotgeTimeLeft.value <= 0 && !JuegoTerminado.value) {
+        JuegoTerminado.value = true;
+        onGameEnd();
+        clearInterval(gameTimer);
+      }
+    }, 33); // ~30 FPS
+  }
+
 
   if (
     !props.isSpectator &&
@@ -315,10 +328,9 @@ onMounted(() => {
 
     // Només s'aplica al jugador eliminat
     if (data.playerId === communicationManager.getId() && !props.isSpectator) {
-      perdedor.value = true; // <-- CANVI CLAU
+      perdedor.value = true;
       ganador.value = false;
-      eliminado.value = true;
-
+      JuegoTerminado.value = true;
       onGameEnd();
       communicationManager.updatePlayerProgress({
         completedWords: palabrasCompletadas.value,
@@ -361,11 +373,9 @@ onMounted(() => {
 
     if (props.isSpectator) {
       // LÒGICA D'ESPECTADOR
-      // Si el jugador ja havia perdut, mantenim l'estat de perdedor
-      // per mostrar la pantalla de resultats correcta.
       ganador.value = false;
-      perdidoMensaje.value =
-        data.message || `La partida ha acabat. Guanyador: ${data.winnerName}.`;
+      perdedor.value = false;
+      perdidoMensaje.value = data.message || `${data.winnerName} ha guanyat.`;
     } else {
       // LÒGICA DE JUGADOR
       if (!props.isSpectator) {
@@ -384,7 +394,7 @@ onMounted(() => {
           data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
-        perdedor.value = true; // Aquí 'perdedor' és correcte perquè és la fi del joc
+        perdedor.value = true;
         playSound('gameLose');
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
@@ -400,7 +410,7 @@ onMounted(() => {
 
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
-      if (JuegoTerminado.value || perdedor.value) return; // Afegit 'perdedor.value'
+      if (JuegoTerminado.value) return;
       try {
         if (
           remainingWords.value.length > 0 &&
@@ -437,6 +447,7 @@ onMounted(() => {
   }
 });
 
+
 onUnmounted(() => {
   if (!props.isSpectator) {
     window.removeEventListener('keydown', handleKeyDown);
@@ -448,17 +459,36 @@ onUnmounted(() => {
 });
 </script>
 
+
 <template>
   <div>
     <div class="game-header">
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
-          {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+            {{
+            props.modo === 'muerteSubita'
+                ? 'Muerte Súbita'
+                : props.modo === 'contrarellotge'
+                ? 'Contrarellotge'
+                : 'Normal'
+            }}
         </span>
-      </h2>
+       </h2>
+       <div v-if="props.modo === 'contrarellotge'" class="timer-bar-wrapper">
+          <div class="timer-label">
+            Temps restant: {{ Math.ceil(contrarellotgeTimeLeft / 1000) }} s
+          </div>
+          <div class="timer-bar-bg">
+            <div
+              class="timer-bar-fill"
+              :style="{
+                width: (contrarellotgeTimeLeft / 30000 * 100) + '%'
+              }"
+            ></div>
+          </div>
+        </div>
     </div>
-
     <div class="game-layout">
       <div class="game-main">
         <TransitionGroup
@@ -502,7 +532,7 @@ onUnmounted(() => {
           :placeholder="
             props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
           "
-          :disabled="JuegoTerminado || perdedor"
+          :disabled="JuegoTerminado"
           :readonly="props.isSpectator"
         />
 
@@ -545,12 +575,7 @@ onUnmounted(() => {
 
         <h3>[REFUGIATS]</h3>
         <ul>
-          <li
-            v-for="p in sortedPlayers"
-            :key="p.id"
-            class="player-name-inline"
-            :class="{ eliminado: p.eliminated }"
-          >
+          <li v-for="p in sortedPlayers" :key="p.id" class="player-name-inline">
             <span
               class="color-dot"
               :style="{
@@ -560,36 +585,12 @@ onUnmounted(() => {
               aria-hidden="true"
             ></span>
             <span class="player-name-text">{{ p.name }}</span>
-            <span
-              v-if="p.eliminated"
-              style="color: #dc3545; font-weight: bold; margin-left: 10px"
-            >
-              Eliminat
-            </span>
             <span class="completed-count">
               [Paraules: {{ p.completedWords || 0 }}]
             </span>
           </li>
         </ul>
       </aside>
-    </div>
-
-    <div
-      v-if="perdedor && !JuegoTerminado && !isSpectator"
-      class="overlay-eliminado"
-    >
-      <div class="overlay-content">
-        <h2>Has sido eliminado</h2>
-        <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
-        <div class="opciones-perdedor">
-          <button @click="convertirEnEspectador" class="btn btn-espectador">
-            Ver Partida
-          </button>
-          <button @click="handleVolverInicio" class="btn btn-salir">
-            Salir al Lobby
-          </button>
-        </div>
-      </div>
     </div>
 
     <GameResult
@@ -606,9 +607,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* ... (TOTS ELS TEUS ESTILS EXISTENTS) ... */
-/* ... (copia i enganxa tots els estils que ja tenies) ... */
-
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
@@ -745,10 +743,6 @@ onUnmounted(() => {
   color: var(--color-text);
   font-weight: 700;
   font-size: 1.3rem;
-  transition: opacity 0.3s ease;
-}
-.player-name-inline.eliminado {
-  opacity: 0.5;
 }
 .player-name-text {
   font-weight: 700;
@@ -958,55 +952,40 @@ onUnmounted(() => {
   animation: pulse-focus 1.5s infinite;
 }
 
-/* --- NOU ESTILS AFEGITS --- */
-.overlay-eliminado {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.85);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
-  color: white;
-}
-.overlay-content {
-  text-align: center;
-  background: var(--color-background-soft);
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-.overlay-content h2 {
-  color: var(--color-error);
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-}
-.overlay-content p {
-  font-size: 1.2rem;
-  margin-bottom: 30px;
-}
-.opciones-perdedor {
-  display: flex;
-  gap: 20px;
-}
-.opciones-perdedor .btn {
-  padding: 12px 24px;
-  font-size: 1.1rem;
-  border: none;
+.timer-bar {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff;
+  background: #4b016d;
+  padding: 8px 16px;
   border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-family: var(--font-main);
+  margin: 10px 0;
+  text-align: center;
 }
-.btn-espectador {
-  background-color: var(--color-primary);
-  color: white;
+
+.timer-bar-wrapper {
+  margin: 10px 0 18px 0;
 }
-.btn-salir {
-  background-color: var(--color-background-mute);
-  color: var(--color-text);
+.timer-label {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #fff;
+  text-shadow: 0 2px 16px #4b016d;
+  text-align: center;
 }
+.timer-bar-bg {
+  width: 100%;
+  background: #25023d;
+  border-radius: 9px;
+  height: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 10px #4b016d;
+}
+.timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #21c4f7, #4b016d 80%);
+  transition: width 0.2s linear;
+}
+
 </style>
