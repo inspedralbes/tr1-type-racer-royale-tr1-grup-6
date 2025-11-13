@@ -25,7 +25,7 @@ const isSpectator = ref(false);
 const spectatorTargetId = ref(null);
 const playerWords = ref([]);
 const gameIntervalMs = ref(3000);
-const gameMaxStack = ref(5);
+const gameMaxStack = ref(20); // Valor por defecto aumentado de 5 a 20
 const modoJuego = ref('normal');
 const currentRoom = ref(null);
 const colorsDisponibles = ref([
@@ -95,7 +95,7 @@ function volverInicio() {
   socketId.value = null;
   playerWords.value = [];
   gameIntervalMs.value = 3000;
-  gameMaxStack.value = 5;
+  gameMaxStack.value = 20; // También actualizado aquí
   stopAllMusic();
 }
 
@@ -163,7 +163,7 @@ function connectarAlServidor() {
     if (payload.gameWords) {
       playerWords.value = payload.gameWords;
       gameIntervalMs.value = payload.intervalMs || payload.interval || 3000;
-      gameMaxStack.value = payload.maxStack || 5;
+      gameMaxStack.value = payload.maxStack || 20; // Actualizado aquí
       modoJuego.value = payload.modo || 'normal';
     } else {
       console.error("No s'han rebut les paraules del servidor!");
@@ -263,6 +263,7 @@ communicationManager.onkicked(() => {
   alert('Has sido expulsado de la sala.');
   volverInicio();
 });
+
 </script>
 
 <template>

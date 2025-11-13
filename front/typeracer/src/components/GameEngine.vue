@@ -220,17 +220,7 @@ function validarProgres() {
       wordStack: estatDelJoc.value.paraules,
     };
 
-    if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
-      JuegoTerminado.value = true;
-      const finalStats = {
-        completedWords: palabrasCompletadas.value,
-        totalErrors: totalErrors.value,
-        playTime: (endTime.value || Date.now()) - (startTime.value || Date.now()),
-      };
-      communicationManager.updatePlayerProgress(finalStats);
-    } else {
       communicationManager.updatePlayerProgress(progressPayload);
-    }
 
     const nextParaula =
       estatDelJoc.value.paraules[estatDelJoc.value.paraules.length - 1];
