@@ -4,6 +4,18 @@ import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
 import { useSounds } from '@/composables/useSounds';
 
+
+const actualTime = ref(Date.now());
+const contrarellotgeStartTime = ref(null);
+
+const contrarellotgeTimeLeft = computed(() => {
+  if (!contrarellotgeStartTime.value) return 30000;
+  const elapsed = actualTime.value - contrarellotgeStartTime.value;
+  return Math.max(30000 - elapsed, 0);
+});
+
+const timeLeft = ref(30000); // 30 segons en ms
+let gameTimer = null;
 const startTime = ref(null);
 const endTime = ref(null);
 
@@ -15,6 +27,7 @@ const props = defineProps({
   modo: { type: String, default: 'normal' },
   isSpectator: { type: Boolean, default: false },
   spectatorTargetId: { type: String, default: null },
+  timeLeft: { type: Number, default: undefined } // <-- AFEGEIX AIXÒ
 });
 const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
 
@@ -260,11 +273,30 @@ function getClasseLletra(indexLletra) {
   return classes.join(' ');
 }
 
+onUnmounted(() => {
+  if (gameTimer) {
+    clearInterval(gameTimer);
+    gameTimer = null;
+  }
+});
+
 // 4. MODIFICAR 'onMounted'
 onMounted(() => {
   if (!props.isSpectator) {
     window.addEventListener('keydown', handleKeyDown);
   }
+  if (props.modo === 'contrarellotge') {
+    contrarellotgeStartTime.value = Date.now();
+    gameTimer = setInterval(() => {
+      actualTime.value = Date.now();
+      if (contrarellotgeTimeLeft.value <= 0 && !JuegoTerminado.value) {
+        JuegoTerminado.value = true;
+        onGameEnd();
+        clearInterval(gameTimer);
+      }
+    }, 33); // ~30 FPS
+  }
+
 
   if (
     !props.isSpectator &&
@@ -415,6 +447,7 @@ onMounted(() => {
   }
 });
 
+
 onUnmounted(() => {
   if (!props.isSpectator) {
     window.removeEventListener('keydown', handleKeyDown);
@@ -426,15 +459,35 @@ onUnmounted(() => {
 });
 </script>
 
+
 <template>
   <div>
     <div class="game-header">
       <h2 class="modo-titulo">
         Mode de joc:
         <span :class="['modo-text', props.modo]">
-          {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
+            {{
+            props.modo === 'muerteSubita'
+                ? 'Muerte Súbita'
+                : props.modo === 'contrarellotge'
+                ? 'Contrarellotge'
+                : 'Normal'
+            }}
         </span>
-      </h2>
+       </h2>
+       <div v-if="props.modo === 'contrarellotge'" class="timer-bar-wrapper">
+          <div class="timer-label">
+            Temps restant: {{ Math.ceil(contrarellotgeTimeLeft / 1000) }} s
+          </div>
+          <div class="timer-bar-bg">
+            <div
+              class="timer-bar-fill"
+              :style="{
+                width: (contrarellotgeTimeLeft / 30000 * 100) + '%'
+              }"
+            ></div>
+          </div>
+        </div>
     </div>
     <div class="game-layout">
       <div class="game-main">
@@ -898,4 +951,41 @@ onUnmounted(() => {
 .text-input:focus {
   animation: pulse-focus 1.5s infinite;
 }
+
+.timer-bar {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #fff;
+  background: #4b016d;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.timer-bar-wrapper {
+  margin: 10px 0 18px 0;
+}
+.timer-label {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #fff;
+  text-shadow: 0 2px 16px #4b016d;
+  text-align: center;
+}
+.timer-bar-bg {
+  width: 100%;
+  background: #25023d;
+  border-radius: 9px;
+  height: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 10px #4b016d;
+}
+.timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #21c4f7, #4b016d 80%);
+  transition: width 0.2s linear;
+}
+
 </style>

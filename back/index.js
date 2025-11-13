@@ -478,7 +478,11 @@ io.on("connection", (socket) => {
       setTimeout(() => {
         const playersArray = Array.from(room.players.values());
         const noEliminats = playersArray.filter(p => !p.eliminated);
-        const winner = noEliminats.sort((a, b) => (b.completedWords || 0) - (a.completedWords || 0))[0];
+        const winner = noEliminats.sort((a, b) => {
+          const diffWords = (b.completedWords || 0) - (a.completedWords || 0);
+          if (diffWords !== 0) return diffWords;
+          return (a.totalErrors || 0) - (b.totalErrors || 0);
+        })[0];
         if (winner) {
           io.to(roomId).emit("gameOver", {
             winnerId: winner.id,
@@ -492,7 +496,18 @@ io.on("connection", (socket) => {
           });
         }
       }, DURATION_MS);
+
+  // Barra sincronitzada per a tothom cada 0,5 s
+  const intervalTimer = setInterval(() => {
+    const now = Date.now();
+    const timeLeft = room.gameState.deadline - now;
+    if (timeLeft <= 0) {
+      clearInterval(intervalTimer);
     }
+    io.to(roomId).emit("timeLeftUpdate", { timeLeft: Math.max(timeLeft, 0) });
+  }, 500);
+}
+
 
     room.gameState.started = true;
     room.gameState.modo = modo;

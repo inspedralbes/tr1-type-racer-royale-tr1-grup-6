@@ -10,6 +10,7 @@ import GameEngineContrarellotge from "./components/GameEngineContrarellotge.vue"
 
 // NO HI HA SELECT NI OPCIONS DE TEMPS
 const tempsContrarellotge = ref(30);
+const timeLeftGlobal = ref(30000); // 30s per defecte
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
@@ -125,6 +126,13 @@ function connectarAlServidor() {
   }
   setVolume(0.5);
   playMenuMusic();
+
+  communicationManager.onEvent("timeLeftUpdate", (data) => {
+    if (data && typeof data.timeLeft === "number") {
+      timeLeftGlobal.value = data.timeLeft;
+    }
+  });
+
 
   communicationManager.onConnect((id) => {
     socketId.value = id;
@@ -419,7 +427,9 @@ communicationManager.onkicked(() => {
 
     <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
       <component
-        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita : GameEngine"
+        :is="modoJuego === 'muerteSubita' ? GameEngineMuerteSubita
+          : modoJuego === 'contrarellotge' ? GameEngineContrarellotge
+          : GameEngine"
         :initialWords="playerWords"
         :intervalMs="gameIntervalMs"
         :maxStack="gameMaxStack"
@@ -429,6 +439,7 @@ communicationManager.onkicked(() => {
         :isSpectator="isSpectator"
         :spectatorTargetId="spectatorTargetId"
         @switch-spectator-target="spectatorTargetId = $event"
+        :timeLeft="modoJuego === 'contrarellotge' ? timeLeftGlobal : undefined"
       />
     </div>
   </main>

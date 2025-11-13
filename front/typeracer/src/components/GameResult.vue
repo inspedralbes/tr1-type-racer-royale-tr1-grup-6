@@ -42,6 +42,12 @@ const title = computed(() =>
 );
 const displayedMessage = computed(() => {
   if (props.message) return props.message;
+  
+  if (props.modo === 'contrarellotge') {
+      if (props.winner) return "Temps completat: tens el millor resultat!";
+      if (props.loser) return "Temps exhaurit o no has estat el millor.";
+      return "Temps esgotat. Consulta el ranking!";
+  }
 
   if (props.winner) {
     return props.modo === "muerteSubita"
