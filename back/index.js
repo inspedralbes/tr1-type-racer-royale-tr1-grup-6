@@ -264,39 +264,71 @@ io.on("connection", (socket) => {
   });
 
   socket.on('requestSpectate', ({ roomId }) => {
-      const room = rooms.get(roomId);
-      if (!room) {
-        console.log(`[requestSpectate] Sala ${roomId} no trobada.`);
-        return;
-      }
+    const room = rooms.get(roomId);
+    if (!room) {
+      console.log(`[requestSpectate] Sala ${roomId} no trobada.`);
+      return socket.emit('spectateError', { message: 'Sala no trobada.' });
+    }
 
-      const player = room.players.get(socket.id);
-      if (!player) {
-        console.log(`[requestSpectate] Socket ${socket.id} no és un jugador actiu.`);
-        if (room.spectators.has(socket.id)) {
-           socket.emit('spectateModeActivated', { success: true, roomId });
-        }
-        return;
-      }
-
-      console.log(`[requestSpectate] Movent jugador ${player.name} (id: ${socket.id}) a espectadors en sala ${roomId}`);
-
-      room.players.delete(socket.id);
-
-      const spectator = {
-        id: player.id,
-        name: `${player.name}`,
-        color: player.color,
-      };
-      room.spectators.set(socket.id, spectator);
-
-      socket.emit('spectateModeActivated', {
+    // Comprovar si ja és espectador
+    if (room.spectators.has(socket.id)) {
+      console.log(`[requestSpectate] El jugador ${socket.id} ja és espectador.`);
+      return socket.emit('spectateSuccess', {
         success: true,
-        roomId: roomId,
+        roomId,
+        gameState: { ...room.gameState, hostId: room.hostId },
       });
+    }
 
-      broadcastRoomPlayerList(roomId);
+    let playerData = room.players.get(socket.id);
+    let isEliminatedPlayer = false;
+
+    // Si no es troba com a jugador actiu, pot ser que acabi de ser eliminat.
+    // Es reconstrueix la informació bàsica des dels maps globals.
+    if (!playerData) {
+      const name = playerNames.get(socket.id);
+      const color = playerColors.get(socket.id);
+
+      if (name && color) {
+        console.log(
+          `[requestSpectate] Jugador no actiu ${name} (${socket.id}) trobat en maps globals. Reconstruint per a espectador.`
+        );
+        playerData = { id: socket.id, name, color };
+        isEliminatedPlayer = true;
+      } else {
+        // Si no està en cap llista, és un socket desconegut.
+        console.log(
+          `[requestSpectate] Socket ${socket.id} desconegut intentant ser espectador.`
+        );
+        return socket.emit('spectateError', { message: 'Jugador desconegut.' });
+      }
+    }
+
+    console.log(
+      `[requestSpectate] Movent jugador ${playerData.name} (id: ${socket.id}) a espectadors en sala ${roomId}`
+    );
+
+    // Si el jugador estava a la llista activa, s'esborra.
+    if (!isEliminatedPlayer) {
+      room.players.delete(socket.id);
+    }
+
+    const spectator = {
+      id: playerData.id,
+      name: playerData.name,
+      color: playerData.color,
+    };
+    room.spectators.set(socket.id, spectator);
+
+    // Emet 'spectateSuccess' que és el que el client espera.
+    socket.emit('spectateSuccess', {
+      success: true,
+      roomId: roomId,
+      gameState: { ...room.gameState, hostId: room.hostId },
     });
+
+    broadcastRoomPlayerList(roomId);
+  });
 
   socket.on("spectateRoom", (data) => {
     const room = rooms.get(data.roomId);

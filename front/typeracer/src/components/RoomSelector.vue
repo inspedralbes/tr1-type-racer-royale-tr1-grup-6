@@ -21,7 +21,11 @@
               <span class="mode-info"
                 >Mode:
                 {{
-                  r.modo === "muerteSubita" ? "Muerte Súbita" : "Normal"
+                  r.modo === "muerteSubita" 
+                    ? "Muerte Súbita" 
+                    : r.modo === "contrarellotge"
+                    ? "Contrarellotge"
+                    : "Normal"
                 }}</span
               >
             </div>

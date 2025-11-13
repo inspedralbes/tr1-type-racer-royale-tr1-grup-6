@@ -335,7 +335,10 @@ communicationManager.onkicked(() => {
               {{
                 modoJuego === 'muerteSubita'
                   ? 'Si comets dos errors quedes eliminat.'
+                  : modoJuego === 'contrarellotge'
+                  ? "Fes tantes paraules com puguis abans que s'acabi el temps!"
                   : 'Completa paraules; acumula 20 per quedar eliminat.'
+                  
               }}
             </span>
           </span>
@@ -512,6 +515,13 @@ communicationManager.onkicked(() => {
   border-style: solid;
   border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
   z-index: 1201;
+}
+
+.modo-btn.contrarellotge .tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff);  
+}
+.modo-btn.contrarellotge .tooltip::after {
+  border-color: #7161ff transparent transparent transparent;
 }
 
 /* special color for Muerte Súbita tooltip to match danger style */
