@@ -85,6 +85,7 @@ function cerrarResultados() {
       <h1>{{ title }}</h1>
       <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
       <p>{{ displayedMessage }}</p>
+      <p v-if="modo === 'contrarellotge'" class="badge-contrarellotge">Modo: Contrarellotge</p>
       <div class="actions">
         <button @click="emitirVolverInicio" style="margin-left: 8px">
           Tornar al lobby
@@ -218,6 +219,15 @@ function cerrarResultados() {
   margin-bottom: 8px;
 }
 
+.badge-contrarellotge {
+  display: inline-block;
+  background: linear-gradient(120deg, #4b016d, #7161ff);  
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
 .actions button {
   padding: 10px 16px;
   border-radius: 6px;
