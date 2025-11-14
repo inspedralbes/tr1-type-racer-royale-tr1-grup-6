@@ -35,7 +35,9 @@ onMounted(() => {
   position: absolute;
   left: 2%;
   bottom: 5%;
-  width: 260px;
+  width: 20vw;
+  max-width: 260px;
+  min-width: 150px;
   border-radius: 10px;
   color: var(--color-text);
   font-family: 'VT323', monospace;

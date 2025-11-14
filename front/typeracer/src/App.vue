@@ -334,7 +334,7 @@ communicationManager.onkicked(() => {
           >
             {{
               modoJuego === 'muerteSubita'
-                ? 'Muerte Súbita'
+                ? 'Mort Súbita'
                 : modoJuego === 'contrarellotge'
                 ? 'Contrarellotge'
                 : 'Normal'
@@ -429,7 +429,7 @@ communicationManager.onkicked(() => {
               :class="{ active: modoJuego === 'muerteSubita' }"
             >
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
-              <span>Muerte Súbita</span>
+              <span>Mort Súbita</span>
               <span class="tooltip"
                 >Tens 3 vides — al 3n error quedes eliminat.</span
               >
