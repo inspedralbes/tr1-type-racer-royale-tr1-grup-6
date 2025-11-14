@@ -290,8 +290,11 @@ onMounted(() => {
     gameTimer = setInterval(() => {
       actualTime.value = Date.now();
       if (contrarellotgeTimeLeft.value <= 0 && !JuegoTerminado.value) {
+        // Timer finished locally: compute winner/loser locally so GameResult
+        // displays for contrarellotge even if server hasn't emitted gameOver yet.
         JuegoTerminado.value = true;
         onGameEnd();
+        computeLocalWinner();
         clearInterval(gameTimer);
       }
     }, 16); // ~60 FPS
@@ -415,6 +418,49 @@ onMounted(() => {
       revealTimer = null;
     }
   });
+
+  // Decide local winner at end of contrarellotge if server doesn't yet send gameOver
+  function computeLocalWinner() {
+    try {
+      // If no players data, default to local player as loser with generic message
+      if (!Array.isArray(props.players) || props.players.length === 0) {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value = 'Temps esgotat. Consulta el ranking!';
+        return;
+      }
+
+      // Sort players by completedWords desc, errors asc
+      const ranking = [...props.players].sort((a, b) => {
+        const aw = a.completedWords || 0;
+        const bw = b.completedWords || 0;
+        if (bw !== aw) return bw - aw;
+        const ae = a.totalErrors || 0;
+        const be = b.totalErrors || 0;
+        return ae - be;
+      });
+
+      const top = ranking[0];
+      const meId = communicationManager.getId();
+
+      if (top && top.id === meId) {
+        ganador.value = true;
+        perdedor.value = false;
+        perdidoMensaje.value = 'Temps completat: tens el millor resultat!';
+        playSound('gameWin');
+      } else {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value = `Temps esgotat. ${top?.name || 'Un altre jugador'} ha obtingut millor resultat.`;
+        playSound('gameLose');
+      }
+    } catch (e) {
+      console.error('computeLocalWinner error', e);
+      ganador.value = false;
+      perdedor.value = true;
+      perdidoMensaje.value = 'Temps esgotat. Consulta el ranking!';
+    }
+  }
 
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
