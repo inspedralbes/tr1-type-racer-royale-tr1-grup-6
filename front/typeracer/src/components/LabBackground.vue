@@ -51,7 +51,11 @@ onMounted(() => {
   inset: 0;
   z-index: -10;
   pointer-events: none;
-  background: radial-gradient(circle at center, #001600 0%, #000000 100%);
+  background: radial-gradient(
+    circle at center,
+    var(--color-background-soft) 0%,
+    var(--color-background) 100%
+  );
   overflow: hidden;
 }
 
@@ -66,8 +70,8 @@ onMounted(() => {
 .falling-icon {
   position: absolute;
   top: -60px;
-  color: rgba(0, 255, 100, 0.35);
-  filter: drop-shadow(0 0 8px #00ff99);
+  color: rgba(255, 140, 0, 0.6);
+  filter: drop-shadow(0 0 10px #ff8c00);
   animation-name: fall;
   animation-timing-function: linear;
 }

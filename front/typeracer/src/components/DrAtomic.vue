@@ -36,22 +36,18 @@ onMounted(() => {
   left: 2%;
   bottom: 5%;
   width: 260px;
-  background: rgba(0, 40, 0, 0.85);
-  border: 2px solid #00ff88;
   border-radius: 10px;
-  box-shadow: 0 0 20px #00ff88;
-  color: #baffc9;
+  color: var(--color-text);
   font-family: 'VT323', monospace;
   padding: 12px;
-  text-shadow: 0 0 4px #00ff88;
-  animation: pulse 3s infinite;
+  text-shadow: 0 0 4px var(--color-heading);
 }
 
 .scientist img {
   width: 100%;
   border-radius: 8px;
   margin-bottom: 6px;
-  filter: brightness(1.2) drop-shadow(0 0 6px #00ff88);
+  filter: brightness(1.2) drop-shadow(0 0 6px var(--color-heading));
 }
 
 .speech p {
