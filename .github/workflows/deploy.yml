@@ -1,0 +1,61 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Define project path and repo URL
+            PROJECT_PATH="/var/www/html/tr1-type-racer-royale-tr1-grup-6-1"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            BRANCH="main"
+
+            # Navigate to project directory, clone if it doesn't exist
+            if [ -d "$PROJECT_PATH/.git" ]; then
+              echo "Repository exists, pulling latest changes..."
+              cd $PROJECT_PATH
+              git reset --hard
+              git clean -fd
+              git checkout $BRANCH
+              git pull origin $BRANCH
+            else
+              echo "Cloning repository for the first time..."
+              rm -rf $PROJECT_PATH
+              git clone --branch $BRANCH $REPO_URL $PROJECT_PATH
+              cd $PROJECT_PATH
+            fi
+
+            # Create .env file from GitHub Secrets
+            echo "Creating .env file..."
+            echo "NODE_ENV=${{ secrets.NODE_ENV }}" > .env
+            echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}" >> .env
+            # Las variables VITE_* son cruciales para el build del frontend
+            echo "VITE_SOCKET_URL=${{ secrets.FRONTEND_URL }}" >> .env
+            echo "JWT_SECResET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> .env
+            echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> .env
+            echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}" >> .env
+            echo "MYSQL_USER=${{ secrets.MYSQL_USER }}" >> .env
+            echo "ADMINER_USER=${{ secrets.ADMINER_USER }}" >> .env
+            echo "ADMINER_PASSWORD=${{ secrets.ADMINER_PASSWORD }}" >> .env
+
+            # Run docker-compose
+            echo "Starting docker-compose..."
+            # Actualiza los servicios: reconstruye las imágenes que han cambiado y reinicia
+            # los contenedores correspondientes. Los datos de las bases de datos se conservan.
+            docker compose --env-file ./.env -f docker-compose.prod.yml up --build -d --remove-orphans
+
+            # Limpia cualquier otra imagen de Docker que no se esté utilizando
+            docker image prune -f
