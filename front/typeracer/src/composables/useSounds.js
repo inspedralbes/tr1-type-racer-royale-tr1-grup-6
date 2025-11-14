@@ -8,6 +8,14 @@ const soundMap = {
   newWord: "/audio/newWord.wav",
   gameLose: "/audio/game-lose.wav",
   gameWin: "/audio/gameWin.wav",
+  bomba_shuffle: "/audio/bomba_shuffle.mp3",
+  amnesia_flash: "/audio/amnesia_flash.mp3",
+  fiebre_activada: "/audio/fiebre_activada.mp3",
+  fiebre_puntua: "/audio/fiebre_puntua.mp3",
+  tinta_splat: "/audio/tinta_splat.mp3",
+  tinta_limpiar: "/audio/tinta_limpiar.mp3",
+  vertigo_rumble: "/audio/vertigo_rumble.mp3",
+  teclas_locas: "/audio/teclas_locas.mp3",
 };
 
 const sounds = {};
