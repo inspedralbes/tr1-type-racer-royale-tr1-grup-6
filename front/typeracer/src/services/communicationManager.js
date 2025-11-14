@@ -255,6 +255,33 @@ const communicationManager = {
   onHostTransferred(callback) {
     socket.on('hostTransferred', callback);
   },
+  
+  /**
+   * Envía un ataque de powerup a un jugador específico.
+   * @param {string} targetId - El ID del socket del jugador a atacar.
+   * @param {string} effectType - El tipo de powerup (ej. 'TINTA', 'TECLAT_BOIG').
+   */
+  sendPowerupAttack(targetId, effectType) {
+    if (currentRoom) {
+      socket.emit('powerup:attack', {
+        roomId: currentRoom,
+        targetId,
+        effectType,
+      });
+    }
+  },
+
+  /**
+   * Escucha los ataques de powerup que te envían otros jugadores.
+   * @param {function} callback - Función a la que se llamará con (effectType, payload).
+   */
+  onPowerupAttacked(callback) {
+    socket.on('powerup:receive', (data) => {
+      // data = { effectType: 'TINTA', payload: null }
+      callback(data.effectType, data.payload);
+    });
+  },
+  // --- FIN POWERUPS ---
 
   // Desconectarse del servidor
   disconnect() {

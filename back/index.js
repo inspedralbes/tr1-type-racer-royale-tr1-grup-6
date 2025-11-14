@@ -241,8 +241,8 @@ io.on("connection", (socket) => {
         eliminated: false,
         completedWords: 0,
         totalErrors: 0,
-        currentWordProgress: "", // ESTAT INICIAL
-        wordStack: [], // ESTAT INICIAL
+        currentWordProgress: "",
+        wordStack: [],
       });
 
       socket.join(data.roomId);
@@ -285,8 +285,6 @@ io.on("connection", (socket) => {
     let playerData = room.players.get(socket.id);
     let isEliminatedPlayer = false;
 
-    // Si no es troba com a jugador actiu, pot ser que acabi de ser eliminat.
-    // Es reconstrueix la informació bàsica des dels maps globals.
     if (!playerData) {
       const name = playerNames.get(socket.id);
       const color = playerColors.get(socket.id);
@@ -322,7 +320,6 @@ io.on("connection", (socket) => {
     };
     room.spectators.set(socket.id, spectator);
 
-    // Emet 'spectateSuccess' que és el que el client espera.
     socket.emit('spectateSuccess', {
       success: true,
       roomId: roomId,
@@ -354,7 +351,7 @@ io.on("connection", (socket) => {
     const payload = {
       success: true,
       roomId: data.roomId,
-      gameState: { ...room.gameState, hostId: room.hostId }, // Envia l'estat complet i el host
+      gameState: { ...room.gameState, hostId: room.hostId },
     };
     socket.emit("spectateSuccess", payload);
 
@@ -394,7 +391,7 @@ io.on("connection", (socket) => {
             id: r.id,
             name: r.name,
             count: r.players.size,
-            spectatorCount: r.spectators.size, // NOU
+            spectatorCount: r.spectators.size,
           }))
         );
         break;
@@ -435,7 +432,7 @@ io.on("connection", (socket) => {
         id: r.id,
         name: r.name,
         count: r.players.size,
-        spectatorCount: r.spectators.size, // NOU
+        spectatorCount: r.spectators.size,
         modo: r.gameState?.modo || "normal",
         inGame: r.gameState?.started || false,
       }))
@@ -537,6 +534,10 @@ io.on("connection", (socket) => {
         if (Array.isArray(payload.wordStack)) {
           player.wordStack = payload.wordStack;
         }
+        // NOU: Guardar l'estat d'eliminació
+        if (typeof payload.eliminated === 'boolean') {
+          player.eliminated = payload.eliminated;
+        }
       }
     }
     broadcastRoomPlayerList(payload.roomId);
@@ -544,8 +545,6 @@ io.on("connection", (socket) => {
 
   socket.on("playerProgressUpdate", (data) => {
     data.playerId = socket.id;
-
-    io.to(roomId).emit("playerProgressUpdate", data);
   });
 
   socket.on("startGame", (payload) => {
@@ -712,6 +711,32 @@ io.on("connection", (socket) => {
       room.gameState.gameOver = true;
     }
   });
+
+  socket.on("powerup:attack", (data) => {
+    const { roomId, targetId, effectType } = data;
+    
+    // Validació bàsica
+    const room = rooms.get(roomId);
+    if (!room) return;
+    if (!room.players.has(socket.id) && !room.spectators.has(socket.id)) {
+      return console.log(`[Powerup] Atacant ${socket.id} no està a la sala ${roomId}`);
+    }
+
+    // Troba el socket de l'objectiu
+    const targetSocket = io.sockets.sockets.get(targetId);
+    
+    if (targetSocket) {
+      console.log(`[Powerup] Enviant atac ${effectType} de ${socket.id} a ${targetId}`);
+      // Reenvia l'atac només a l'objectiu
+      targetSocket.emit("powerup:receive", { 
+        effectType, 
+        payload: null // Pots afegir dades extra aquí si cal (p.ex. qui ataca)
+      });
+    } else {
+      console.log(`[Powerup] Objectiu ${targetId} no trobat (desconnectat?)`);
+    }
+  });
+  // --- FI POWERUPS ---
 
   socket.on("muerteSubitaElimination", (payload) => {
     const roomId = payload?.roomId;
