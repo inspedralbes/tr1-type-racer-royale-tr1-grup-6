@@ -56,6 +56,7 @@
     <div class="create-room">
       <input v-model="newRoomName" placeholder="Nom de la sala" />
       <button @click="createRoom">Crear sala</button>
+      <button @click="changeNameAndPipBoy">Canviar de Nom i Pip-Boy</button>
     </div>
   </div>
 </template>
@@ -84,6 +85,11 @@ function createRoom() {
 
 function joinRoom(id) {
   communicationManager.joinRoom(id);
+}
+
+function changeNameAndPipBoy() {
+  localStorage.clear();
+  window.location.reload();
 }
 
 // ===================================
