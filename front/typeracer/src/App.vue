@@ -113,23 +113,6 @@ function volverInicio() {
   stopAllMusic();
 }
 
-function volverAPantallaPrincipal() {
-  // Desconectar completamente y volver a 'salaEspera' para poner nombre nuevamente
-  localStorage.removeItem('typeRacerUser');
-  communicationManager.disconnect();
-  nomJugador.value = '';
-  isReady.value = false;
-  isSpectator.value = false;
-  spectatorTargetId.value = null;
-  vistaActual.value = 'salaEspera';
-  playersPayload.value = { players: [], hostId: null, spectators: [] };
-  socketId.value = null;
-  playerWords.value = [];
-  gameIntervalMs.value = 3000;
-  gameMaxStack.value = 20;
-  stopAllMusic();
-}
-
 onMounted(() => {
   loadStateFromLocalStorage();
   const entries = performance.getEntriesByType('navigation');
@@ -335,9 +318,6 @@ communicationManager.onkicked(() => {
 
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
       <RoomSelector />
-      <button class="btn-back-to-main" @click="volverAPantallaPrincipal">
-        Canviar Nom
-      </button>
     </div>
 
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
