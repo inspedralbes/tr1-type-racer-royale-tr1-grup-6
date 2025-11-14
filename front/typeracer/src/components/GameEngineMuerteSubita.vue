@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, onUnmounted, defineEmits, watch } from 'vue';
 import communicationManager from '../services/communicationManager.js';
 import GameResult from '@/components/GameResult.vue';
+import { useSounds } from '@/composables/useSounds';
 
 const props = defineProps({
   initialWords: { type: Array, default: () => [] },
@@ -14,6 +15,10 @@ const props = defineProps({
   spectatorTargetId: { type: String, default: null },
 });
 const emit = defineEmits(['volverInicio', 'switchSpectatorTarget']);
+
+const { playSound } = useSounds();
+
+const isShaking = ref(false);
 
 // 2. CREAR LISTA LOCAL DE JUGADORES
 const localPlayers = ref([]);
@@ -172,6 +177,27 @@ function validarProgres() {
     textEntratLocal.value = '';
     reiniciarCronometro();
     return;
+  }
+
+  if (typed.length > 0) {
+    const lastCharIndex = typed.length - 1;
+    if (lastCharIndex < paraula.text.length) {
+      if (typed[lastCharIndex] !== paraula.text[lastCharIndex]) {
+        playSound('keyError');
+        isShaking.value = true;
+        setTimeout(() => {
+          isShaking.value = false;
+        }, 400);
+      } else {
+        playSound('keyPress');
+      }
+    } else {
+      playSound('keyError');
+      isShaking.value = true;
+      setTimeout(() => {
+        isShaking.value = false;
+      }, 400);
+    }
   }
 
   if (
@@ -488,6 +514,7 @@ onMounted(() => {
           letterErrors: Array.from({ length: nextText.length }, () => false),
         };
         estatDelJoc.value.paraules.unshift(newParaula);
+        playSound('newWord');
 
         if (estatDelJoc.value.paraules.length === 1) {
           reiniciarCronometro();
@@ -552,14 +579,6 @@ function finalizarJuego() {
         </span>
       </h2>
       <!-- Botón para volver al lobby cuando estamos en modo espectador -->
-      <button
-        v-if="props.isSpectator"
-        class="spectator-back-btn"
-        @click="handleVolverInicio"
-        title="Volver al lobby"
-      >
-        Volver al lobby
-      </button>
     </div>
     <div class="game-layout">
       <div class="game-main">
@@ -595,6 +614,7 @@ function finalizarJuego() {
           <input
             type="text"
             class="text-input"
+            :class="{ 'shake-animation': isShaking }"
             :value="displayedText"
             @input="textEntratLocal = $event.target.value"
             @keydown="handleKeyDown"
@@ -647,7 +667,8 @@ function finalizarJuego() {
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="`Canviar a ${p.name}`"
+              :title="p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`"
+              :disabled="p.eliminated"
             >
               {{ p.name.substring(0, 3) }}
             </button>
@@ -663,29 +684,29 @@ function finalizarJuego() {
           <li
             v-for="p in sortedPlayers"
             :key="p.id"
-            class="player-item"
-            :class="{
-              eliminado: p.eliminated || p.lives === 0,
-            }"
+            class="player-name-inline"
+            :class="{ eliminado: p.eliminated }"
           >
-            <div class="player-info">
-              <span class="player-name-text">{{ p.name }}</span>
-              <span
-                v-if="p.eliminated || p.lives === 0"
-                style="color: #dc3545; font-weight: bold; margin-left: 10px"
-              >
-                Eliminat
-              </span>
-            </div>
-            <div class="player-stats">
-              <span class="completed-count">
-                Paraules: {{ p.completedWords || 0 }}
-              </span>
-              <div class="vidas-jugador">
-                <span v-for="n in p.lives || 0" :key="n" class="corazon"
-                  >❤️</span
-                >
-              </div>
+            <span
+              class="color-dot"
+              :style="{
+                backgroundColor: p.color,
+                filter: `brightness(1.5) drop-shadow(0 0 5px ${p.color})`,
+              }"
+              aria-hidden="true"
+            ></span>
+            <span class="player-name-text">{{ p.name }}</span>
+            <span
+              v-if="p.eliminated"
+              style="color: #dc3545; font-weight: bold; margin-left: 10px"
+            >
+              Eliminat
+            </span>
+            <span class="completed-count">
+              [Paraules: {{ p.completedWords || 0 }}]
+            </span>
+            <div class="vidas-jugador">
+              <span v-for="n in p.lives === undefined ? 3 : p.lives" :key="n" class="corazon">❤️</span>
             </div>
           </li>
         </ul>
@@ -933,73 +954,66 @@ function finalizarJuego() {
   border-radius: 4px;
   border: 2px solid var(--color-background);
 }
-.player-name-inline.eliminado {
-  opacity: 0.5;
-  text-decoration: line-through;
-}
 .player-name-inline {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
   margin-bottom: 8px;
-  background: transparent;
   border-radius: 6px;
-  color: var(--color-text, #333);
-  font-weight: 600;
-}
-
-.player-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  margin-bottom: 10px;
-  background: var(--color-background, #fff);
-  border-radius: 6px;
-  border: 1px solid var(--color-border, #e0e0e0);
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 1.3rem;
   transition: opacity 0.3s ease;
 }
-
-.player-item.eliminado {
+.player-name-inline.eliminado {
   opacity: 0.5;
 }
-
-.player-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.player-name-text {
+  font-weight: 700;
+  color: var(--color-heading);
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-.player-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
+.completed-count {
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+  background: var(--color-background);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .vidas-jugador {
   display: flex;
   gap: 4px;
+  margin-left: 10px;
 }
 
 .corazon {
   font-size: 1.2rem;
+  animation: heartbeat 1.5s infinite;
 }
-.player-name-text {
-  font-weight: 700;
-  color: var(--color-heading, #333);
+
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
 }
-.completed-count {
-  font-size: 12px;
-  color: var(--color-text, #555);
-  opacity: 0.9;
-  background: var(--color-background, #fff);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: bold;
+.color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-text-muted);
 }
 .paraules-container {
   border: 1px solid var(--color-border, #ccc);
@@ -1155,6 +1169,28 @@ function finalizarJuego() {
   }
   50% {
     opacity: 0;
+  }
+}
+.shake-animation {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes shake {
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0);
+  }
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%,
+  60% {
+    transform: translate3d(4px, 0, 0);
   }
 }
 

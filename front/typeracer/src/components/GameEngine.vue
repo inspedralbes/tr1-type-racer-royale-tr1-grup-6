@@ -485,14 +485,6 @@ onUnmounted(() => {
           {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
         </span>
       </h2>
-      <button
-        v-if="props.isSpectator"
-        class="spectator-back-btn"
-        @click="handleVolverInicio"
-        title="Volver al lobby"
-      >
-        Volver al lobby
-      </button>
     </div>
 
     <div class="game-layout">
@@ -572,7 +564,8 @@ onUnmounted(() => {
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="`Canviar a ${p.name}`"
+              :title="p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`"
+              :disabled="p.eliminated"
             >
               {{ p.name.substring(0, 3) }}
             </button>

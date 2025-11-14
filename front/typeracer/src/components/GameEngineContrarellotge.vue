@@ -519,14 +519,6 @@ onMounted(() => {
           }}
         </span>
       </h2>
-      <button
-        v-if="props.isSpectator"
-        class="spectator-back-btn"
-        @click="handleVolverInicio"
-        title="Volver al lobby"
-      >
-        Volver al lobby
-      </button>
       <div v-if="props.modo === 'contrarellotge'" class="timer-bar-wrapper">
         <div class="timer-label">
           Temps restant: {{ Math.ceil(contrarellotgeTimeLeft / 1000) }} s
@@ -622,7 +614,8 @@ onMounted(() => {
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="`Canviar a ${p.name}`"
+              :title="p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`"
+              :disabled="p.eliminated"
             >
               {{ p.name.substring(0, 3) }}
             </button>
