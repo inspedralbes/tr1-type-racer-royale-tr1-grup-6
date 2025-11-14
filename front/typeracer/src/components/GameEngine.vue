@@ -781,6 +781,9 @@ onUnmounted(() => {
   padding: 12px 16px;
   border: 2px solid var(--color-border);
   box-shadow: 0 0 18px var(--shadow-color), inset 0 0 10px var(--shadow-color);
+  max-height: calc(80vh);
+  display: flex;
+  flex-direction: column;
 }
 .players-sidebar h3 {
   margin: 0 0 12px 0;
@@ -790,6 +793,29 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 8px;
   text-align: center;
+}
+
+.players-sidebar ul {
+  overflow-y: auto;
+  flex-grow: 1;
+  padding-right: 5px; /* Add some space for the scrollbar */
+  margin-right: -5px; /* Compensate for the padding */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) var(--color-background);
+}
+
+.players-sidebar ul::-webkit-scrollbar {
+  width: 8px;
+}
+
+.players-sidebar ul::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+.players-sidebar ul::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  border: 2px solid var(--color-background);
 }
 .player-name-inline {
   display: flex;

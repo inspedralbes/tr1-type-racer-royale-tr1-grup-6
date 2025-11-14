@@ -360,7 +360,7 @@ communicationManager.onkicked(() => {
           </span>
         </div>
       </div>
-      <ul>
+      <ul class="player-list-lobby">
         <li v-for="jugador in jugadors" :key="jugador.id">
           <span
             class="color-dot"

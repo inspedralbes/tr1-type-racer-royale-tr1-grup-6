@@ -1,6 +1,7 @@
 <script setup>
 import communicationManager from '@/services/communicationManager';
 import DarkModeToggle from './DarkModeToggle.vue';
+import LabBackground from './LabBackground.vue';
 import { ref, computed, defineEmits } from 'vue';
 const emit = defineEmits(['volverInicio']);
 
@@ -76,8 +77,9 @@ function cerrarResultados() {
 
 <template>
   <div class="result-screen" role="dialog" aria-live="polite">
-    <DarkModeToggle />
+    <LabBackground />
     <div class="result-card" :class="{ win: winner, lose: loser }">
+      <DarkModeToggle />
       <h1>{{ title }}</h1>
       <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
       <p>{{ displayedMessage }}</p>
@@ -122,6 +124,24 @@ function cerrarResultados() {
 .ranking-table {
   margin-top: 24px;
   text-align: left;
+  max-height: 50vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) var(--color-background);
+}
+
+.ranking-table::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ranking-table::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+.ranking-table::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  border: 2px solid var(--color-background);
 }
 .ranking-table table {
   width: 100%;
