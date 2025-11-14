@@ -333,7 +333,7 @@ communicationManager.onkicked(() => {
             <span class="mode-help-tooltip">
               {{
                 modoJuego === 'muerteSubita'
-                  ? 'Si comets dos errors quedes eliminat.'
+                  ? 'Si comets tres errors quedes eliminat.'
                   : modoJuego === 'contrarellotge'
                   ? "Fes tantes paraules com puguis abans que s'acabi el temps!"
                   : 'Completa paraules; acumula 20 per quedar eliminat.'
@@ -414,7 +414,7 @@ communicationManager.onkicked(() => {
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
               <span>Muerte Súbita</span>
               <span class="tooltip"
-                >Tens 2 vides — al 2n error quedes eliminat.</span
+                >Tens 3 vides — al 3n error quedes eliminat.</span
               >
             </label>
             <label

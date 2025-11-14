@@ -187,11 +187,13 @@ function validarProgres() {
     if (isError && !paraula.letterErrors[i]) {
       paraula.letterErrors[i] = true;
 
+      totalErrors.value++;
+
       // Reducir vidas si estamos en modo muerte súbita
       if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
         manejarError();
       }
-    } else {
+    } else if (!isError){
       paraula.letterErrors[i] = false;
     }
   }
@@ -675,8 +677,8 @@ function finalizarJuego() {
 .tecla {
   display: inline-flex;
   padding: 10px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  border: 2px solid var(--color-border, #ccc);
   min-width: 40px;
   height: 45px;
   margin: 2px;
@@ -688,6 +690,7 @@ function finalizarJuego() {
   font-weight: bold;
   background: var(--color-background, #fff);
   color: var(--color-text, #333);
+  font-size: 1.5rem;
 }
 .tecla:hover {
   background-color: var(--color-background-soft, #f0f0f0);
@@ -741,7 +744,11 @@ function finalizarJuego() {
 
 .progreso-tiempo {
   height: 100%;
-  background-color: #00ff7f;
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
   transition: width 0.1s linear;
 }
 
@@ -767,7 +774,7 @@ function finalizarJuego() {
 .players-sidebar {
   width: 300px;
   background: var(--color-background-soft, #f8f8f8);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px 16px;
   align-self: flex-start;
   box-shadow: 0 6px 18px var(--shadow-color, rgba(0, 0, 0, 0.08));
@@ -778,9 +785,10 @@ function finalizarJuego() {
   text-align: center;
   color: var(--color-heading, #333);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   border-bottom: 1px solid var(--color-border, #e0e0e0);
   padding-bottom: 8px;
+  text-align: center;
 }
 .player-name-inline.eliminado {
   opacity: 0.5;
