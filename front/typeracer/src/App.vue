@@ -310,7 +310,7 @@ communicationManager.onkicked(() => {
       <input
         type="text"
         v-model="nomJugador"
-        placeholder="Introdueix el teu nom (Refugiat)"
+        placeholder="Introdueix el teu nom (Cientific)"
         @input="saveStateToLocalStorage"
       />
       <div class="color-picker-container">
@@ -332,7 +332,7 @@ communicationManager.onkicked(() => {
           ></span>
         </div>
       </div>
-      <button @click="connectarAlServidor">Entra al Refugi</button>
+      <button @click="connectarAlServidor">Entra al laboratori</button>
     </div>
 
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
