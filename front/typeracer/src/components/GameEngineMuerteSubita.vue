@@ -31,7 +31,7 @@ watch(
         // Añade nuevo jugador con 3 vidas por defecto (para este modo)
         localPlayers.value.push({
           ...JSON.parse(JSON.stringify(propP)),
-          lives: 3, 
+          lives: 3,
         });
       }
     });
@@ -52,7 +52,9 @@ const sortedPlayers = computed(() => {
 
 const watchedPlayer = computed(() => {
   if (!props.isSpectator || !props.spectatorTargetId) return null;
-  const target = localPlayers.value.find((p) => p.id === props.spectatorTargetId);
+  const target = localPlayers.value.find(
+    (p) => p.id === props.spectatorTargetId,
+  );
   return target || localPlayers.value[0] || null;
 });
 
@@ -184,7 +186,7 @@ function validarProgres() {
 
   if (typed === paraula.text) {
     palabrasCompletadas.value++;
-    
+
     // Actualiza la lista local
     const self = localPlayers.value.find(
       (p) => p.id === communicationManager.getId(),
@@ -202,7 +204,7 @@ function validarProgres() {
       totalErrors: totalErrors.value,
       playTime: playTime,
     });
-    
+
     estatDelJoc.value.paraules.pop();
     textEntratLocal.value = '';
     reiniciarCronometro();
@@ -216,10 +218,12 @@ function validarProgres() {
     if (isError && !paraula.letterErrors[i]) {
       paraula.letterErrors[i] = true;
 
+      totalErrors.value++;
+
       if (props.modo === 'muerteSubita' && !perdedor.value && !ganador.value) {
         manejarError();
       }
-    } else {
+    } else if (!isError) {
       paraula.letterErrors[i] = false;
     }
   }
@@ -244,7 +248,7 @@ function getClasseLletra(indexLletra) {
 // 6. CREAR FUNCIÓN PARA GUARDAR STATS AL SER ELIMINADO
 function saveEliminationStats() {
   if (perdedor.value) return; // Ya se ha procesado
-  
+
   const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
   const finalStats = {
     playTime,
@@ -258,7 +262,9 @@ function saveEliminationStats() {
   communicationManager.updatePlayerProgress(finalStats);
 
   // Guardar en localPlayers
-  const self = localPlayers.value.find(p => p.id === communicationManager.getId());
+  const self = localPlayers.value.find(
+    (p) => p.id === communicationManager.getId(),
+  );
   if (self) {
     Object.assign(self, finalStats);
   }
@@ -339,13 +345,13 @@ function updateLocalPlayerLives(newLives) {
       lives: newLives,
     };
     playersLives.value = { ...playersLives.value };
-    
+
     // **CAMBIO CLAVE**: Actualiza 'localPlayers'
-    const localP = localPlayers.value.find(p => p.id === playerId);
+    const localP = localPlayers.value.find((p) => p.id === playerId);
     if (localP) {
       localP.lives = newLives;
     }
-    
+
     communicationManager.updatePlayerProgress({
       lives: newLives,
     });
@@ -356,7 +362,7 @@ function updateLocalPlayerLives(newLives) {
 onMounted(() => {
   // El watch 'immediate: true' ya ha poblado 'localPlayers'.
   // Ahora sincronizamos 'playersLives' (si aún se usa) y 'vidasRestantes' local.
-  
+
   // Sincroniza 'playersLives' con 'localPlayers'
   localPlayers.value.forEach((player) => {
     playersLives.value[player.id] = {
@@ -364,12 +370,14 @@ onMounted(() => {
       lives: player.lives ?? 3, // Asume 3 si no está definido
     };
   });
-  
-  const self = localPlayers.value.find(p => p.id === communicationManager.getId());
+
+  const self = localPlayers.value.find(
+    (p) => p.id === communicationManager.getId(),
+  );
   if (self) {
     vidasRestantes.value = self.lives ?? 3;
   }
-  
+
   communicationManager.onConnect((id) => {
     if (props.modo === 'muerteSubita') {
       playersLives.value[id] = {
@@ -377,8 +385,8 @@ onMounted(() => {
         lives: vidasRestantes.value,
       };
       playersLives.value = { ...playersLives.value };
-      
-      const localP = localPlayers.value.find(p => p.id === id);
+
+      const localP = localPlayers.value.find((p) => p.id === id);
       if (localP) {
         localP.lives = vidasRestantes.value;
       }
@@ -413,8 +421,8 @@ onMounted(() => {
         ...(playersLives.value[data.playerId] || {}),
         lives: data.lives,
       };
-      
-      const localP = localPlayers.value.find(p => p.id === data.playerId);
+
+      const localP = localPlayers.value.find((p) => p.id === data.playerId);
       if (localP) {
         localP.lives = data.lives;
       }
@@ -427,8 +435,8 @@ onMounted(() => {
       if (playersLives.value[data.playerId]) {
         playersLives.value[data.playerId].lives = 0;
       }
-      
-      const localP = localPlayers.value.find(p => p.id === data.playerId);
+
+      const localP = localPlayers.value.find((p) => p.id === data.playerId);
       if (localP) {
         localP.lives = 0;
         localP.eliminated = true; // Marca como eliminado en la lista local
@@ -438,7 +446,7 @@ onMounted(() => {
 
   communicationManager.onGameOver((data) => {
     if (JuegoTerminado.value) return;
-    
+
     if (props.isSpectator) {
       ganador.value = false;
       perdidoMensaje.value =
@@ -451,7 +459,7 @@ onMounted(() => {
           data.message || 'Has guanyat! Tots els altres han estat eliminats.';
       } else {
         ganador.value = false;
-        perdedor.value = true; 
+        perdedor.value = true;
         perdidoMensaje.value =
           data.message || `Has perdut. ${data.winnerName} ha guanyat.`;
       }
@@ -512,7 +520,7 @@ function finalizarJuego() {
     completedWords: palabrasCompletadas.value,
     lives: vidasRestantes.value,
   };
-  
+
   if (!props.isSpectator) {
     communicationManager.updatePlayerProgress(finalStats);
 
@@ -521,7 +529,7 @@ function finalizarJuego() {
       (p) => p.id === communicationManager.getId(),
     );
     // No sobrescribas si ya estabas eliminado (tus stats finales ya se guardaron)
-    if (localPlayer && !localPlayer.eliminated) { 
+    if (localPlayer && !localPlayer.eliminated) {
       localPlayer.playTime = finalStats.playTime;
       localPlayer.totalErrors = finalStats.totalErrors;
       localPlayer.completedWords = finalStats.completedWords;
@@ -627,12 +635,15 @@ function finalizarJuego() {
         <h3 v-if="props.isSpectator" class="spectator-banner">
           [MODO ESPECTADOR]
         </h3>
-        
-        <div v-if="props.isSpectator && !JuegoTerminado" class="spectator-controls">
+
+        <div
+          v-if="props.isSpectator && !JuegoTerminado"
+          class="spectator-controls"
+        >
           <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
           <div class="spectator-targets">
             <button
-              v-for="p in localPlayers" 
+              v-for="p in localPlayers"
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
@@ -641,7 +652,7 @@ function finalizarJuego() {
               {{ p.name.substring(0, 3) }}
             </button>
           </div>
-          
+
           <button @click="handleVolverInicio" class="spectator-exit-btn">
             Sortir al Lobby
           </button>
@@ -671,10 +682,7 @@ function finalizarJuego() {
                 Paraules: {{ p.completedWords || 0 }}
               </span>
               <div class="vidas-jugador">
-                 <span
-                  v-for="n in p.lives || 0"
-                  :key="n"
-                  class="corazon"
+                <span v-for="n in p.lives || 0" :key="n" class="corazon"
                   >❤️</span
                 >
               </div>
@@ -683,7 +691,10 @@ function finalizarJuego() {
         </ul>
       </aside>
 
-      <div v-if="perdedor && !JuegoTerminado && !isSpectator" class="overlay-eliminado">
+      <div
+        v-if="perdedor && !JuegoTerminado && !isSpectator"
+        class="overlay-eliminado"
+      >
         <div class="overlay-content">
           <h2>Has sido eliminado</h2>
           <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
@@ -713,8 +724,6 @@ function finalizarJuego() {
 </template>
 
 <style scoped>
-
-
 .spectator-banner {
   color: var(--color-warning, #ffc107);
   background: var(--color-background);
@@ -785,8 +794,8 @@ function finalizarJuego() {
 .tecla {
   display: inline-flex;
   padding: 10px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border, #ccc);
+  border-radius: 8px;
+  border: 2px solid var(--color-border, #ccc);
   min-width: 40px;
   height: 45px;
   margin: 2px;
@@ -798,6 +807,7 @@ function finalizarJuego() {
   font-weight: bold;
   background: var(--color-background, #fff);
   color: var(--color-text, #333);
+  font-size: 1.5rem;
 }
 .tecla:hover {
   background-color: var(--color-background-soft, #f0f0f0);
@@ -851,7 +861,11 @@ function finalizarJuego() {
 
 .progreso-tiempo {
   height: 100%;
-  background-color: #00ff7f;
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
   transition: width 0.1s linear;
 }
 
@@ -877,7 +891,7 @@ function finalizarJuego() {
 .players-sidebar {
   width: 300px;
   background: var(--color-background-soft, #f8f8f8);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px 16px;
   align-self: flex-start;
   box-shadow: 0 6px 18px var(--shadow-color, rgba(0, 0, 0, 0.08));
@@ -888,9 +902,10 @@ function finalizarJuego() {
   text-align: center;
   color: var(--color-heading, #333);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   border-bottom: 1px solid var(--color-border, #e0e0e0);
   padding-bottom: 8px;
+  text-align: center;
 }
 .player-name-inline.eliminado {
   opacity: 0.5;
@@ -1068,7 +1083,7 @@ function finalizarJuego() {
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 1rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 .spectator-back-btn:hover {
   transform: translateY(-1px);
@@ -1136,7 +1151,7 @@ function finalizarJuego() {
   background: var(--color-background-soft);
   padding: 40px;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 .overlay-content h2 {
   color: var(--color-error);

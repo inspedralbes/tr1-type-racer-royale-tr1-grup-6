@@ -5,13 +5,9 @@ import { ref, computed, defineEmits } from 'vue';
 const emit = defineEmits(['volverInicio']);
 
 const showRanking = ref(false);
-const showStats = ref(false);
 
 function toggleRanking() {
   showRanking.value = !showRanking.value;
-}
-function toggleStats() {
-  showStats.value = !showStats.value;
 }
 
 function calcularWPM(player) {
@@ -92,9 +88,6 @@ function cerrarResultados() {
         <button @click="toggleRanking">
           {{ showRanking ? 'Amagar ranking' : 'Veure ranking' }}
         </button>
-        <button @click="toggleStats">
-          {{ showStats ? 'Amagar estadístiques' : 'Estadístiques' }}
-        </button>
       </div>
       <div v-if="showRanking" class="ranking-table">
         <table>
@@ -104,24 +97,6 @@ function cerrarResultados() {
               <th>Jugador</th>
               <th>Paraules</th>
               <th>Errors</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
-              <td>{{ idx + 1 }}</td>
-              <td>{{ player.name }}</td>
-              <td>{{ player.completedWords || 0 }}</td>
-              <td>{{ player.totalErrors || 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="showStats" style="display: flex; justify-content: center">
-        <table class="ranking-table" style="width: 100%; max-width: 500px">
-          <thead>
-            <tr>
-              <th>Posició</th>
-              <th>Jugador</th>
               <th>Velocitat (WPM)</th>
               <th>Precisió (%)</th>
             </tr>
@@ -130,6 +105,8 @@ function cerrarResultados() {
             <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
               <td>{{ idx + 1 }}</td>
               <td>{{ player.name }}</td>
+              <td>{{ player.completedWords || 0 }}</td>
+              <td>{{ player.totalErrors || 0 }}</td>
               <td>{{ calcularWPM(player) }}</td>
               <td>{{ calcularPrecision(player) }}</td>
             </tr>
