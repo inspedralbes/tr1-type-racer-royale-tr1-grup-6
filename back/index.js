@@ -577,6 +577,15 @@ io.on("connection", (socket) => {
       room.gameState.duration = duration;
       gamePayload.duration = duration;
 
+      // Palabras más rápidas en contrarellotge pero evitar eliminación instantánea:
+      const FAST_INTERVAL_MS = 300; // <<--- valor pequeño = palabras muy rápidas (ajusta aquí)
+      const CONTRA_MAX_STACK = 100; // <<--- aumentar el tope para no eliminar jugadores inmediatamente
+
+      room.gameState.intervalMs = FAST_INTERVAL_MS;
+      room.gameState.maxStack = CONTRA_MAX_STACK;
+      gamePayload.intervalMs = FAST_INTERVAL_MS;
+      gamePayload.maxStack = CONTRA_MAX_STACK;
+
       setTimeout(() => {
         const playersArray = Array.from(room.players.values());
         const noEliminats = playersArray.filter(p => !p.eliminated);
@@ -598,7 +607,6 @@ io.on("connection", (socket) => {
           });
         }
       }, DURATION_MS);
-
   // Barra sincronitzada per a tothom cada 0,5 s
   const intervalTimer = setInterval(() => {
     const now = Date.now();
@@ -681,7 +689,7 @@ io.on("connection", (socket) => {
 
       io.to(ganador.id).emit("playerWon", {
         winnerId: ganador.id,
-        message: "¡Enhorabona! Has guanyat tots els jugadors.",
+        message: "¡Enhorabona! Has guanyat tots els Científics.",
       });
 
       Array.from(room.players.values()).forEach((j) => {

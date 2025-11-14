@@ -1,17 +1,14 @@
 <script setup>
 import communicationManager from '@/services/communicationManager';
 import DarkModeToggle from './DarkModeToggle.vue';
+import LabBackground from './LabBackground.vue';
 import { ref, computed, defineEmits } from 'vue';
 const emit = defineEmits(['volverInicio']);
 
 const showRanking = ref(false);
-const showStats = ref(false);
 
 function toggleRanking() {
   showRanking.value = !showRanking.value;
-}
-function toggleStats() {
-  showStats.value = !showStats.value;
 }
 
 function calcularWPM(player) {
@@ -80,20 +77,19 @@ function cerrarResultados() {
 
 <template>
   <div class="result-screen" role="dialog" aria-live="polite">
-    <DarkModeToggle />
+    <LabBackground />
     <div class="result-card" :class="{ win: winner, lose: loser }">
+      <DarkModeToggle />
       <h1>{{ title }}</h1>
       <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
       <p>{{ displayedMessage }}</p>
+      <p v-if="modo === 'contrarellotge'" class="badge-contrarellotge">Modo: Contrarellotge</p>
       <div class="actions">
         <button @click="emitirVolverInicio" style="margin-left: 8px">
-          Tornar al lobby
+          Tornar al laboratori
         </button>
         <button @click="toggleRanking">
           {{ showRanking ? 'Amagar ranking' : 'Veure ranking' }}
-        </button>
-        <button @click="toggleStats">
-          {{ showStats ? 'Amagar estadístiques' : 'Estadístiques' }}
         </button>
       </div>
       <div v-if="showRanking" class="ranking-table">
@@ -101,27 +97,9 @@ function cerrarResultados() {
           <thead>
             <tr>
               <th>Posició</th>
-              <th>Jugador</th>
+              <th>Científic</th>
               <th>Paraules</th>
               <th>Errors</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
-              <td>{{ idx + 1 }}</td>
-              <td>{{ player.name }}</td>
-              <td>{{ player.completedWords || 0 }}</td>
-              <td>{{ player.totalErrors || 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="showStats" style="display: flex; justify-content: center">
-        <table class="ranking-table" style="width: 100%; max-width: 500px">
-          <thead>
-            <tr>
-              <th>Posició</th>
-              <th>Jugador</th>
               <th>Velocitat (WPM)</th>
               <th>Precisió (%)</th>
             </tr>
@@ -130,6 +108,8 @@ function cerrarResultados() {
             <tr v-for="(player, idx) in sortedPlayers" :key="player.id">
               <td>{{ idx + 1 }}</td>
               <td>{{ player.name }}</td>
+              <td>{{ player.completedWords || 0 }}</td>
+              <td>{{ player.totalErrors || 0 }}</td>
               <td>{{ calcularWPM(player) }}</td>
               <td>{{ calcularPrecision(player) }}</td>
             </tr>
@@ -144,6 +124,24 @@ function cerrarResultados() {
 .ranking-table {
   margin-top: 24px;
   text-align: left;
+  max-height: 50vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) var(--color-background);
+}
+
+.ranking-table::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ranking-table::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+.ranking-table::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  border: 2px solid var(--color-background);
 }
 .ranking-table table {
   width: 100%;
@@ -218,6 +216,15 @@ function cerrarResultados() {
   margin-bottom: 8px;
 }
 
+.badge-contrarellotge {
+  display: inline-block;
+  background: linear-gradient(120deg, #4b016d, #7161ff);  
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
 .actions button {
   padding: 10px 16px;
   border-radius: 6px;

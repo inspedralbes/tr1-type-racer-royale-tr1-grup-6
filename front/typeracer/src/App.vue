@@ -8,6 +8,8 @@ import RoomSelector from './components/RoomSelector.vue';
 import communicationManager from './services/communicationManager.js';
 import { useSounds } from '@/composables/useSounds';
 import GameEngineContrarellotge from './components/GameEngineContrarellotge.vue';
+import DrAtomic from './components/DrAtomic.vue';
+import LabBackground from './components/LabBackground.vue';
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
@@ -84,18 +86,30 @@ function loadStateFromLocalStorage() {
 }
 
 function volverInicio() {
-  localStorage.removeItem('typeRacerUser');
-  communicationManager.disconnect();
-  nomJugador.value = '';
   isReady.value = false;
-  isSpectator.value = false; // <-- Esto ya estaba correcto, ¡bien!
+  // If we were spectating, inform server we leave the room so the server
+  // doesn't keep us listed as a spectator after returning to the rooms view.
+  try {
+    if (isSpectator.value || spectatorTargetId.value) {
+      communicationManager.leaveRoom();
+    }
+  } catch (e) {
+    // ignore errors if socket not connected
+  }
+
+  isSpectator.value = false;
   spectatorTargetId.value = null;
-  vistaActual.value = 'salaEspera';
+  // Navegar al selector de salas
+  vistaActual.value = 'rooms';
+  // Reset estado de jugadores locales y palabras de la partida
   playersPayload.value = { players: [], hostId: null, spectators: [] };
-  socketId.value = null;
   playerWords.value = [];
   gameIntervalMs.value = 3000;
-  gameMaxStack.value = 20; // También actualizado aquí
+  gameMaxStack.value = 20;
+  try {
+    communicationManager.leaveRoom();
+    communicationManager.setReady(false);
+  } catch (e) {}
   stopAllMusic();
 }
 
@@ -263,18 +277,21 @@ communicationManager.onkicked(() => {
   alert('Has sido expulsado de la sala.');
   volverInicio();
 });
-
 </script>
 
 <template>
+  <LabBackground />
   <main>
     <DarkModeToggle />
+
+    <DrAtomic v-if="vistaActual === 'salaEspera'" />
+
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Atomic Syntax</h1>
       <input
         type="text"
         v-model="nomJugador"
-        placeholder="Introdueix el teu nom (Refugiat)"
+        placeholder="Introdueix el teu nom (Cientific)"
         @input="saveStateToLocalStorage"
       />
       <div class="color-picker-container">
@@ -296,7 +313,7 @@ communicationManager.onkicked(() => {
           ></span>
         </div>
       </div>
-      <button @click="connectarAlServidor">Entra al Refugi</button>
+      <button @click="connectarAlServidor">Entra al laboratori</button>
     </div>
 
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
@@ -304,7 +321,7 @@ communicationManager.onkicked(() => {
     </div>
 
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
-      <h2>Refugiats Connectats</h2>
+      <h2>CIENTÍFICS CONNECTATS</h2>
       <div class="lobby-header" v-if="!isHost">
         <div class="game-mode-display">
           Mode actual:
@@ -334,17 +351,16 @@ communicationManager.onkicked(() => {
             <span class="mode-help-tooltip">
               {{
                 modoJuego === 'muerteSubita'
-                  ? 'Si comets dos errors quedes eliminat.'
+                  ? 'Si comets tres errors quedes eliminat.'
                   : modoJuego === 'contrarellotge'
                   ? "Fes tantes paraules com puguis abans que s'acabi el temps!"
                   : 'Completa paraules; acumula 20 per quedar eliminat.'
-                  
               }}
             </span>
           </span>
         </div>
       </div>
-      <ul>
+      <ul class="player-list-lobby">
         <li v-for="jugador in jugadors" :key="jugador.id">
           <span
             class="color-dot"
@@ -396,7 +412,7 @@ communicationManager.onkicked(() => {
         >
           [INICIAR] (Supervisor)
         </button>
-        <button @click="volverInicio">Tornar a l'Inici</button>
+        <button @click="volverInicio">Tornar al laboratori</button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el mode de joc</h3>
           <div class="modo-buttons">
@@ -415,7 +431,7 @@ communicationManager.onkicked(() => {
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
               <span>Muerte Súbita</span>
               <span class="tooltip"
-                >Tens 2 vides — al 2n error quedes eliminat.</span
+                >Tens 3 vides — al 3n error quedes eliminat.</span
               >
             </label>
             <label
@@ -518,7 +534,7 @@ communicationManager.onkicked(() => {
 }
 
 .modo-btn.contrarellotge .tooltip {
-  background: linear-gradient(120deg, #4b016d, #7161ff);  
+  background: linear-gradient(120deg, #4b016d, #7161ff);
 }
 .modo-btn.contrarellotge .tooltip::after {
   border-color: #7161ff transparent transparent transparent;

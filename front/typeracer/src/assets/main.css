@@ -11,7 +11,7 @@ html[data-theme="light"] {
   --color-text-muted: #804000;
 
   --color-primary: #c06000;
-  --color-success: #006400;
+  --color-success: #FFFFFF;
 
   --color-error: #b71c1c;
   --color-error-bg: rgba(183, 28, 28, 0.2);
@@ -64,20 +64,6 @@ body {
   font-size: 1.3rem;
 
   text-shadow: 0 0 3px var(--color-text-muted);
-
-  background: repeating-linear-gradient(
-      var(--scanline-color) 0,
-      var(--scanline-color) 1px,
-      transparent 1px,
-      transparent 6px
-    ),
-    radial-gradient(
-      ellipse at center,
-      var(--body-glow-color) 10%,
-      var(--vignette-color) 90%
-    );
-  background-size: 100% 3px, 100% 100%;
-  animation: scanlines 20s linear infinite;
 
   transition: background-color 1s ease, color 1s ease;
 }

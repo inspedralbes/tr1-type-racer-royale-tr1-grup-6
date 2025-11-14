@@ -485,6 +485,14 @@ onUnmounted(() => {
           {{ props.modo === 'muerteSubita' ? 'Muerte Súbita' : 'Normal' }}
         </span>
       </h2>
+      <button
+        v-if="props.isSpectator"
+        class="spectator-back-btn"
+        @click="handleVolverInicio"
+        title="Volver al lobby"
+      >
+        Volver al lobby
+      </button>
     </div>
 
     <div class="game-layout">
@@ -574,7 +582,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <h3>[REFUGIATS]</h3>
+        <h3>[CIENTÍFICS]</h3>
         <ul>
           <li
             v-for="p in sortedPlayers"
@@ -773,6 +781,9 @@ onUnmounted(() => {
   padding: 12px 16px;
   border: 2px solid var(--color-border);
   box-shadow: 0 0 18px var(--shadow-color), inset 0 0 10px var(--shadow-color);
+  max-height: calc(80vh);
+  display: flex;
+  flex-direction: column;
 }
 .players-sidebar h3 {
   margin: 0 0 12px 0;
@@ -782,6 +793,29 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 8px;
   text-align: center;
+}
+
+.players-sidebar ul {
+  overflow-y: auto;
+  flex-grow: 1;
+  padding-right: 5px; /* Add some space for the scrollbar */
+  margin-right: -5px; /* Compensate for the padding */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary) var(--color-background);
+}
+
+.players-sidebar ul::-webkit-scrollbar {
+  width: 8px;
+}
+
+.players-sidebar ul::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+.players-sidebar ul::-webkit-scrollbar-thumb {
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  border: 2px solid var(--color-background);
 }
 .player-name-inline {
   display: flex;
@@ -875,6 +909,28 @@ onUnmounted(() => {
   box-shadow: 0 0 20px var(--shadow-color);
   outline: none;
   transition: border-color 0.15s;
+}
+.game-header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 12px;
+  position: relative; /* permite posicionar el botón de espectador */
+}
+
+/* Estilo del botón "Volver al lobby" cuando eres espectador */
+.spectator-back-btn {
+  position: absolute;
+  top: 8px;
+  right: 70px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.spectator-back-btn:hover {
+  transform: translateY(-1px);
 }
 .text-input:focus {
   border-color: var(--color-success);
