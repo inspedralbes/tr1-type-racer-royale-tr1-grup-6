@@ -78,7 +78,7 @@ function createGamePayload(room) {
   return {
     gameWords: gameWords,
     maxStack: 20,
-    intervalMs: 2000,
+    intervalMs: 1000,
     startAt: Date.now() + 1500,
   };
 }
