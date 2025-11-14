@@ -1,17 +1,17 @@
 <template>
   <div class="room-selector">
-    <h2>Sales disponibles</h2>
+    <h2>Cambres d’Assaig</h2>
 
     <div class="rooms-list">
       <div v-if="rooms.length === 0" class="empty">
-        No hi ha sales disponibles
+        No hi ha Sales d’Experimentació Actives
       </div>
       <ul>
         <li v-for="r in rooms" :key="r.id" class="room-item">
           <div class="room-info">
             <div class="room-name">
               {{ r.name }}
-              <span v-if="r.inGame" class="in-game-badge">En juego</span>
+              <span v-if="r.inGame" class="in-game-badge">Fent proves</span>
             </div>
             <div class="room-meta">
               <span>Jugadors: {{ r.count || 0 }}</span>
@@ -21,11 +21,11 @@
               <span class="mode-info"
                 >Mode:
                 {{
-                  r.modo === "muerteSubita" 
-                    ? "Muerte Súbita" 
-                    : r.modo === "contrarellotge"
-                    ? "Contrarellotge"
-                    : "Normal"
+                  r.modo === 'muerteSubita'
+                    ? 'Muerte Súbita'
+                    : r.modo === 'contrarellotge'
+                    ? 'Contrarellotge'
+                    : 'Normal'
                 }}</span
               >
             </div>
@@ -37,9 +37,9 @@
               :class="{ disabled: r.inGame }"
               :title="r.inGame ? 'No puedes unirte a una partida en curso' : ''"
             >
-              {{ r.inGame ? "En juego" : "Entrar" }}
+              {{ r.inGame ? 'Fent proves' : 'Entrar' }}
             </button>
-            
+
             <button
               v-if="r.inGame"
               @click="spectateRoom(r.id)"
@@ -55,20 +55,20 @@
 
     <div class="create-room">
       <input v-model="newRoomName" placeholder="Nom de la sala" />
-      <button @click="createRoom">Crear sala</button>
+      <button @click="createRoom">Crear Cambra</button>
       <button @click="changeNameAndPipBoy">Canviar de Nom i Pip-Boy</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
-import communicationManager from "../services/communicationManager.js";
+import { ref, onMounted, onUnmounted } from 'vue';
+import communicationManager from '../services/communicationManager.js';
 
-const emit = defineEmits(["joined"]);
+const emit = defineEmits(['joined']);
 
 const rooms = ref([]);
-const newRoomName = ref("");
+const newRoomName = ref('');
 
 let pollTimer = null;
 
@@ -77,10 +77,10 @@ function refreshRooms() {
 }
 
 function createRoom() {
-  const name = (newRoomName.value || "").trim();
+  const name = (newRoomName.value || '').trim();
   if (!name) return;
   communicationManager.createRoom(name);
-  newRoomName.value = "";
+  newRoomName.value = '';
 }
 
 function joinRoom(id) {
@@ -107,14 +107,14 @@ function onRoomList(payload) {
 }
 
 function onJoined(payload) {
-  emit("joined", payload);
+  emit('joined', payload);
 }
 
 onMounted(() => {
   communicationManager.onRoomList(onRoomList);
   // NOTA: 'onJoinedRoom' s'escolta ara a App.vue per gestionar la navegació
-  // communicationManager.onJoinedRoom(onJoined); 
-  
+  // communicationManager.onJoinedRoom(onJoined);
+
   // ===================================
   // NOU LISTENER D'ERROR
   // ===================================

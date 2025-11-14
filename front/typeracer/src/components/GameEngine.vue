@@ -582,7 +582,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <h3>[REFUGIATS]</h3>
+        <h3>[CIENTÍFICS]</h3>
         <ul>
           <li
             v-for="p in sortedPlayers"

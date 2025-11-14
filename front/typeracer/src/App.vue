@@ -8,6 +8,8 @@ import RoomSelector from './components/RoomSelector.vue';
 import communicationManager from './services/communicationManager.js';
 import { useSounds } from '@/composables/useSounds';
 import GameEngineContrarellotge from './components/GameEngineContrarellotge.vue';
+import DrAtomic from './components/DrAtomic.vue';
+import LabBackground from './components/LabBackground.vue';
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
@@ -85,6 +87,16 @@ function loadStateFromLocalStorage() {
 
 function volverInicio() {
   isReady.value = false;
+  // If we were spectating, inform server we leave the room so the server
+  // doesn't keep us listed as a spectator after returning to the rooms view.
+  try {
+    if (isSpectator.value || spectatorTargetId.value) {
+      communicationManager.leaveRoom();
+    }
+  } catch (e) {
+    // ignore errors if socket not connected
+  }
+
   isSpectator.value = false;
   spectatorTargetId.value = null;
   // Navegar al selector de salas
@@ -93,13 +105,28 @@ function volverInicio() {
   playersPayload.value = { players: [], hostId: null, spectators: [] };
   playerWords.value = [];
   gameIntervalMs.value = 3000;
-  gameMaxStack.value = 20; 
+  gameMaxStack.value = 20;
   try {
     communicationManager.leaveRoom();
     communicationManager.setReady(false);
-  } catch (e) {
+  } catch (e) {}
+  stopAllMusic();
+}
 
-  }
+function volverAPantallaPrincipal() {
+  // Desconectar completamente y volver a 'salaEspera' para poner nombre nuevamente
+  localStorage.removeItem('typeRacerUser');
+  communicationManager.disconnect();
+  nomJugador.value = '';
+  isReady.value = false;
+  isSpectator.value = false;
+  spectatorTargetId.value = null;
+  vistaActual.value = 'salaEspera';
+  playersPayload.value = { players: [], hostId: null, spectators: [] };
+  socketId.value = null;
+  playerWords.value = [];
+  gameIntervalMs.value = 3000;
+  gameMaxStack.value = 20;
   stopAllMusic();
 }
 
@@ -267,18 +294,21 @@ communicationManager.onkicked(() => {
   alert('Has sido expulsado de la sala.');
   volverInicio();
 });
-
 </script>
 
 <template>
+  <LabBackground />
   <main>
     <DarkModeToggle />
+
+    <DrAtomic v-if="vistaActual === 'salaEspera'" />
+
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Atomic Syntax</h1>
       <input
         type="text"
         v-model="nomJugador"
-        placeholder="Introdueix el teu nom (Refugiat)"
+        placeholder="Introdueix el teu nom (Cientific)"
         @input="saveStateToLocalStorage"
       />
       <div class="color-picker-container">
@@ -300,15 +330,18 @@ communicationManager.onkicked(() => {
           ></span>
         </div>
       </div>
-      <button @click="connectarAlServidor">Entra al Refugi</button>
+      <button @click="connectarAlServidor">Entra al laboratori</button>
     </div>
 
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
       <RoomSelector />
+      <button class="btn-back-to-main" @click="volverAPantallaPrincipal">
+        Canviar Nom
+      </button>
     </div>
 
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
-      <h2>Refugiats Connectats</h2>
+      <h2>CIENTÍFICS CONNECTATS</h2>
       <div class="lobby-header" v-if="!isHost">
         <div class="game-mode-display">
           Mode actual:
@@ -342,7 +375,6 @@ communicationManager.onkicked(() => {
                   : modoJuego === 'contrarellotge'
                   ? "Fes tantes paraules com puguis abans que s'acabi el temps!"
                   : 'Completa paraules; acumula 20 per quedar eliminat.'
-                  
               }}
             </span>
           </span>
@@ -400,7 +432,7 @@ communicationManager.onkicked(() => {
         >
           [INICIAR] (Supervisor)
         </button>
-        <button @click="volverInicio">Tornar a l'Inici</button>
+        <button @click="volverInicio">Tornar al laboratori</button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el mode de joc</h3>
           <div class="modo-buttons">
@@ -437,460 +469,460 @@ communicationManager.onkicked(() => {
         </div>
       </div>
     </div>
-        
-            <div
-              v-else-if="vistaActual === 'preparados'"
-              class="vista-container-preparados"
-            >
-              <GameCountdown
-                :modo="modoJuego"
-                @countdownComplete="onCountdownComplete"
-              />
-            </div>
-        
-            <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
-              <component
-                :is="
-                  modoJuego === 'muerteSubita'
-                    ? GameEngineMuerteSubita
-                    : modoJuego === 'contrarellotge'
-                    ? GameEngineContrarellotge
-                    : GameEngine
-                "
-                :initialWords="playerWords"
-                :intervalMs="gameIntervalMs"
-                :maxStack="gameMaxStack"
-                :players="jugadors"
-                @volverInicio="volverInicio"
-                :modo="modoJuego"
-                :isSpectator="isSpectator"
-                :spectatorTargetId="spectatorTargetId"
-                @switch-spectator-target="spectatorTargetId = $event"
-                :timeLeft="modoJuego === 'contrarellotge' ? timeLeftGlobal : undefined"
-              />
-            </div>
-          </main>
-        </template>
-        
-        <style scoped>
-        /* ... (TOTS ELS TEUS ESTILS ES QUEDEN EXACTAMENT IGUAL) ... */
-        .modo-btn .tooltip {
-          position: absolute;
-          bottom: 125%;
-          left: 50%;
-          transform: translateX(-50%) translateY(6px) scale(0.98);
-          opacity: 0;
-          visibility: hidden;
-          background: linear-gradient(
-            180deg,
-            rgba(20, 20, 20, 0.95),
-            rgba(40, 40, 40, 0.95)
-          );
-          color: #fff;
-          padding: 10px 12px;
-          border-radius: 8px;
-          font-size: 0.95rem;
-          line-height: 1.2;
-          transition: opacity 180ms ease, transform 180ms ease,
-            visibility 0s linear 180ms;
-          z-index: 1200; /* definitely above everything */
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
-          pointer-events: none; /* don't block hover */
-          min-width: 180px;
-          text-align: center;
-          z-index: 9999;
-        }
-        
-        .modo-btn:hover .tooltip {
-          opacity: 1;
-          visibility: visible;
-          transform: translateX(-50%) translateY(0) scale(1);
-          transition-delay: 40ms;
-        }
-        
-        /* little arrow under the tooltip */
-        .modo-btn .tooltip::after {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border-width: 7px;
-          border-style: solid;
-          border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
-          z-index: 1201;
-        }
-        
-        .modo-btn.contrarellotge .tooltip {
-          background: linear-gradient(120deg, #4b016d, #7161ff);  
-        }
-        .modo-btn.contrarellotge .tooltip::after {
-          border-color: #7161ff transparent transparent transparent;
-        }
-        
-        /* special color for Muerte Súbita tooltip to match danger style */
-        .modo-btn.muerte .tooltip {
-          background: linear-gradient(
-            180deg,
-            rgba(200, 40, 40, 0.98),
-            rgba(220, 70, 70, 0.98)
-          );
-          color: #fff;
-        }
-        
-        .modo-btn.muerte .tooltip::after {
-          border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
-        }
-        
-        /* non-host mode help icon + tooltip */
-        .mode-help {
-          display: inline-block;
-          position: relative;
-          margin-left: 10px;
-          cursor: pointer;
-        }
-        .mode-help-icon {
-          display: inline-flex;
-          width: 20px;
-          height: 20px;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          background: linear-gradient(180deg, #ffffff, #f0f0f0);
-          color: #222;
-          font-weight: 700;
-          font-size: 0.9rem;
-          border: 1px solid rgba(0, 0, 0, 0.06);
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-        }
-        .mode-help-tooltip {
-          position: absolute;
-          bottom: 125%;
-          left: 50%;
-          transform: translateX(-50%) translateY(6px) scale(0.98);
-          opacity: 0;
-          visibility: hidden;
-          background: linear-gradient(
-            180deg,
-            rgba(20, 20, 20, 0.95),
-            rgba(40, 40, 40, 0.95)
-          );
-          color: #fff;
-          padding: 8px 10px;
-          border-radius: 6px;
-          font-size: 0.85rem;
-          line-height: 1.2;
-          transition: opacity 160ms ease, transform 160ms ease;
-          z-index: 1200;
-          white-space: nowrap;
-          pointer-events: none;
-        }
-        .mode-help:hover .mode-help-tooltip {
-          opacity: 1;
-          visibility: visible;
-          transform: translateX(-50%) translateY(0) scale(1);
-        }
-        .mode-help .mode-help-tooltip::after {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border-width: 6px;
-          border-style: solid;
-          border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
-        }
-        .mode-help.muerte .mode-help-tooltip {
-          background: linear-gradient(
-            180deg,
-            rgba(200, 40, 40, 0.98),
-            rgba(220, 70, 70, 0.98)
-          );
-        }
-        .mode-help.muerte .mode-help-tooltip::after {
-          border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
-        }
-        .spectator-list {
-          margin-top: 20px;
-          border-top: 1px dashed var(--color-border);
-          padding-top: 15px;
-        }
-        .spectator-list h3 {
-          font-size: 1.2rem;
-          color: var(--color-text-muted);
-          margin-bottom: 10px;
-        }
-        .spectator-list ul {
-          opacity: 0.7;
-        }
-        .app {
-          max-width: 1200px;
-          margin: 20px auto;
-          padding: 18px;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-            Roboto, 'Helvetica Neue', Arial;
-        }
-        .vista-container {
-          max-width: 600px;
-          margin: 70px auto;
-          padding: 20px;
-          border: 1px solid var(--color-border, #ccc);
-          background: var(--color-background-soft);
-          border-radius: 8px;
-          text-align: center;
-          align-items: center;
-        }
-        .vista-container-lobby {
-          max-width: 700px;
-          margin: 100px auto;
-          padding: 24px;
-          border: 2px solid var(--color-border);
-          background: var(--color-background-soft);
-          text-align: center;
-          border-radius: 12px;
-          box-shadow: 0 0 20px var(--shadow-color), inset 0 0 15px var(--shadow-color);
-        }
-        .vista-container-joc {
-          max-width: 1200px;
-          margin: 20px auto;
-          padding: 0;
-          border: none;
-        }
-        .vista-container-preparados {
-          width: 100%;
-          height: 100vh;
-          padding: 0;
-          margin: 0;
-        }
-        h1 {
-          font-size: 3.5rem;
-          margin-bottom: 24px;
-        }
-        h2 {
-          font-size: 2.5rem;
-          border-bottom: 2px solid var(--color-border);
-          padding-bottom: 10px;
-          margin-bottom: 20px;
-        }
-        input[type='text'] {
-          width: 100%;
-          padding: 12px;
-          margin-bottom: 16px;
-          box-sizing: border-box;
-          font-size: 1.8rem;
-          text-align: center;
-          border: 1px solid var(--color-border, #ccc);
-          border-radius: 4px;
-        }
-        button {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 4px;
-          background-color: var(--color-primary, #007bff);
-          color: white;
-          cursor: pointer;
-          font-family: var(--font-main);
-          font-size: 1.5rem;
-          text-shadow: 0 0 5px var(--color-heading);
-          width: auto;
-        }
-        .vista-container button {
-          width: 100%;
-        }
-        .lobby-actions {
-          display: flex;
-          gap: 16px;
-          margin-top: 20px;
-          flex-wrap: wrap;
-        }
-        .lobby-actions button {
-          flex-grow: 1;
-          flex-basis: 200px;
-          margin-left: 0;
-          padding: 0.4rem;
-        }
-        .color-picker-container {
-          margin: 20px 0;
-        }
-        .color-picker-container label {
-          display: block;
-          margin-bottom: 12px;
-          font-weight: 700;
-          font-size: 1.5rem;
-          color: var(--color-text);
-        }
-        .color-picker {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 12px;
-        }
-        .color-swatch {
-          width: 35px;
-          height: 35px;
-          border-radius: 50%;
-          cursor: pointer;
-          border: 2px solid var(--color-text-muted);
-          transition: all 0.1s ease;
-        }
-        .color-swatch:hover {
-          transform: scale(1.1);
-        }
-        .color-swatch.selected {
-          border-color: var(--color-heading);
-          transform: scale(1.1);
-        }
-        .color-dot {
-          display: inline-block;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          margin-right: 10px;
-          vertical-align: middle;
-          border: 1px solid rgba(0, 0, 0, 0.2);
-        }
-        button.ready {
-          background-color: #28a745;
-        }
-        button.btn-host {
-          background-color: var(--color-success, #28a745);
-        }
-        
-        .btn-kick {
-          margin-top: 10px;
-          background-color: var(--color-danger, #dc3545);
-          margin-left: 10px;
-          padding: 4px 10px;
-          font-size: 18px;
-          color: white;
-        }
-        .btn-kick:hover {
-          background-color: #b71c1c;
-        }
-        
-        .btn-transfer {
-          padding: 4px 10px;
-          font-size: 18px;
-          background-color: var(--color-warning, #ffc107);
-          margin-left: 10px;
-          color: black;
-        }
-        .btn-transfer:hover {
-          background-color: #e0a800;
-        }
-        
-        .host-status {
-          color: var(--color-text-muted);
-          margin-left: 8px;
-        }
-        .lobby-header {
-          margin-bottom: 20px;
-          text-align: center;
-        }
-        .game-mode-display {
-          font-size: 1.2rem;
-          margin: 10px 0;
-        }
-        .mode-badge {
-          display: inline-block;
-          padding: 4px 12px;
-          border-radius: 12px;
-          background: linear-gradient(120deg, #007bff, #00d4ff);
-          color: white;
-          font-weight: 600;
-          margin-left: 8px;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-        }
-        .mode-badge.muerte-subita {
-          background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
-        }
-        .modo-selector {
-          margin-top: 20px;
-          text-align: center;
-          width: 100%;
-        }
-        .modo-selector h3 {
-          font-size: 1.2rem;
-          margin-bottom: 12px;
-          color: var(--color-heading, #333);
-        }
-        .modo-buttons {
-          display: flex;
-          justify-content: center;
-          gap: 16px;
-        }
-        .modo-btn {
-          position: relative;
-          padding: 12px 24px;
-          border-radius: 12px;
-          border: 2px solid transparent;
-          background: linear-gradient(145deg, #e3e3e3, #f9f9f9);
-          color: #333;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          overflow: visible;
-          z-index: 1;
-        }
-        .modo-btn:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-        }
-        .modo-btn input {
-          display: none;
-        }
-        .modo-btn span {
-          position: relative;
-          z-index: 2;
-        }
-        .modo-btn::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(120deg, #007bff, #00d4ff);
-          opacity: 0;
-          transition: opacity 0.3s ease;
-          border-radius: 12px;
-          z-index: 1;
-        }
-        .modo-btn.active::before {
-          opacity: 1;
-        }
-        .modo-btn.active {
-          color: white;
-          transform: scale(1.05);
-        }
-        .modo-btn.muerte::before {
-          background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
-        }
-        .modo-btn.muerte.active {
-          color: white;
-        }
-        .modo-btn:active {
-          transform: scale(0.98);
-        }
-        
-        .modo-btn.contrarellotge::before {
-          background: linear-gradient(120deg, #4b016d, #7161ff);
-        }
-        
-        .modo-btn.contrarellotge.active {
-          color: white;
-          transform: scale(1.05);
-        }
-        
-        .mode-badge.contrarellotge {
-          background: linear-gradient(120deg, #4b016d, #7161ff);
-          color: white;
-          font-weight: 700;
-        }
-        
-        .mode-help.contrarellotge .mode-help-tooltip {
-          background: linear-gradient(120deg, #4b016d, #7161ff) !important;
-          color: #fff;
-        }
-        
-        .mode-help.contrarellotge .mode-help-tooltip::after {
-          border-color: #7161ff transparent transparent transparent !important;
-        }
-        </style>
+
+    <div
+      v-else-if="vistaActual === 'preparados'"
+      class="vista-container-preparados"
+    >
+      <GameCountdown
+        :modo="modoJuego"
+        @countdownComplete="onCountdownComplete"
+      />
+    </div>
+
+    <div v-else-if="vistaActual === 'joc'" class="vista-container-joc">
+      <component
+        :is="
+          modoJuego === 'muerteSubita'
+            ? GameEngineMuerteSubita
+            : modoJuego === 'contrarellotge'
+            ? GameEngineContrarellotge
+            : GameEngine
+        "
+        :initialWords="playerWords"
+        :intervalMs="gameIntervalMs"
+        :maxStack="gameMaxStack"
+        :players="jugadors"
+        @volverInicio="volverInicio"
+        :modo="modoJuego"
+        :isSpectator="isSpectator"
+        :spectatorTargetId="spectatorTargetId"
+        @switch-spectator-target="spectatorTargetId = $event"
+        :timeLeft="modoJuego === 'contrarellotge' ? timeLeftGlobal : undefined"
+      />
+    </div>
+  </main>
+</template>
+
+<style scoped>
+/* ... (TOTS ELS TEUS ESTILS ES QUEDEN EXACTAMENT IGUAL) ... */
+.modo-btn .tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  transition: opacity 180ms ease, transform 180ms ease,
+    visibility 0s linear 180ms;
+  z-index: 1200; /* definitely above everything */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: none; /* don't block hover */
+  min-width: 180px;
+  text-align: center;
+  z-index: 9999;
+}
+
+.modo-btn:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+  transition-delay: 40ms;
+}
+
+/* little arrow under the tooltip */
+.modo-btn .tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 7px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+  z-index: 1201;
+}
+
+.modo-btn.contrarellotge .tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+}
+.modo-btn.contrarellotge .tooltip::after {
+  border-color: #7161ff transparent transparent transparent;
+}
+
+/* special color for Muerte Súbita tooltip to match danger style */
+.modo-btn.muerte .tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+  color: #fff;
+}
+
+.modo-btn.muerte .tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
+
+/* non-host mode help icon + tooltip */
+.mode-help {
+  display: inline-block;
+  position: relative;
+  margin-left: 10px;
+  cursor: pointer;
+}
+.mode-help-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #f0f0f0);
+  color: #222;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.mode-help-tooltip {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.98);
+  opacity: 0;
+  visibility: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 20, 20, 0.95),
+    rgba(40, 40, 40, 0.95)
+  );
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 1200;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mode-help:hover .mode-help-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+.mode-help .mode-help-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: rgba(40, 40, 40, 0.95) transparent transparent transparent;
+}
+.mode-help.muerte .mode-help-tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(200, 40, 40, 0.98),
+    rgba(220, 70, 70, 0.98)
+  );
+}
+.mode-help.muerte .mode-help-tooltip::after {
+  border-color: rgba(220, 70, 70, 0.98) transparent transparent transparent;
+}
+.spectator-list {
+  margin-top: 20px;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 15px;
+}
+.spectator-list h3 {
+  font-size: 1.2rem;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+.spectator-list ul {
+  opacity: 0.7;
+}
+.app {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 18px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial;
+}
+.vista-container {
+  max-width: 600px;
+  margin: 70px auto;
+  padding: 20px;
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-background-soft);
+  border-radius: 8px;
+  text-align: center;
+  align-items: center;
+}
+.vista-container-lobby {
+  max-width: 700px;
+  margin: 100px auto;
+  padding: 24px;
+  border: 2px solid var(--color-border);
+  background: var(--color-background-soft);
+  text-align: center;
+  border-radius: 12px;
+  box-shadow: 0 0 20px var(--shadow-color), inset 0 0 15px var(--shadow-color);
+}
+.vista-container-joc {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0;
+  border: none;
+}
+.vista-container-preparados {
+  width: 100%;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+h1 {
+  font-size: 3.5rem;
+  margin-bottom: 24px;
+}
+h2 {
+  font-size: 2.5rem;
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+input[type='text'] {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  font-size: 1.8rem;
+  text-align: center;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
+}
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--color-primary, #007bff);
+  color: white;
+  cursor: pointer;
+  font-family: var(--font-main);
+  font-size: 1.5rem;
+  text-shadow: 0 0 5px var(--color-heading);
+  width: auto;
+}
+.vista-container button {
+  width: 100%;
+}
+.lobby-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.lobby-actions button {
+  flex-grow: 1;
+  flex-basis: 200px;
+  margin-left: 0;
+  padding: 0.4rem;
+}
+.color-picker-container {
+  margin: 20px 0;
+}
+.color-picker-container label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--color-text);
+}
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.color-swatch {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--color-text-muted);
+  transition: all 0.1s ease;
+}
+.color-swatch:hover {
+  transform: scale(1.1);
+}
+.color-swatch.selected {
+  border-color: var(--color-heading);
+  transform: scale(1.1);
+}
+.color-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+button.ready {
+  background-color: #28a745;
+}
+button.btn-host {
+  background-color: var(--color-success, #28a745);
+}
+
+.btn-kick {
+  margin-top: 10px;
+  background-color: var(--color-danger, #dc3545);
+  margin-left: 10px;
+  padding: 4px 10px;
+  font-size: 18px;
+  color: white;
+}
+.btn-kick:hover {
+  background-color: #b71c1c;
+}
+
+.btn-transfer {
+  padding: 4px 10px;
+  font-size: 18px;
+  background-color: var(--color-warning, #ffc107);
+  margin-left: 10px;
+  color: black;
+}
+.btn-transfer:hover {
+  background-color: #e0a800;
+}
+
+.host-status {
+  color: var(--color-text-muted);
+  margin-left: 8px;
+}
+.lobby-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+.game-mode-display {
+  font-size: 1.2rem;
+  margin: 10px 0;
+}
+.mode-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #007bff, #00d4ff);
+  color: white;
+  font-weight: 600;
+  margin-left: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.mode-badge.muerte-subita {
+  background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
+}
+.modo-selector {
+  margin-top: 20px;
+  text-align: center;
+  width: 100%;
+}
+.modo-selector h3 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  color: var(--color-heading, #333);
+}
+.modo-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+.modo-btn {
+  position: relative;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: linear-gradient(145deg, #e3e3e3, #f9f9f9);
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: visible;
+  z-index: 1;
+}
+.modo-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+.modo-btn input {
+  display: none;
+}
+.modo-btn span {
+  position: relative;
+  z-index: 2;
+}
+.modo-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, #007bff, #00d4ff);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: 12px;
+  z-index: 1;
+}
+.modo-btn.active::before {
+  opacity: 1;
+}
+.modo-btn.active {
+  color: white;
+  transform: scale(1.05);
+}
+.modo-btn.muerte::before {
+  background: linear-gradient(120deg, #ff3b3b, #ff7e7e);
+}
+.modo-btn.muerte.active {
+  color: white;
+}
+.modo-btn:active {
+  transform: scale(0.98);
+}
+
+.modo-btn.contrarellotge::before {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+}
+
+.modo-btn.contrarellotge.active {
+  color: white;
+  transform: scale(1.05);
+}
+
+.mode-badge.contrarellotge {
+  background: linear-gradient(120deg, #4b016d, #7161ff);
+  color: white;
+  font-weight: 700;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip {
+  background: linear-gradient(120deg, #4b016d, #7161ff) !important;
+  color: #fff;
+}
+
+.mode-help.contrarellotge .mode-help-tooltip::after {
+  border-color: #7161ff transparent transparent transparent !important;
+}
+</style>

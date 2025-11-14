@@ -83,7 +83,7 @@ function cerrarResultados() {
       <p>{{ displayedMessage }}</p>
       <div class="actions">
         <button @click="emitirVolverInicio" style="margin-left: 8px">
-          Tornar al lobby
+          Tornar al laboratori
         </button>
         <button @click="toggleRanking">
           {{ showRanking ? 'Amagar ranking' : 'Veure ranking' }}
@@ -94,7 +94,7 @@ function cerrarResultados() {
           <thead>
             <tr>
               <th>Posició</th>
-              <th>Jugador</th>
+              <th>Científic</th>
               <th>Paraules</th>
               <th>Errors</th>
               <th>Velocitat (WPM)</th>
