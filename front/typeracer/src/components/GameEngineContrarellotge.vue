@@ -286,24 +286,14 @@ onMounted(() => {
     gameTimer = setInterval(() => {
       actualTime.value = Date.now();
       if (contrarellotgeTimeLeft.value <= 0 && !JuegoTerminado.value) {
-        perdedor.value = false;
-        ganador.value = false;
+        // Timer finished locally: compute winner/loser locally so GameResult
+        // displays for contrarellotge even if server hasn't emitted gameOver yet.
         JuegoTerminado.value = true;
         onGameEnd();
-        communicationManager.updatePlayerProgress({
-          completedWords: palabrasCompletadas.value,
-          totalErrors: totalErrors.value,
-          playTime: 30000,
-        });
-        perdidoMensaje.value = "S'ha acabat el temps!";
-        playSound('gameLose');
+        computeLocalWinner();
         clearInterval(gameTimer);
-        if (revealTimer) {
-          clearInterval(revealTimer);
-          revealTimer = null;
-        }
       }
-    }, 33);
+    }, 16); // ~60 FPS
   }
 
   if (
@@ -378,6 +368,17 @@ onMounted(() => {
   });
 
   communicationManager.onGameOver((data) => {
+    // En modo contrarellotge evitamos terminar la partida por un gameOver
+    // enviado por el servidor hasta que nuestro temporizador local llegue a 0.
+    if (props.modo === 'contrarellotge' && contrarellotgeTimeLeft.value > 0) {
+      // Ignorar gameOver temprano; el servidor puede enviar gameOver por seguridad,
+      // pero el cliente debe esperar a 0s para mostrar el final.
+      console.log(
+        'Ignorando gameOver del servidor hasta timeLeft 0 (contrarellotge).',
+        contrarellotgeTimeLeft.value,
+      );
+      return;
+    }
     if (JuegoTerminado.value) return;
     onGameEnd();
 
@@ -416,11 +417,52 @@ onMounted(() => {
       clearInterval(revealTimer);
       revealTimer = null;
     }
-    if (gameTimer) {
-      clearInterval(gameTimer);
-      gameTimer = null;
-    }
   });
+
+  // Decide local winner at end of contrarellotge if server doesn't yet send gameOver
+  function computeLocalWinner() {
+    try {
+      // If no players data, default to local player as loser with generic message
+      if (!Array.isArray(props.players) || props.players.length === 0) {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value = 'Temps esgotat. Consulta el ranking!';
+        return;
+      }
+
+      // Sort players by completedWords desc, errors asc
+      const ranking = [...props.players].sort((a, b) => {
+        const aw = a.completedWords || 0;
+        const bw = b.completedWords || 0;
+        if (bw !== aw) return bw - aw;
+        const ae = a.totalErrors || 0;
+        const be = b.totalErrors || 0;
+        return ae - be;
+      });
+
+      const top = ranking[0];
+      const meId = communicationManager.getId();
+
+      if (top && top.id === meId) {
+        ganador.value = true;
+        perdedor.value = false;
+        perdidoMensaje.value = 'Temps completat: tens el millor resultat!';
+        playSound('gameWin');
+      } else {
+        ganador.value = false;
+        perdedor.value = true;
+        perdidoMensaje.value = `Temps esgotat. ${
+          top?.name || 'Un altre jugador'
+        } ha obtingut millor resultat.`;
+        playSound('gameLose');
+      }
+    } catch (e) {
+      console.error('computeLocalWinner error', e);
+      ganador.value = false;
+      perdedor.value = true;
+      perdidoMensaje.value = 'Temps esgotat. Consulta el ranking!';
+    }
+  }
 
   if (!JuegoTerminado.value && !props.isSpectator) {
     revealTimer = setInterval(() => {
@@ -569,7 +611,10 @@ onMounted(() => {
           [MODO ESPECTADOR]
         </h3>
 
-        <div v-if="props.isSpectator && !JuegoTerminado" class="spectator-controls">
+        <div
+          v-if="props.isSpectator && !JuegoTerminado"
+          class="spectator-controls"
+        >
           <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
           <div class="spectator-targets">
             <button
@@ -609,7 +654,12 @@ onMounted(() => {
     </div>
 
     <div
-      v-if="perdedor && !JuegoTerminado && !isSpectator && props.modo !== 'contrarellotge'"
+      v-if="
+        perdedor &&
+        !JuegoTerminado &&
+        !isSpectator &&
+        props.modo !== 'contrarellotge'
+      "
       class="overlay-eliminado"
     >
       <div class="overlay-content">
@@ -856,7 +906,7 @@ onMounted(() => {
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 1rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 .spectator-back-btn:hover {
   transform: translateY(-1px);
