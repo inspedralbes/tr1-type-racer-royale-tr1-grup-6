@@ -665,7 +665,7 @@ io.on("connection", (socket) => {
 
       io.to(ganador.id).emit("playerWon", {
         winnerId: ganador.id,
-        message: "¡Enhorabona! Has guanyat tots els jugadors.",
+        message: "¡Enhorabona! Has guanyat tots els Científics.",
       });
 
       Array.from(room.players.values()).forEach((j) => {

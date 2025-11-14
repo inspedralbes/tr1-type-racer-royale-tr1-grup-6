@@ -8,6 +8,8 @@ import RoomSelector from './components/RoomSelector.vue';
 import communicationManager from './services/communicationManager.js';
 import { useSounds } from '@/composables/useSounds';
 import GameEngineContrarellotge from './components/GameEngineContrarellotge.vue';
+import DrAtomic from './components/DrAtomic.vue';
+import LabBackground from './components/LabBackground.vue'
 
 const { playSound, setVolume, playMenuMusic, playGameMusic, stopAllMusic } =
   useSounds();
@@ -85,6 +87,16 @@ function loadStateFromLocalStorage() {
 
 function volverInicio() {
   isReady.value = false;
+  // If we were spectating, inform server we leave the room so the server
+  // doesn't keep us listed as a spectator after returning to the rooms view.
+  try {
+    if (isSpectator.value || spectatorTargetId.value) {
+      communicationManager.leaveRoom();
+    }
+  } catch (e) {
+    // ignore errors if socket not connected
+  }
+
   isSpectator.value = false;
   spectatorTargetId.value = null;
   // Navegar al selector de salas
@@ -99,6 +111,23 @@ function volverInicio() {
   } catch (e) {
 
   }
+  stopAllMusic();
+}
+
+function volverAPantallaPrincipal() {
+  // Desconectar completamente y volver a 'salaEspera' para poner nombre nuevamente
+  localStorage.removeItem('typeRacerUser');
+  communicationManager.disconnect();
+  nomJugador.value = '';
+  isReady.value = false;
+  isSpectator.value = false;
+  spectatorTargetId.value = null;
+  vistaActual.value = 'salaEspera';
+  playersPayload.value = { players: [], hostId: null, spectators: [] };
+  socketId.value = null;
+  playerWords.value = [];
+  gameIntervalMs.value = 3000;
+  gameMaxStack.value = 20;
   stopAllMusic();
 }
 
@@ -270,8 +299,12 @@ communicationManager.onkicked(() => {
 </script>
 
 <template>
+  <LabBackground />
   <main>
     <DarkModeToggle />
+    
+    <DrAtomic v-if="vistaActual === 'salaEspera'" />
+
     <div v-if="vistaActual === 'salaEspera'" class="vista-container">
       <h1>Atomic Syntax</h1>
       <input
@@ -304,10 +337,13 @@ communicationManager.onkicked(() => {
 
     <div v-else-if="vistaActual === 'rooms'" class="vista-container-lobby">
       <RoomSelector />
+      <button class="btn-back-to-main" @click="volverAPantallaPrincipal">
+        Canviar Nom
+      </button>
     </div>
 
     <div v-else-if="vistaActual === 'lobby'" class="vista-container-lobby">
-      <h2>Refugiats Connectats</h2>
+      <h2>CIENTÍFICS CONNECTATS</h2>
       <div class="lobby-header" v-if="!isHost">
         <div class="game-mode-display">
           Mode actual:
@@ -399,7 +435,7 @@ communicationManager.onkicked(() => {
         >
           [INICIAR] (Supervisor)
         </button>
-        <button @click="volverInicio">Tornar a l'Inici</button>
+        <button @click="volverInicio">Tornar al laboratori</button>
         <div v-if="isHost && vistaActual === 'lobby'" class="modo-selector">
           <h3>Selecciona el mode de joc</h3>
           <div class="modo-buttons">
@@ -892,4 +928,33 @@ button.btn-host {
 .mode-help.contrarellotge .mode-help-tooltip::after {
   border-color: #7161ff transparent transparent transparent !important;
 }
+
+/* Botón para volver a pantalla principal desde rooms */
+.btn-back-to-main {
+  display: block;
+  margin-top: 20px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: var(--color-warning, #ffc107);
+  color: black;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-back-to-main:hover {
+  background-color: #e0a800;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-back-to-main:active {
+  transform: translateY(0);
+}
 </style>
+

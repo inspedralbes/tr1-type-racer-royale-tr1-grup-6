@@ -1,17 +1,17 @@
 <template>
   <div class="room-selector">
-    <h2>Sales disponibles</h2>
+    <h2>Cambres d’Assaig</h2>
 
     <div class="rooms-list">
       <div v-if="rooms.length === 0" class="empty">
-        No hi ha sales disponibles
+        No hi ha Sales d’Experimentació Actives
       </div>
       <ul>
         <li v-for="r in rooms" :key="r.id" class="room-item">
           <div class="room-info">
             <div class="room-name">
               {{ r.name }}
-              <span v-if="r.inGame" class="in-game-badge">En juego</span>
+              <span v-if="r.inGame" class="in-game-badge">Fent proves</span>
             </div>
             <div class="room-meta">
               <span>Jugadors: {{ r.count || 0 }}</span>
@@ -37,7 +37,7 @@
               :class="{ disabled: r.inGame }"
               :title="r.inGame ? 'No puedes unirte a una partida en curso' : ''"
             >
-              {{ r.inGame ? "En juego" : "Entrar" }}
+              {{ r.inGame ? "Fent proves" : "Entrar" }}
             </button>
             
             <button
@@ -55,7 +55,7 @@
 
     <div class="create-room">
       <input v-model="newRoomName" placeholder="Nom de la sala" />
-      <button @click="createRoom">Crear sala</button>
+      <button @click="createRoom">Crear Cambra</button>
     </div>
   </div>
 </template>
