@@ -209,7 +209,7 @@ function validarProgres() {
       wordStack: estatDelJoc.value.paraules,
     };
 
-    if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value) {
+    if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value && props.modo !== 'contrarellotge') {
       JuegoTerminado.value = true;
       onGameEnd();
       communicationManager.updatePlayerProgress(progressPayload);
@@ -430,8 +430,20 @@ onMounted(() => {
         return;
       }
 
+      const meId = communicationManager.getId();
+      const playersWithMyStats = props.players.map(p => {
+        if (p.id === meId) {
+          return {
+            ...p,
+            completedWords: palabrasCompletadas.value,
+            totalErrors: totalErrors.value
+          };
+        }
+        return p;
+      });
+
       // Sort players by completedWords desc, errors asc
-      const ranking = [...props.players].sort((a, b) => {
+      const ranking = playersWithMyStats.sort((a, b) => {
         const aw = a.completedWords || 0;
         const bw = b.completedWords || 0;
         if (bw !== aw) return bw - aw;
@@ -441,7 +453,6 @@ onMounted(() => {
       });
 
       const top = ranking[0];
-      const meId = communicationManager.getId();
 
       if (top && top.id === meId) {
         ganador.value = true;

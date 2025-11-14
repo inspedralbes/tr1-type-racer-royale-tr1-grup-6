@@ -54,10 +54,15 @@
       </ul>
     </div>
 
-    <div class="create-room">
-      <input v-model="newRoomName" placeholder="Nom de la sala" />
-      <button @click="createRoom">Crear Cambra</button>
-      <button @click="changeNameAndPipBoy">Canviar de Nom i Pip-Boy</button>
+    <div class="create-room-container">
+      <h3>Crear Nova Cambra d'Assaig</h3>
+      <div class="create-room-controls">
+        <input v-model="newRoomName" placeholder="Introdueix el nom..." />
+      </div>
+      <div class="create-room-buttons">
+        <button @click="createRoom">Crear Cambra</button>
+        <button @click="changeNameAndPipBoy">Canviar de Nom i Pip-Boy</button>
+      </div>
     </div>
   </div>
 </template>
@@ -177,19 +182,69 @@ onUnmounted(() => {
   border: 1px solid var(--color-border);
 }
 
-.create-room {
+.create-room-container {
+  margin-top: 24px;
+  padding: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-background);
+}
+
+.create-room-container h3 {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  color: var(--color-heading);
+  text-align: center;
+}
+
+.create-room-controls {
   display: flex;
-  gap: 8px;
+  gap: 12px;
+}
+
+.create-room-controls input {
+  flex-grow: 1;
+  font-family: var(--font-main);
+  font-size: 1.5rem;
+  padding: 10px 14px;
+  background: var(--color-background-soft);
+  border: 2px solid var(--color-border);
+  color: var(--color-heading);
+  border-radius: 6px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.create-room-controls input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 15px var(--shadow-color);
+}
+
+.create-room-buttons {
+  display: flex;
+  gap: 12px;
   margin-top: 12px;
 }
-.create-room input {
-  flex: 1;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
+
+.create-room-buttons button {
+  flex: 1; /* This will make them equal width */
+  font-size: 1.3rem; /* A medium size for both */
+  padding: 12px;
+  text-align: center;
 }
-.create-room button {
-  padding: 8px 12px;
+
+/* Style the primary button */
+.create-room-buttons button:first-child {
+  background-color: var(--color-primary);
+  color: var(--color-background);
+  border-color: var(--color-primary);
+}
+
+/* Style the secondary button */
+.create-room-buttons button:last-child {
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 .empty {
   color: var(--color-text);
