@@ -149,6 +149,7 @@ io.on("connection", (socket) => {
       spectatorCount: room.spectators.size, // NOU
       modo: room.gameState?.modo || "normal",
       inGame: room.gameState?.started || false,
+      gameOver: room.gameState?.gameOver || false,
     }));
     socket.emit("roomList", roomsList);
   });
@@ -165,6 +166,7 @@ io.on("connection", (socket) => {
       hostId: socket.id,
       gameState: {
         started: false,
+        gameOver: false,
         gameWords: [],
         maxStack: 20,
         intervalMs: 2000,
@@ -590,6 +592,7 @@ io.on("connection", (socket) => {
             message: 'Temps esgotat! Cap guanyador clar.',
           });
         }
+        room.gameState.gameOver = true;
       }, DURATION_MS);
   // Barra sincronitzada per a tothom cada 0,5 s
   const intervalTimer = setInterval(() => {
@@ -604,6 +607,7 @@ io.on("connection", (socket) => {
 
 
     room.gameState.started = true;
+    room.gameState.gameOver = false;
     room.gameState.modo = modo;
     room.gameState.gameWords = gamePayload.gameWords;
     io.to(roomId).emit("gameStart", gamePayload);
@@ -689,6 +693,7 @@ io.on("connection", (socket) => {
         winnerName: ganador.name,
         message: `${ganador.name} ha guanyat la partida.`,
       });
+      room.gameState.gameOver = true;
     }
   });
 
@@ -753,6 +758,7 @@ io.on("connection", (socket) => {
         winnerName: ganador.name,
         message: `${ganador.name} ha ganado la partida en modo muerte súbita.`,
       });
+      room.gameState.gameOver = true;
     }
   });
 });

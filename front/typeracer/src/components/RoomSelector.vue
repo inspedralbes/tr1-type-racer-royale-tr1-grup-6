@@ -33,18 +33,19 @@
           <div class="room-actions">
             <button
               @click="joinRoom(r.id)"
-              :disabled="r.inGame"
-              :class="{ disabled: r.inGame }"
-              :title="r.inGame ? 'No puedes unirte a una partida en curso' : ''"
+              :disabled="r.inGame && !r.gameOver"
+              :class="{ disabled: r.inGame && !r.gameOver }"
+              :title="r.inGame && !r.gameOver ? 'No puedes unirte a una partida en curso' : ''"
             >
-              {{ r.inGame ? 'Fent proves' : 'Entrar' }}
+              {{ r.inGame && !r.gameOver ? 'Fent proves' : 'Entrar' }}
             </button>
 
             <button
               v-if="r.inGame"
               @click="spectateRoom(r.id)"
               class="btn-spectate"
-              title="Entrar como espectador"
+              :title="r.gameOver ? 'La partida ha acabat' : 'Entrar como espectador'"
+              :disabled="r.gameOver"
             >
               Espiar
             </button>
