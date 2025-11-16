@@ -272,7 +272,22 @@ io.on("connection", (socket) => {
       return socket.emit('spectateError', { message: 'Sala no trobada.' });
     }
 
-    // Comprovar si ja és espectador
+    // NOU: Comprovar si el jugador ja està a la llista de jugadors i està eliminat.
+    const eliminatedPlayer = room.players.get(socket.id);
+    if (eliminatedPlayer && eliminatedPlayer.eliminated) {
+      console.log(
+        `[requestSpectate] Jugador eliminat ${eliminatedPlayer.name} ara és espectador.`,
+      );
+      // Simplement confirma al client que pot ser espectador.
+      // NO el moguis de la llista de jugadors.
+      return socket.emit('spectateSuccess', {
+        success: true,
+        roomId,
+        gameState: { ...room.gameState, hostId: room.hostId },
+      });
+    }
+
+    // Comprovar si ja és espectador (lògica original)
     if (room.spectators.has(socket.id)) {
       console.log(`[requestSpectate] El jugador ${socket.id} ja és espectador.`);
       return socket.emit('spectateSuccess', {
@@ -291,21 +306,21 @@ io.on("connection", (socket) => {
 
       if (name && color) {
         console.log(
-          `[requestSpectate] Jugador no actiu ${name} (${socket.id}) trobat en maps globals. Reconstruint per a espectador.`
+          `[requestSpectate] Jugador no actiu ${name} (${socket.id}) trobat en maps globals. Reconstruint per a espectador.`,
         );
         playerData = { id: socket.id, name, color };
         isEliminatedPlayer = true;
       } else {
         // Si no està en cap llista, és un socket desconegut.
         console.log(
-          `[requestSpectate] Socket ${socket.id} desconegut intentant ser espectador.`
+          `[requestSpectate] Socket ${socket.id} desconegut intentant ser espectador.`,
         );
         return socket.emit('spectateError', { message: 'Jugador desconegut.' });
       }
     }
 
     console.log(
-      `[requestSpectate] Movent jugador ${playerData.name} (id: ${socket.id}) a espectadors en sala ${roomId}`
+      `[requestSpectate] Movent jugador ${playerData.name} (id: ${socket.id}) a espectadors en sala ${roomId}`,
     );
 
     // Si el jugador estava a la llista activa, s'esborra.
