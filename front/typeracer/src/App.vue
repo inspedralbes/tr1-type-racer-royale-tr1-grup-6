@@ -208,6 +208,12 @@ function connectarAlServidor() {
         gameMaxStack.value = data.gameState.maxStack;
         modoJuego.value = data.gameState.modo;
         spectatorTargetId.value = data.gameState.hostId;
+
+        if (data.gameState.modo === 'contrarellotge' && data.gameState.deadline) {
+          const now = Date.now();
+          timeLeftGlobal.value = Math.max(data.gameState.deadline - now, 0);
+        }
+
         vistaActual.value = 'joc';
       } else {
         spectatorTargetId.value = data.gameState.hostId;

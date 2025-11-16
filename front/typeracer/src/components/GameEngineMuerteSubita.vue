@@ -266,8 +266,6 @@ function getClasseLletra(indexLletra) {
 
 // 6. CREAR FUNCIÓN PARA GUARDAR STATS AL SER ELIMINADO
 function saveEliminationStats() {
-  if (perdedor.value) return; // Ya se ha procesado
-
   const playTime = gameStartTime ? Date.now() - gameStartTime : 0;
   const finalStats = {
     playTime,
@@ -717,14 +715,14 @@ function finalizarJuego() {
         class="overlay-eliminado"
       >
         <div class="overlay-content">
-          <h2>Has sido eliminado</h2>
-          <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
+          <h2>Has estat eliminat</h2>
+          <p>{{ perdidoMensaje || 'Mala sort!' }}</p>
           <div class="opciones-perdedor">
             <button @click="convertirEnEspectador" class="btn btn-espectador">
-              Ver Partida
+              Veure Partida
             </button>
             <button @click="handleVolverInicio" class="btn btn-salir">
-              Salir al Lobby
+              Sortir al Lobby
             </button>
           </div>
         </div>
