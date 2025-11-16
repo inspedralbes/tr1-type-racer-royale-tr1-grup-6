@@ -492,7 +492,6 @@ onMounted(() => {
             letterErrors: Array.from({ length: nextText.length }, () => false),
           };
           estatDelJoc.value.paraules.unshift(newParaula);
-          playSound('newWord');
 
           communicationManager.updatePlayerProgress({
             wordStack: estatDelJoc.value.paraules,

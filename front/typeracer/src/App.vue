@@ -268,13 +268,13 @@ function transferHost(newHostId) {
 communicationManager.onHostTransferred(({ newHostId }) => {
   playersPayload.value.hostId = newHostId;
   if (newHostId === socketId.value) {
-    alert('Ahora eres el nuevo supervisor de la sala');
+    alert('Ara ets el nou supervisor de la sala');
   } else {
-    alert('El rol de supervisor ha sido transferido a otro jugador.');
+    alert('El rol de supervisor ha estat transferit a un altre jugador.');
   }
 });
 communicationManager.onkicked(() => {
-  alert('Has sido expulsado de la sala.');
+  alert('Has estat expulsat de la sala.');
   volverInicio();
 });
 </script>
@@ -354,7 +354,7 @@ communicationManager.onkicked(() => {
                   ? 'Si comets tres errors quedes eliminat.'
                   : modoJuego === 'contrarellotge'
                   ? "Fes tantes paraules com puguis abans que s'acabi el temps!"
-                  : 'Completa paraules; acumula 20 per quedar eliminat.'
+                  : 'Completa paraules; si acumules 20, quedes eliminat.'
               }}
             </span>
           </span>
@@ -377,17 +377,17 @@ communicationManager.onkicked(() => {
           </span>
           <template v-if="isHost && jugador.id !== socketId">
             <button @click="kickPlayer(jugador.id)" class="btn-kick">
-              Elimninar
+              Expulsar
             </button>
             <button @click="transferHost(jugador.id)" class="btn-transfer">
-              Transferir Supervisor
+              Transferir Supervisió
             </button>
           </template>
         </li>
       </ul>
 
       <div v-if="espectadors.length > 0" class="spectator-list">
-        <h3>Espectadors (Mirones)</h3>
+        <h3>Espectadors</h3>
         <ul>
           <li v-for="espectador in espectadors" :key="espectador.id">
             <span
@@ -431,7 +431,7 @@ communicationManager.onkicked(() => {
               <input type="radio" value="muerteSubita" v-model="modoJuego" />
               <span>Mort Súbita</span>
               <span class="tooltip"
-                >Tens 3 vides — al 3n error quedes eliminat.</span
+                >Tens 3 vides. Al tercer error, quedes eliminat.</span
               >
             </label>
             <label

@@ -39,11 +39,11 @@ const title = computed(() =>
 );
 const displayedMessage = computed(() => {
   if (props.message) return props.message;
-  
+
   if (props.modo === 'contrarellotge') {
-      if (props.winner) return "Temps completat: tens el millor resultat!";
-      if (props.loser) return "Temps exhaurit o no has estat el millor.";
-      return "Temps esgotat. Consulta el ranking!";
+    if (props.winner) return 'Temps completat: tens el millor resultat!';
+    if (props.loser) return 'Temps exhaurit o no has estat el millor.';
+    return 'Temps esgotat. Consulta el ranking!';
   }
 
   if (props.winner) {
@@ -81,9 +81,11 @@ function cerrarResultados() {
     <div class="result-card" :class="{ win: winner, lose: loser }">
       <DarkModeToggle />
       <h1>{{ title }}</h1>
-      <p v-if="modo === 'muerteSubita'" class="badge">Modo: Muerte Súbita</p>
+      <p v-if="modo === 'muerteSubita'" class="badge">Mode: Mort Súbita</p>
       <p>{{ displayedMessage }}</p>
-      <p v-if="modo === 'contrarellotge'" class="badge-contrarellotge">Modo: Contrarellotge</p>
+      <p v-if="modo === 'contrarellotge'" class="badge-contrarellotge">
+        Mode: Contrarellotge
+      </p>
       <div class="actions">
         <button @click="emitirVolverInicio" style="margin-left: 8px">
           Tornar al laboratori
@@ -218,7 +220,7 @@ function cerrarResultados() {
 
 .badge-contrarellotge {
   display: inline-block;
-  background: linear-gradient(120deg, #4b016d, #7161ff);  
+  background: linear-gradient(120deg, #4b016d, #7161ff);
   color: white;
   padding: 4px 10px;
   border-radius: 12px;

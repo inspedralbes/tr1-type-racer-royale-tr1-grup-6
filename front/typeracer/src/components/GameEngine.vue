@@ -834,11 +834,11 @@ onUnmounted(() => {
       class="overlay-eliminado"
     >
       <div class="overlay-content">
-        <h2>Has sido eliminado</h2>
-        <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
+        <h2>Has estat eliminat</h2>
+        <p>{{ perdidoMensaje || 'Mala sort!' }}</p>
         <div class="opciones-perdedor">
           <button @click="convertirEnEspectador" class="btn btn-espectador">
-            Ver Partida
+            Veure Partida
           </button>
           <button @click="handleVolverInicio" class="btn btn-salir">
             Salir al Lobby
@@ -857,6 +857,11 @@ onUnmounted(() => {
       :modo="props.modo"
       :isSpectator="props.isSpectator"
     />
+    <div v-if="JuegoTerminado && !isSpectator" class="final-actions">
+      <button @click="handleVolverInicio" class="btn btn-salir">
+        Sortir al Lobby
+      </button>
+    </div>
   </div>
 </template>
 

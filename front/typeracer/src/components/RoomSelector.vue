@@ -22,7 +22,7 @@
                 >Mode:
                 {{
                   r.modo === 'muerteSubita'
-                    ? 'Muerte Súbita'
+                    ? 'Mort Súbita'
                     : r.modo === 'contrarellotge'
                     ? 'Contrarellotge'
                     : 'Normal'
@@ -35,7 +35,11 @@
               @click="joinRoom(r.id)"
               :disabled="r.inGame && !r.gameOver"
               :class="{ disabled: r.inGame && !r.gameOver }"
-              :title="r.inGame && !r.gameOver ? 'No puedes unirte a una partida en curso' : ''"
+              :title="
+                r.inGame && !r.gameOver
+                  ? 'No puedes unirte a una partida en curso'
+                  : ''
+              "
             >
               {{ r.inGame && !r.gameOver ? 'Fent proves' : 'Entrar' }}
             </button>
@@ -44,7 +48,9 @@
               v-if="r.inGame"
               @click="spectateRoom(r.id)"
               class="btn-spectate"
-              :title="r.gameOver ? 'La partida ha acabat' : 'Entrar como espectador'"
+              :title="
+                r.gameOver ? 'La partida ha acabat' : 'Entrar como espectador'
+              "
               :disabled="r.gameOver"
             >
               Espiar
