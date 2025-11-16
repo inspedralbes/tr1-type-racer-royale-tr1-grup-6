@@ -48,7 +48,7 @@ onMounted(() => {
           >
             {{
               props.modo === 'muerteSubita'
-                ? 'Muerte Súbita'
+                ? 'Mort Subita'
                 : props.modo === 'contrarellotge'
                 ? 'Contrarellotge'
                 : 'Normal'

@@ -765,6 +765,30 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <div
+          v-if="props.isSpectator && !JuegoTerminado"
+          class="spectator-controls"
+        >
+          <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
+          <div class="spectator-targets">
+            <button
+              v-for="p in localPlayers"
+              :key="p.id"
+              @click="emit('switchSpectatorTarget', p.id)"
+              :class="{ 'target-active': p.id === props.spectatorTargetId }"
+              :title="
+                p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`
+              "
+              :disabled="p.eliminated"
+            >
+              {{ p.name.substring(0, 3) }}
+            </button>
+          </div>
+          <button @click="handleVolverInicio" class="spectator-exit-btn">
+            Sortir al Lobby
+          </button>
+        </div>
+
         <h3>[CIENTÍFICS]</h3>
         <ul>
           <li
@@ -1492,5 +1516,23 @@ onUnmounted(() => {
 .btn-salir {
   background-color: var(--color-background-mute);
   color: var(--color-text);
+}
+
+.spectator-exit-btn {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px 12px;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-main);
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
+  transition: background-color 0.2s;
+}
+.spectator-exit-btn:hover {
+  background-color: var(--color-border);
 }
 </style>

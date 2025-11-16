@@ -8,6 +8,9 @@ const actualTime = ref(Date.now());
 const contrarellotgeStartTime = ref(null);
 
 const contrarellotgeTimeLeft = computed(() => {
+  if (props.isSpectator) {
+    return props.timeLeft;
+  }
   if (!contrarellotgeStartTime.value) return 30000;
   const elapsed = actualTime.value - contrarellotgeStartTime.value;
   return Math.max(30000 - elapsed, 0);
@@ -209,7 +212,11 @@ function validarProgres() {
       wordStack: estatDelJoc.value.paraules,
     };
 
-    if (palabrasCompletadas.value >= 20 && !JuegoTerminado.value && props.modo !== 'contrarellotge') {
+    if (
+      palabrasCompletadas.value >= 20 &&
+      !JuegoTerminado.value &&
+      props.modo !== 'contrarellotge'
+    ) {
       JuegoTerminado.value = true;
       onGameEnd();
       communicationManager.updatePlayerProgress(progressPayload);
@@ -281,7 +288,7 @@ onMounted(() => {
   if (!props.isSpectator) {
     window.addEventListener('keydown', handleKeyDown);
   }
-  if (props.modo === 'contrarellotge') {
+  if (props.modo === 'contrarellotge' && !props.isSpectator) {
     contrarellotgeStartTime.value = Date.now();
     gameTimer = setInterval(() => {
       actualTime.value = Date.now();
@@ -431,12 +438,12 @@ onMounted(() => {
       }
 
       const meId = communicationManager.getId();
-      const playersWithMyStats = props.players.map(p => {
+      const playersWithMyStats = props.players.map((p) => {
         if (p.id === meId) {
           return {
             ...p,
             completedWords: palabrasCompletadas.value,
-            totalErrors: totalErrors.value
+            totalErrors: totalErrors.value,
           };
         }
         return p;
@@ -584,7 +591,7 @@ onMounted(() => {
           :value="displayedText"
           @input="textEntratLocal = $event.target.value"
           :placeholder="
-            props.isSpectator ? 'MODO ESPECTADOR' : '> Comença a escriure...'
+            props.isSpectator ? 'MODE ESPECTADOR' : '> Comença a escriure...'
           "
           :disabled="JuegoTerminado || perdedor"
           :readonly="props.isSpectator"
@@ -610,7 +617,7 @@ onMounted(() => {
 
       <aside class="players-sidebar">
         <h3 v-if="props.isSpectator" class="spectator-banner">
-          [MODO ESPECTADOR]
+          [MODE ESPECTADOR]
         </h3>
 
         <div
@@ -624,7 +631,9 @@ onMounted(() => {
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`"
+              :title="
+                p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`
+              "
               :disabled="p.eliminated"
             >
               {{ p.name.substring(0, 3) }}
@@ -666,14 +675,14 @@ onMounted(() => {
       class="overlay-eliminado"
     >
       <div class="overlay-content">
-        <h2>Has sido eliminado</h2>
+        <h2>Has sigut eliminat</h2>
         <p>{{ perdidoMensaje || '¡Mala suerte!' }}</p>
         <div class="opciones-perdedor">
           <button @click="convertirEnEspectador" class="btn btn-espectador">
-            Ver Partida
+            Veure Partida
           </button>
           <button @click="handleVolverInicio" class="btn btn-salir">
-            Salir al Lobby
+            Sortir al Lobby
           </button>
         </div>
       </div>
