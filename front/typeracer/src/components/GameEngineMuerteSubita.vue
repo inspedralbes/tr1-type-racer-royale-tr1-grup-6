@@ -26,18 +26,11 @@ const localPlayers = ref([]);
 // 3. AÑADIR WATCH PARA SINCRONIZAR LISTAS (SIN ELIMINAR)
 watch(
   () => props.players,
-  (propPlayers) => {
-    propPlayers.forEach((propP) => {
-      let localP = localPlayers.value.find((p) => p.id === propP.id);
-      if (localP) {
-        // Actualiza datos existentes
-        Object.assign(localP, propP);
-      } else {
-        // Añade nuevo jugador con 3 vidas por defecto (para este modo)
-        localPlayers.value.push({
-          ...JSON.parse(JSON.stringify(propP)),
-          lives: 3,
-        });
+  (newPlayers) => {
+    localPlayers.value = JSON.parse(JSON.stringify(newPlayers));
+    localPlayers.value.forEach((p) => {
+      if (p.lives === undefined) {
+        p.lives = 3;
       }
     });
   },
@@ -619,7 +612,7 @@ function finalizarJuego() {
             @input="textEntratLocal = $event.target.value"
             @keydown="handleKeyDown"
             :placeholder="
-              props.isSpectator ? 'MODO ESPECTADOR' : 'Comença a escriure...'
+              props.isSpectator ? 'MODE ESPECTADOR' : 'Comença a escriure...'
             "
             :disabled="JuegoTerminado || perdedor"
             :readonly="props.isSpectator"
@@ -653,7 +646,7 @@ function finalizarJuego() {
 
       <aside class="players-sidebar">
         <h3 v-if="props.isSpectator" class="spectator-banner">
-          [MODO ESPECTADOR]
+          [MODE ESPECTADOR]
         </h3>
 
         <div
@@ -667,7 +660,9 @@ function finalizarJuego() {
               :key="p.id"
               @click="emit('switchSpectatorTarget', p.id)"
               :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`"
+              :title="
+                p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`
+              "
               :disabled="p.eliminated"
             >
               {{ p.name.substring(0, 3) }}
@@ -706,7 +701,12 @@ function finalizarJuego() {
               [Paraules: {{ p.completedWords || 0 }}]
             </span>
             <div class="vidas-jugador">
-              <span v-for="n in p.lives === undefined ? 3 : p.lives" :key="n" class="corazon">❤️</span>
+              <span
+                v-for="n in p.lives === undefined ? 3 : p.lives"
+                :key="n"
+                class="corazon"
+                >❤️</span
+              >
             </div>
           </li>
         </ul>
@@ -999,7 +999,8 @@ function finalizarJuego() {
 }
 
 @keyframes heartbeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {

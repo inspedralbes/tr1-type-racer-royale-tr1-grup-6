@@ -375,11 +375,9 @@ onMounted(() => {
   });
 
   communicationManager.onGameOver((data) => {
-    // En modo contrarellotge evitamos terminar la partida por un gameOver
-    // enviado por el servidor hasta que nuestro temporizador local llegue a 0.
-    if (props.modo === 'contrarellotge' && contrarellotgeTimeLeft.value > 0) {
-      // Ignorar gameOver temprano; el servidor puede enviar gameOver por seguridad,
-      // pero el cliente debe esperar a 0s para mostrar el final.
+    // En modo contrarellotge, los JUGADORES esperan a que su timer local llegue a 0.
+    // Los espectadores deben pasar siempre.
+    if (!props.isSpectator && props.modo === 'contrarellotge' && contrarellotgeTimeLeft.value > 0) {
       console.log(
         'Ignorando gameOver del servidor hasta timeLeft 0 (contrarellotge).',
         contrarellotgeTimeLeft.value,

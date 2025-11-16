@@ -715,7 +715,7 @@ onUnmounted(() => {
             isTintaBloqueado
               ? '¡ESCRIBE &quot;NET&quot;!'
               : props.isSpectator
-              ? 'MODO ESPECTADOR'
+              ? 'MODE ESPECTADOR'
               : '> Comença a escriure...'
           "
           :disabled="JuegoTerminado || perdedor"
@@ -742,29 +742,8 @@ onUnmounted(() => {
 
       <aside class="players-sidebar">
         <h3 v-if="props.isSpectator" class="spectator-banner">
-          [MODO ESPECTADOR]
+          [MODE ESPECTADOR]
         </h3>
-        <div
-          v-if="props.isSpectator && !JuegoTerminado"
-          class="spectator-controls"
-        >
-          <h4>Mirant a: {{ watchedPlayer?.name || '...' }}</h4>
-          <div class="spectator-targets">
-            <button
-              v-for="p in localPlayers"
-              :key="p.id"
-              @click="emit('switchSpectatorTarget', p.id)"
-              :class="{ 'target-active': p.id === props.spectatorTargetId }"
-              :title="
-                p.eliminated ? `${p.name} (Eliminat)` : `Canviar a ${p.name}`
-              "
-              :disabled="p.eliminated"
-            >
-              {{ p.name.substring(0, 3) }}
-            </button>
-          </div>
-        </div>
-
         <div
           v-if="props.isSpectator && !JuegoTerminado"
           class="spectator-controls"
