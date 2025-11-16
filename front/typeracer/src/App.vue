@@ -293,6 +293,7 @@ communicationManager.onkicked(() => {
         v-model="nomJugador"
         placeholder="Introdueix el teu nom (Cientific)"
         @input="saveStateToLocalStorage"
+        @keydown.enter="connectarAlServidor"
       />
       <div class="color-picker-container">
         <label>Tria el teu color (Pip-Boy):</label>
