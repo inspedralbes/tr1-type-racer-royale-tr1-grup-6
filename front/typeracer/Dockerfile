@@ -1,5 +1,5 @@
 # Stage 1: Build the Vue application for production
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the production build with Nginx
-FROM nginx:stable-alpine as production
+FROM nginx:stable-alpine AS production
 
 # Copy the Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
@@ -33,7 +33,7 @@ CMD ["nginx", "-g", "daemon off;"]
 # Stage 3: Development environment setup (used by docker-compose.dev.yml)
 # This stage is primarily for installing node_modules.
 # The actual source code will be mounted as a volume by docker-compose.dev.yml.
-FROM node:20-alpine as development
+FROM node:20-alpine AS development
 
 WORKDIR /app
 
