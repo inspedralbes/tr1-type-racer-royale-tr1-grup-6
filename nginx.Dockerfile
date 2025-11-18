@@ -3,7 +3,7 @@
 # Utiliza una construcción multi-etapa para optimizar el tamaño de la imagen final.
 
 # Etapa 1: Construir la aplicación Vue para producción
-FROM node:20-alpine as frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 # Establecer el directorio de trabajo para la construcción del frontend
 WORKDIR /app
